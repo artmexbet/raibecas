@@ -1,0 +1,72 @@
+graph TB
+subgraph "Frontend Routes"
+Home["/ Home Page"]
+PhilList["/philosophers"]
+
+subgraph "Raibecas Namespace"
+RHome[/philosophers/raibecas]
+RDocs[/philosophers/raibecas/documents]
+RChat[/philosophers/raibecas/chat]
+end
+
+subgraph "Kant Namespace (Future)"
+KHome[/philosophers/kant]
+KDocs[/philosophers/kant/documents]
+KChat[/philosophers/kant/chat]
+end
+end
+
+subgraph "Backend - Author Configs"
+AuthorTable[(authors table)]
+ConfigTable[(author_chat_configs)]
+
+RConfig[Raibecas Config<br/>- system_prompt<br/>- model: llama3.1:8b<br/>- collection: raibecas_embeddings]
+
+KConfig[Kant Config<br/>- system_prompt<br/>- model: mistral:7b<br/>- collection: kant_embeddings]
+end
+
+subgraph "Vector Collections (pgvector)"
+RVectors[(raibecas_embeddings<br/>document_embeddings<br/>WHERE author_id='raibecas')]
+
+KVectors[(kant_embeddings<br/>document_embeddings<br/>WHERE author_id='kant')]
+end
+
+subgraph "Chat Service - Dynamic Routing"
+ChatSvc[Chat Service]
+
+ChatSvc -->|Load Config| RConfig
+ChatSvc -->|Load Config| KConfig
+
+ChatSvc -->|Query| RVectors
+ChatSvc -->|Query| KVectors
+end
+
+Home --> PhilList
+PhilList --> RHome
+PhilList --> KHome
+
+RHome --> RDocs & RChat
+KHome --> KDocs & KChat
+
+RChat --> ChatSvc
+KChat --> ChatSvc
+
+AuthorTable --> RConfig & KConfig
+ConfigTable --> RConfig & KConfig
+
+RConfig --> RVectors
+KConfig --> KVectors
+
+style Home fill:#e1f5ff
+style PhilList fill:#e1f5ff
+style RHome fill:#ffebee
+style RDocs fill:#ffebee
+style RChat fill:#ffebee
+style KHome fill:#e8f5e9
+style KDocs fill:#e8f5e9
+style KChat fill:#e8f5e9
+style ChatSvc fill:#3776ab
+style RConfig fill:#ff5722
+style KConfig fill:#4caf50
+style RVectors fill:#336791
+style KVectors fill:#336791

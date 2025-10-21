@@ -1,0 +1,50 @@
+sequenceDiagram
+    autonumber
+
+    actor Admin
+    participant Gateway as API Gateway
+    participant Corpus as Corpus Service
+    participant NATS
+    participant Indexing as Indexing Service
+    participant Ollama
+    participant PG as PostgreSQL<br/>(pgvector)
+    participant Meili as Meilisearch
+
+    Admin->>Gateway: POST /api/v1/documents<br/>(upload MD file)
+    Gateway->>Gateway: Validate JWT & Role
+    Gateway->>Corpus: Forward request
+
+    Corpus->>PG: INSERT INTO documents
+    PG-->>Corpus: document_id, version=1
+
+    Corpus->>PG: INSERT INTO document_versions
+
+    Corpus->>NATS: Publish:<br/>corpus.document.created<br/>{document_id, content, metadata}
+
+    Corpus-->>Gateway: 201 Created<br/>{document_id}
+    Gateway-->>Admin: Success Response
+
+    Note over NATS,Indexing: Async Processing Starts
+
+    NATS->>Indexing: Event: corpus.document.created
+
+    Indexing->>PG: SELECT content FROM documents
+    PG-->>Indexing: document content
+
+    Indexing->>Indexing: Split into chunks<br/>(~1000 tokens, 100 overlap)
+
+    loop For each chunk
+        Indexing->>Ollama: POST /api/embeddings<br/>{model: nomic-embed-text}
+        Ollama-->>Indexing: embedding vector (768d)
+        Indexing->>PG: INSERT INTO document_embeddings<br/>(document_id, chunk, embedding)
+    end
+
+    Indexing->>Meili: POST /indexes/documents<br/>(fulltext indexing)
+    Meili-->>Indexing: OK
+
+    Indexing->>NATS: Publish:<br/>indexing.document.indexed<br/>{document_id, chunks_count}
+
+    NATS->>Corpus: Event: indexing.document.indexed
+    Corpus->>PG: UPDATE documents<br/>SET indexed=true
+
+    Note over Admin,PG: Document ready for RAG queries

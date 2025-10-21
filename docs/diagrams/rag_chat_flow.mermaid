@@ -1,0 +1,64 @@
+sequenceDiagram
+    autonumber
+
+    actor User
+    participant Frontend as SvelteKit
+    participant Gateway as API Gateway<br/>(WebSocket)
+    participant NATS
+    participant Chat as Chat Service
+    participant Redis
+    participant PG as PostgreSQL<br/>(pgvector)
+    participant Ollama
+
+    User->>Frontend: Type message:<br/>"Что такое диалектика?"
+    Frontend->>Gateway: WebSocket msg:<br/>{message, session_id, mode: "popular"}
+
+    Gateway->>Gateway: Validate JWT
+
+    Gateway->>NATS: Publish:<br/>chat.query.{user_id}<br/>{message, session_id, mode}
+
+    NATS->>Chat: Event: chat.query
+
+    Chat->>Redis: GET chat:context:{session_id}
+    Redis-->>Chat: last 5 messages (context)
+
+    Note over Chat: Step 1: Generate Query Embedding
+    Chat->>Ollama: POST /api/embeddings<br/>{prompt: "Что такое диалектика?"}
+    Ollama-->>Chat: query_embedding (768d)
+
+    Note over Chat: Step 2: Semantic Search
+    Chat->>PG: SELECT * FROM document_embeddings<br/>ORDER BY embedding <=> query_embedding<br/>LIMIT 5
+    PG-->>Chat: Top 5 relevant chunks<br/>+ metadata
+
+    Note over Chat: Step 3: Build Context
+    Chat->>Chat: Format context:<br/>- Relevant chunks<br/>- Conversation history<br/>- Mode-specific prompt
+
+    Note over Chat: Step 4: LLM Generation
+    Chat->>Ollama: POST /api/chat (stream=true)<br/>{model: llama3.1:8b,<br/>messages: [system, context, query]}
+
+    loop Stream tokens
+        Ollama-->>Chat: {chunk: "Диалектика — это..."}
+        Chat->>NATS: Publish:<br/>chat.response.chunk.{session_id}
+        NATS->>Gateway: Forward chunk
+        Gateway->>Frontend: WebSocket: chunk
+        Frontend->>User: Display streaming text
+    end
+
+    Ollama-->>Chat: {done: true}
+
+    Note over Chat: Step 5: Save to History
+    Chat->>NATS: Publish:<br/>chat.message.created<br/>{session_id, role, content, sources}
+
+    NATS->>Chat: Ack
+
+    Chat->>Redis: SET chat:context:{session_id}<br/>(update context cache)
+
+    Chat->>Gateway: WebSocket: {type: "complete", sources: [...]}
+    Gateway->>Frontend: Display sources
+    Frontend->>User: Show cited documents
+
+    Note over NATS,User: Async: Save to DB
+
+    NATS->>User: Event: chat.message.created
+    participant UserSvc as User Service
+    UserSvc->>PG: INSERT INTO chat_messages

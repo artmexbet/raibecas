@@ -1,0 +1,75 @@
+sequenceDiagram
+    autonumber
+
+    actor User1 as User 1
+    participant Frontend as SvelteKit
+    participant Gateway as API Gateway
+    participant UserSvc as User Service
+    participant PG as PostgreSQL
+    actor User2 as User 2
+
+    Note over User1,Frontend: User selects text on document page
+
+    User1->>Frontend: Select text (mouse up)
+    Frontend->>Frontend: Calculate offsets:<br/>start=1523, end=1789
+    Frontend->>Frontend: Extract context:<br/>±200 chars
+
+    User1->>Frontend: Click "Save Fragment"
+
+    Frontend->>Gateway: POST /api/v1/fragments<br/>{document_id, start, end,<br/>selected_text, context_before,<br/>context_after}
+
+    Gateway->>Gateway: Validate JWT
+
+    Gateway->>UserSvc: Forward request
+
+    UserSvc->>UserSvc: Generate share_token:<br/>random(32)
+
+    UserSvc->>UserSvc: Calculate content_hash:<br/>SHA256(selected_text)
+
+    UserSvc->>PG: INSERT INTO fragments<br/>(user_id, document_id,<br/>document_version, offsets,<br/>text, context, hash, token)
+
+    PG-->>UserSvc: fragment_id
+
+    UserSvc->>UserSvc: Build share URL:<br/>/fragments/{token}
+
+    UserSvc-->>Gateway: 201 Created<br/>{fragment_id, share_url}
+
+    Gateway-->>Frontend: Response
+
+    Frontend->>User1: Show "Saved!" +<br/>Copy share link button
+
+    Note over User1,User2: User 1 shares link with User 2
+
+    User1->>User2: Send URL:<br/>https://app.com/fragments/abc123xyz
+
+    User2->>Frontend: Open link
+
+    Frontend->>Gateway: GET /fragments/abc123xyz
+
+    Gateway->>UserSvc: Forward request
+
+    UserSvc->>PG: SELECT * FROM fragments<br/>WHERE share_token='abc123xyz'
+
+    PG-->>UserSvc: fragment data
+
+    UserSvc->>PG: SELECT content, version<br/>FROM documents<br/>WHERE id={document_id}
+
+    PG-->>UserSvc: current document content
+
+    Note over UserSvc: Check if fragment still valid
+
+    alt Exact match found
+        UserSvc->>UserSvc: Find exact text at offsets
+        UserSvc-->>Gateway: {fragment, position, exact: true}
+    else Text changed (fuzzy match)
+        UserSvc->>UserSvc: Fuzzy search using context
+        UserSvc-->>Gateway: {fragment, position,<br/>exact: false, outdated: true}
+    else Not found
+        UserSvc-->>Gateway: {fragment, position: null,<br/>outdated: true,<br/>saved_text: "..."}
+    end
+
+    Gateway-->>Frontend: Response
+
+    Frontend->>Frontend: Scroll to position<br/>+ Highlight fragment
+
+    Frontend->>User2: Show document with<br/>highlighted text

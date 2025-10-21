@@ -1,0 +1,83 @@
+graph LR
+    subgraph "Publishers"
+        Auth[Auth Service]
+        Corpus[Corpus Service]
+        User[User Service]
+        Indexing[Indexing Service]
+        Chat[Chat Service]
+    end
+
+    subgraph "NATS JetStream"
+        direction TB
+
+        subgraph "Streams"
+            AuthStream[AUTH Stream<br/>auth.>]
+            DocsStream[DOCUMENTS Stream<br/>corpus.>]
+            UserStream[USER Stream<br/>user.>]
+            IndexStream[INDEXING Stream<br/>indexing.>]
+            ChatStream[CHAT Stream<br/>chat.>]
+        end
+
+        subgraph "Subjects"
+            A1[auth.user.registered]
+            A2[auth.user.login]
+            A3[auth.password.reset]
+
+            D1[corpus.document.created]
+            D2[corpus.document.updated]
+            D3[corpus.document.deleted]
+            D4[corpus.author.created]
+
+            U1[user.fragment.created]
+            U2[user.note.created]
+            U3[user.chat.history_deleted]
+
+            I1[indexing.document.indexed]
+            I2[indexing.document.failed]
+
+            C1[chat.message.created]
+            C2[chat.session.started]
+        end
+    end
+
+    subgraph "Subscribers"
+        Auth2[Auth Service]
+        Corpus2[Corpus Service]
+        User2[User Service]
+        Indexing2[Indexing Service]
+        Chat2[Chat Service]
+    end
+
+    Auth -->|Publish| AuthStream
+    Corpus -->|Publish| DocsStream
+    User -->|Publish| UserStream
+    Indexing -->|Publish| IndexStream
+    Chat -->|Publish| ChatStream
+
+    AuthStream --> A1 & A2 & A3
+    DocsStream --> D1 & D2 & D3 & D4
+    UserStream --> U1 & U2 & U3
+    IndexStream --> I1 & I2
+    ChatStream --> C1 & C2
+
+    A1 & A2 & A3 -->|Subscribe| Auth2
+    D1 & D2 & D3 -->|Subscribe| Indexing2
+    D1 & D2 -->|Subscribe| User2
+    I1 -->|Subscribe| Corpus2
+    C1 -->|Subscribe| User2
+
+    style Auth fill:#00add8
+    style Corpus fill:#00add8
+    style User fill:#00add8
+    style Indexing fill:#3776ab
+    style Chat fill:#3776ab
+    style Auth2 fill:#00add8
+    style Corpus2 fill:#00add8
+    style User2 fill:#00add8
+    style Indexing2 fill:#3776ab
+    style Chat2 fill:#3776ab
+    style AuthStream fill:#27aae1
+    style DocsStream fill:#27aae1
+    style UserStream fill:#27aae1
+    style IndexStream fill:#27aae1
+    style ChatStream fill:#27aae1

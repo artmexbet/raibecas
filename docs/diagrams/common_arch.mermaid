@@ -1,0 +1,112 @@
+graph TB
+    subgraph "Client Layer"
+        Browser[Web Browser]
+        Mobile[Mobile Browser]
+    end
+
+    subgraph "Edge Layer"
+        Nginx[Nginx<br/>Reverse Proxy<br/>SSL Termination]
+    end
+
+    subgraph "Frontend"
+        Svelte[SvelteKit App<br/>SSR/CSR Hybrid<br/>Port 3000]
+    end
+
+    subgraph "API Layer"
+        Gateway[API Gateway<br/>Go + Fiber<br/>Port 8080<br/>- Auth Middleware<br/>- Rate Limiting<br/>- WebSocket Handler]
+    end
+
+    subgraph "Message Broker"
+        NATS[NATS JetStream<br/>Port 4222<br/>- Pub/Sub<br/>- Event Persistence<br/>- Request-Reply]
+    end
+
+    subgraph "Microservices"
+        Auth[Auth Service<br/>Go - Port 8081<br/>- Registration<br/>- Login/Logout<br/>- JWT Management]
+
+        Corpus[Corpus Service<br/>Go - Port 8082<br/>- Documents CRUD<br/>- Authors<br/>- Versioning]
+
+        User[User Service<br/>Go - Port 8083<br/>- Fragments<br/>- Notes<br/>- Chat History]
+
+        Indexing[Indexing Service<br/>Python - Port 8084<br/>- Chunking<br/>- Embeddings<br/>- Vector Indexing]
+
+        Chat[Chat Service<br/>Python - Port 8085<br/>- RAG Pipeline<br/>- LLM Integration<br/>- Streaming]
+    end
+
+    subgraph "Data Layer"
+        Postgres[(PostgreSQL<br/>+ pgvector<br/>Port 5432)]
+        Redis[(Redis<br/>Cache & Sessions<br/>Port 6379)]
+        Meili[(Meilisearch<br/>Fulltext Search<br/>Port 7700)]
+    end
+
+    subgraph "AI Layer"
+        Ollama[Ollama Server<br/>Port 11434<br/>- llama3.1:8b<br/>- nomic-embed-text]
+    end
+
+    subgraph "Monitoring"
+        Prometheus[Prometheus<br/>Metrics]
+        Grafana[Grafana<br/>Dashboards]
+        Loki[Loki<br/>Logs]
+    end
+
+    Browser --> Nginx
+    Mobile --> Nginx
+    Nginx --> Svelte
+    Nginx --> Gateway
+
+    Svelte <--> Gateway
+    Gateway <--> NATS
+
+    NATS <--> Auth
+    NATS <--> Corpus
+    NATS <--> User
+    NATS <--> Indexing
+    NATS <--> Chat
+
+    Auth --> Postgres
+    Auth --> Redis
+
+    Corpus --> Postgres
+    Corpus --> Meili
+
+    User --> Postgres
+
+    Indexing --> Postgres
+    Indexing --> Meili
+    Indexing --> Ollama
+
+    Chat --> Postgres
+    Chat --> Redis
+    Chat --> Ollama
+
+    Auth -.-> Prometheus
+    Corpus -.-> Prometheus
+    User -.-> Prometheus
+    Indexing -.-> Prometheus
+    Chat -.-> Prometheus
+
+    Prometheus --> Grafana
+
+    Auth -.-> Loki
+    Corpus -.-> Loki
+    User -.-> Loki
+    Indexing -.-> Loki
+    Chat -.-> Loki
+
+    style Browser fill:#e1f5ff
+    style Mobile fill:#e1f5ff
+    style Nginx fill:#4caf50
+    style Svelte fill:#ff3e00
+    style Gateway fill:#00add8
+    style NATS fill:#27aae1
+    style Auth fill:#00add8
+    style Corpus fill:#00add8
+    style User fill:#00add8
+    style Indexing fill:#3776ab
+    style Chat fill:#3776ab
+    style Postgres fill:#336791
+    style Redis fill:#dc382d
+    style Meili fill:#ff5c8d
+    style Ollama fill:#000000
+    style Prometheus fill:#e6522c
+    style Grafana fill:#f46800
+    style Loki fill:#f46800
