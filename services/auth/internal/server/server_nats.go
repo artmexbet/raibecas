@@ -78,7 +78,8 @@ func NewNATS(cfg *config.Config) (*NATS, error) {
 
 	pgs := postgres.New(pool)
 	// Initialize repositories
-	regRepo := repository.NewRegistrationRepository(pool)
+	authRepo := repository.NewAuthRepository(pgs)
+	regRepo := repository.NewRegistrationRepository(pgs)
 
 	// Initialize stores
 	tokenStore := storeredis.NewTokenStore(redisClient)
@@ -92,8 +93,8 @@ func NewNATS(cfg *config.Config) (*NATS, error) {
 	)
 
 	// Initialize services
-	authService := service.NewAuthService(pgs, tokenStore, jwtManager)
-	regService := service.NewRegistrationService(regRepo, pgs)
+	authService := service.NewAuthService(authRepo, tokenStore, jwtManager)
+	regService := service.NewRegistrationService(regRepo, authRepo)
 
 	// Initialize NATS publisher and subscriber
 	publisher := nats.NewPublisher(natsConn)

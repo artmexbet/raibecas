@@ -59,5 +59,20 @@ func (p *Postgres) UpdateRegistrationRequestStatus(ctx context.Context, id uuid.
 	return nil
 }
 
-// TODO: Add more methods
-// TODO: Create repository level wrapping this postgres methods
+func (p *Postgres) ExistsPendingRegistrationByEmail(ctx context.Context, email string) (bool, error) {
+	exists, err := p.q.RegistrationExistsByEmail(ctx, email)
+	if err != nil {
+		return false, fmt.Errorf("could not check existence of pending registration by email: %v", err)
+	}
+
+	return exists, nil
+}
+
+func (p *Postgres) ExistsPendingRegistrationByUsername(ctx context.Context, username string) (bool, error) {
+	exists, err := p.q.RegistrationExistsByUsername(ctx, username)
+	if err != nil {
+		return false, fmt.Errorf("could not check existence of pending registration by username: %v", err)
+	}
+
+	return exists, nil
+}
