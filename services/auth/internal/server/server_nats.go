@@ -1,16 +1,17 @@
 package server
 
 import (
+	"auth/internal/postgres"
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"auth/internal/config"
-	natshandler "auth/internal/handler/nats"
+	"auth/internal/handler"
 	"auth/internal/nats"
 	"auth/internal/repository"
 	"auth/internal/service"
@@ -22,18 +23,18 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// ServerNATS represents the NATS-based auth service server
-type ServerNATS struct {
-	cfg            *config.Config
-	pool           *pgxpool.Pool
-	redis          *redis.Client
-	natsConn       *natsgo.Conn
-	subscriber     *nats.Subscriber
-	subscriptions  []*natsgo.Subscription
+// NATS represents the NATS-based auth service server
+type NATS struct {
+	cfg           *config.Config
+	pool          *pgxpool.Pool
+	redis         *redis.Client
+	natsConn      *natsgo.Conn
+	subscriber    *nats.Subscriber
+	subscriptions []*natsgo.Subscription
 }
 
 // NewNATS creates a new NATS-based server instance
-func NewNATS(cfg *config.Config) (*ServerNATS, error) {
+func NewNATS(cfg *config.Config) (*NATS, error) {
 	ctx := context.Background()
 
 	// Initialize database connection pool
@@ -75,9 +76,10 @@ func NewNATS(cfg *config.Config) (*ServerNATS, error) {
 		return nil, fmt.Errorf("failed to connect to NATS: %w", err)
 	}
 
+	pgs := postgres.New(pool)
 	// Initialize repositories
-	userRepo := repository.NewUserRepository(pool)
-	regRepo := repository.NewRegistrationRepository(pool)
+	authRepo := repository.NewAuthRepository(pgs)
+	regRepo := repository.NewRegistrationRepository(pgs)
 
 	// Initialize stores
 	tokenStore := storeredis.NewTokenStore(redisClient)
@@ -91,19 +93,19 @@ func NewNATS(cfg *config.Config) (*ServerNATS, error) {
 	)
 
 	// Initialize services
-	authService := service.NewAuthService(userRepo, tokenStore, jwtManager)
-	regService := service.NewRegistrationService(regRepo, userRepo)
+	authService := service.NewAuthService(authRepo, tokenStore, jwtManager)
+	regService := service.NewRegistrationService(regRepo, authRepo)
 
 	// Initialize NATS publisher and subscriber
 	publisher := nats.NewPublisher(natsConn)
 	subscriber := nats.NewSubscriber(natsConn, regService, publisher)
 
 	// Initialize NATS handlers
-	authHandler := natshandler.NewAuthHandler(authService, publisher)
-	regHandler := natshandler.NewRegistrationHandler(regService, publisher)
+	authHandler := handler.NewAuthHandler(authService, publisher)
+	regHandler := handler.NewRegistrationHandler(regService, publisher)
 
 	// Setup NATS subscriptions
-	server := &ServerNATS{
+	server := &NATS{
 		cfg:           cfg,
 		pool:          pool,
 		redis:         redisClient,
@@ -126,7 +128,7 @@ func NewNATS(cfg *config.Config) (*ServerNATS, error) {
 }
 
 // setupSubscriptions sets up NATS request/reply subscriptions
-func (s *ServerNATS) setupSubscriptions(authHandler *natshandler.AuthHandler, regHandler *natshandler.RegistrationHandler) error {
+func (s *NATS) setupSubscriptions(authHandler *handler.AuthHandler, regHandler *handler.RegistrationHandler) error {
 	var err error
 
 	// Auth service subscriptions
@@ -172,43 +174,37 @@ func (s *ServerNATS) setupSubscriptions(authHandler *natshandler.AuthHandler, re
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	log.Println("NATS subscriptions setup complete:")
-	log.Println("  - auth.register")
-	log.Println("  - auth.login")
-	log.Println("  - auth.refresh")
-	log.Println("  - auth.validate")
-	log.Println("  - auth.logout")
-	log.Println("  - auth.logout_all")
-	log.Println("  - auth.change_password")
+	slog.Info("NATS subscriptions setup complete",
+		"topics", []string{"auth.register", "auth.login", "auth.refresh", "auth.validate", "auth.logout", "auth.logout_all", "auth.change_password"})
 
 	return nil
 }
 
 // Start starts the NATS server
-func (s *ServerNATS) Start() error {
-	log.Printf("Auth service is ready and listening on NATS topics")
+func (s *NATS) Start() error {
+	slog.Info("Auth service is ready and listening on NATS topics")
 
 	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down auth service...")
+	slog.Info("Shutting down auth service...")
 	return s.Shutdown()
 }
 
 // Shutdown gracefully shuts down the server
-func (s *ServerNATS) Shutdown() error {
+func (s *NATS) Shutdown() error {
 	// Unsubscribe from all topics
 	for _, sub := range s.subscriptions {
 		if err := sub.Unsubscribe(); err != nil {
-			log.Printf("Error unsubscribing: %v", err)
+			slog.Error("Error unsubscribing", "error", err)
 		}
 	}
 
 	// Stop NATS event subscribers
 	if err := s.subscriber.Stop(); err != nil {
-		log.Printf("Error stopping NATS subscribers: %v", err)
+		slog.Error("Error stopping NATS subscribers", "error", err)
 	}
 
 	// Close NATS connection
@@ -216,12 +212,12 @@ func (s *ServerNATS) Shutdown() error {
 
 	// Close Redis connection
 	if err := s.redis.Close(); err != nil {
-		log.Printf("Error closing Redis connection: %v", err)
+		slog.Error("Error closing Redis connection", "error", err)
 	}
 
 	// Close database connection pool
 	s.pool.Close()
 
-	log.Println("Auth service shut down successfully")
+	slog.Info("Auth service shut down successfully")
 	return nil
 }

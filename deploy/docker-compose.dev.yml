@@ -48,8 +48,8 @@ services:
 
   auth-service:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../services/auth
+      dockerfile: ../services/auth/Dockerfile
     environment:
       DB_HOST: postgres
       DB_PORT: 5432

@@ -9,6 +9,10 @@ import (
 // UserRole represents user roles in the system
 type UserRole string
 
+func (u UserRole) String() string {
+	return string(u)
+}
+
 const (
 	RoleUser  UserRole = "user"
 	RoleAdmin UserRole = "admin"
@@ -28,6 +32,10 @@ type User struct {
 
 // RegistrationStatus represents the status of a registration request
 type RegistrationStatus string
+
+func (r RegistrationStatus) String() string {
+	return string(r)
+}
 
 const (
 	StatusPending  RegistrationStatus = "pending"
@@ -58,4 +66,42 @@ type RefreshToken struct {
 	IPAddress string    `json:"ip_address"`
 	ExpiresAt time.Time `json:"expires_at"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// LoginRequest represents a login request
+type LoginRequest struct {
+	Email     string
+	Password  string
+	DeviceID  string
+	UserAgent string
+	IPAddress string
+}
+
+// TokenPair represents access and refresh tokens
+type TokenPair struct {
+	AccessToken  string
+	RefreshToken string
+}
+
+// RefreshRequest represents a token refresh request
+type RefreshRequest struct {
+	RefreshToken string
+	DeviceID     string
+	UserAgent    string
+	IPAddress    string
+}
+
+// ChangePasswordRequest represents a password change request
+type ChangePasswordRequest struct {
+	UserID      uuid.UUID
+	OldPassword string
+	NewPassword string
+}
+
+// RegisterRequest represents a registration request
+type RegisterRequest struct {
+	Username string
+	Email    string
+	Password string
+	Metadata map[string]any
 }

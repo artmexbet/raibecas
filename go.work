@@ -3,5 +3,5 @@ go 1.25.1
 use (
 	./services/auth
 	./services/gateway
-	./libs/proto
+	libs/utills
 )

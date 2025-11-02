@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"time"
 
 	"auth/internal/domain"
 
@@ -26,14 +25,14 @@ type RegistrationRepository interface {
 // RegistrationService handles registration business logic
 type RegistrationService struct {
 	regRepo    RegistrationRepository
-	userRepo   UserRepository
+	userRepo   IUserRepository
 	bcryptCost int
 }
 
 // NewRegistrationService creates a new registration service
 func NewRegistrationService(
 	regRepo RegistrationRepository,
-	userRepo UserRepository,
+	userRepo IUserRepository,
 ) *RegistrationService {
 	return &RegistrationService{
 		regRepo:    regRepo,
@@ -42,16 +41,8 @@ func NewRegistrationService(
 	}
 }
 
-// RegisterRequest represents a registration request
-type RegisterRequest struct {
-	Username string
-	Email    string
-	Password string
-	Metadata map[string]any
-}
-
 // CreateRegistrationRequest creates a new registration request
-func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req RegisterRequest) (uuid.UUID, error) {
+func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req domain.RegisterRequest) (uuid.UUID, error) {
 	// Validate email format
 	if !emailRegex.MatchString(req.Email) {
 		return uuid.Nil, domain.ErrInvalidEmail
@@ -102,16 +93,12 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 		return uuid.Nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// Create registration request
+	// CreateUser registration request
 	regReq := &domain.RegistrationRequest{
-		ID:        uuid.New(),
-		Username:  req.Username,
-		Email:     req.Email,
-		Password:  string(hashedPassword),
-		Status:    domain.StatusPending,
-		Metadata:  req.Metadata,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Username: req.Username,
+		Email:    req.Email,
+		Password: string(hashedPassword),
+		Metadata: req.Metadata,
 	}
 
 	if err := s.regRepo.Create(ctx, regReq); err != nil {
@@ -134,16 +121,11 @@ func (s *RegistrationService) ApproveRegistration(ctx context.Context, requestID
 		return nil, domain.ErrRegistrationNotPending
 	}
 
-	// Create user
+	// CreateUser user
 	user := &domain.User{
-		ID:           uuid.New(),
 		Username:     regReq.Username,
 		Email:        regReq.Email,
 		PasswordHash: regReq.Password, // Already hashed
-		Role:         domain.RoleUser,
-		IsActive:     true,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
 	}
 
 	if err := s.userRepo.Create(ctx, user); err != nil {
