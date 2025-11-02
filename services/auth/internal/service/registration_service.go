@@ -26,14 +26,14 @@ type RegistrationRepository interface {
 // RegistrationService handles registration business logic
 type RegistrationService struct {
 	regRepo    RegistrationRepository
-	userRepo   UserRepository
+	userRepo   IUserRepository
 	bcryptCost int
 }
 
 // NewRegistrationService creates a new registration service
 func NewRegistrationService(
 	regRepo RegistrationRepository,
-	userRepo UserRepository,
+	userRepo IUserRepository,
 ) *RegistrationService {
 	return &RegistrationService{
 		regRepo:    regRepo,

@@ -17,7 +17,7 @@ type IAuthService interface {
 	ValidateAccessToken(context.Context, string) (*jwt.Claims, error)
 	Login(context.Context, domain.LoginRequest) (*domain.TokenPair, uuid.UUID, error)
 	RefreshTokens(context.Context, domain.RefreshRequest) (*domain.TokenPair, uuid.UUID, error)
-	Logout(ctx context.Context, userID uuid.UUID) error
+	Logout(ctx context.Context, userID uuid.UUID, token string) error
 	LogoutAll(ctx context.Context, userID uuid.UUID) error
 	ChangePassword(ctx context.Context, req domain.ChangePasswordRequest) error
 }
@@ -146,7 +146,7 @@ func (h *AuthHandler) HandleLogout(msg *natspkg.Msg) {
 		return
 	}
 
-	if err := h.authService.Logout(ctx, req.UserID); err != nil {
+	if err := h.authService.Logout(ctx, req.UserID, req.Token); err != nil {
 		h.respondError(msg, "Failed to logout")
 		return
 	}

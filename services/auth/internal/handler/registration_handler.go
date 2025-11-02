@@ -3,7 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"time"
 
 	"auth/internal/domain"
@@ -72,12 +72,12 @@ func (h *RegistrationHandler) respond(msg *natspkg.Msg, data any, err error) {
 
 	response, err := json.Marshal(resp)
 	if err != nil {
-		log.Printf("Failed to marshal response: %v", err)
+		slog.Error("Failed to marshal response", "error", err)
 		return
 	}
 
 	if err := msg.Respond(response); err != nil {
-		log.Printf("Failed to send response: %v", err)
+		slog.Error("Failed to send response", "error", err)
 	}
 }
 
@@ -89,11 +89,11 @@ func (h *RegistrationHandler) respondError(msg *natspkg.Msg, errorMsg string) {
 
 	response, err := json.Marshal(resp)
 	if err != nil {
-		log.Printf("Failed to marshal error response: %v", err)
+		slog.Error("Failed to marshal error response", "error", err)
 		return
 	}
 
 	if err := msg.Respond(response); err != nil {
-		log.Printf("Failed to send error response: %v", err)
+		slog.Error("Failed to send error response", "error", err)
 	}
 }
