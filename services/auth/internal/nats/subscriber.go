@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"auth/internal/domain"
@@ -45,7 +45,7 @@ type RegistrationRejectedEvent struct {
 }
 
 // Start starts all NATS subscriptions
-func (s *Subscriber) Start(ctx context.Context) error {
+func (s *Subscriber) Start(_ context.Context) error {
 	// Subscribe to registration approved events
 	sub1, err := s.conn.Subscribe("admin.registration.approved", s.handleRegistrationApproved)
 	if err != nil {
@@ -60,7 +60,7 @@ func (s *Subscriber) Start(ctx context.Context) error {
 	}
 	s.subscribers = append(s.subscribers, sub2)
 
-	log.Println("NATS subscribers started successfully")
+	slog.Info("NATS subscribers started successfully")
 	return nil
 }
 
@@ -71,7 +71,7 @@ func (s *Subscriber) Stop() error {
 			return fmt.Errorf("failed to unsubscribe: %w", err)
 		}
 	}
-	log.Println("NATS subscribers stopped successfully")
+	slog.Info("NATS subscribers stopped successfully")
 	return nil
 }
 
@@ -79,7 +79,7 @@ func (s *Subscriber) Stop() error {
 func (s *Subscriber) handleRegistrationApproved(msg *nats.Msg) {
 	var event RegistrationApprovedEvent
 	if err := json.Unmarshal(msg.Data, &event); err != nil {
-		log.Printf("Failed to unmarshal registration approved event: %v", err)
+		slog.Error("Failed to unmarshal registration approved event", "error", err)
 		return
 	}
 
@@ -88,11 +88,11 @@ func (s *Subscriber) handleRegistrationApproved(msg *nats.Msg) {
 	// Approve registration and create user
 	user, err := s.regService.ApproveRegistration(ctx, event.RequestID, event.ApproverID)
 	if err != nil {
-		log.Printf("Failed to approve registration %s: %v", event.RequestID, err)
+		slog.Error("Failed to approve registration", "request_id", event.RequestID, "error", err)
 		return
 	}
 
-	log.Printf("Registration %s approved, user %s created", event.RequestID, user.ID)
+	slog.Info("Registration approved, user created", "request_id", event.RequestID, "user_id", user.ID)
 
 	// Publish user registered event with complete user data
 	if err := s.publisher.PublishUserRegistered(domain.UserRegisteredEvent{
@@ -101,7 +101,7 @@ func (s *Subscriber) handleRegistrationApproved(msg *nats.Msg) {
 		Email:     user.Email,
 		Timestamp: time.Now(),
 	}); err != nil {
-		log.Printf("Failed to publish user registered event: %v", err)
+		slog.Error("Failed to publish user registered event", "error", err)
 	}
 }
 
@@ -109,7 +109,7 @@ func (s *Subscriber) handleRegistrationApproved(msg *nats.Msg) {
 func (s *Subscriber) handleRegistrationRejected(msg *nats.Msg) {
 	var event RegistrationRejectedEvent
 	if err := json.Unmarshal(msg.Data, &event); err != nil {
-		log.Printf("Failed to unmarshal registration rejected event: %v", err)
+		slog.Error("Failed to unmarshal registration rejected event", "error", err)
 		return
 	}
 
@@ -117,9 +117,9 @@ func (s *Subscriber) handleRegistrationRejected(msg *nats.Msg) {
 
 	// Reject registration
 	if err := s.regService.RejectRegistration(ctx, event.RequestID, event.ApproverID); err != nil {
-		log.Printf("Failed to reject registration %s: %v", event.RequestID, err)
+		slog.Error("Failed to reject registration", "request_id", event.RequestID, "error", err)
 		return
 	}
 
-	log.Printf("Registration %s rejected by %s", event.RequestID, event.ApproverID)
+	slog.Info("Registration rejected", "request_id", event.RequestID, "approver_id", event.ApproverID)
 }

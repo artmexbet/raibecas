@@ -4,7 +4,7 @@ import (
 	"auth/internal/postgres"
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -174,28 +174,22 @@ func (s *NATS) setupSubscriptions(authHandler *handler.AuthHandler, regHandler *
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	log.Println("NATS subscriptions setup complete:")
-	log.Println("  - auth.register")
-	log.Println("  - auth.login")
-	log.Println("  - auth.refresh")
-	log.Println("  - auth.validate")
-	log.Println("  - auth.logout")
-	log.Println("  - auth.logout_all")
-	log.Println("  - auth.change_password")
+	slog.Info("NATS subscriptions setup complete",
+		"topics", []string{"auth.register", "auth.login", "auth.refresh", "auth.validate", "auth.logout", "auth.logout_all", "auth.change_password"})
 
 	return nil
 }
 
 // Start starts the NATS server
 func (s *NATS) Start() error {
-	log.Printf("Auth service is ready and listening on NATS topics")
+	slog.Info("Auth service is ready and listening on NATS topics")
 
 	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down auth service...")
+	slog.Info("Shutting down auth service...")
 	return s.Shutdown()
 }
 
@@ -204,13 +198,13 @@ func (s *NATS) Shutdown() error {
 	// Unsubscribe from all topics
 	for _, sub := range s.subscriptions {
 		if err := sub.Unsubscribe(); err != nil {
-			log.Printf("Error unsubscribing: %v", err)
+			slog.Error("Error unsubscribing", "error", err)
 		}
 	}
 
 	// Stop NATS event subscribers
 	if err := s.subscriber.Stop(); err != nil {
-		log.Printf("Error stopping NATS subscribers: %v", err)
+		slog.Error("Error stopping NATS subscribers", "error", err)
 	}
 
 	// Close NATS connection
@@ -218,12 +212,12 @@ func (s *NATS) Shutdown() error {
 
 	// Close Redis connection
 	if err := s.redis.Close(); err != nil {
-		log.Printf("Error closing Redis connection: %v", err)
+		slog.Error("Error closing Redis connection", "error", err)
 	}
 
 	// Close database connection pool
 	s.pool.Close()
 
-	log.Println("Auth service shut down successfully")
+	slog.Info("Auth service shut down successfully")
 	return nil
 }

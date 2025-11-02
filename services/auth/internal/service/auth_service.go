@@ -12,8 +12,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// UserRepository defines the interface for user data access
-type UserRepository interface {
+// IUserRepository defines the interface for user data access
+type IUserRepository interface {
 	Create(ctx context.Context, user *domain.User) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
@@ -23,27 +23,26 @@ type UserRepository interface {
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
 }
 
-// TokenStore defines the interface for token storage
-type TokenStore interface {
+// ITokenStore defines the interface for token storage
+type ITokenStore interface {
 	StoreRefreshToken(ctx context.Context, token *domain.RefreshToken, ttl time.Duration) error
-	GetRefreshToken(ctx context.Context, userID uuid.UUID) (*domain.RefreshToken, error)
 	GetRefreshTokenByValue(ctx context.Context, tokenValue string) (*domain.RefreshToken, error)
-	DeleteRefreshToken(ctx context.Context, userID uuid.UUID) error
+	DeleteRefreshToken(ctx context.Context, userID uuid.UUID, tokenValue string) error
 	DeleteAllRefreshTokens(ctx context.Context, userID uuid.UUID) error
 }
 
 // AuthService handles authentication business logic
 type AuthService struct {
-	userRepo   UserRepository
-	tokenStore TokenStore
+	userRepo   IUserRepository
+	tokenStore ITokenStore
 	jwtManager *jwt.Manager
 	bcryptCost int
 }
 
 // NewAuthService creates a new auth service
 func NewAuthService(
-	userRepo UserRepository,
-	tokenStore TokenStore,
+	userRepo IUserRepository,
+	tokenStore ITokenStore,
 	jwtManager *jwt.Manager,
 ) *AuthService {
 	return &AuthService{
@@ -105,8 +104,8 @@ func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*doma
 }
 
 // Logout logs out a user by revoking their refresh token
-func (s *AuthService) Logout(ctx context.Context, userID uuid.UUID) error {
-	if err := s.tokenStore.DeleteRefreshToken(ctx, userID); err != nil {
+func (s *AuthService) Logout(ctx context.Context, userID uuid.UUID, token string) error {
+	if err := s.tokenStore.DeleteRefreshToken(ctx, userID, token); err != nil {
 		return fmt.Errorf("failed to delete refresh token: %w", err)
 	}
 	return nil
@@ -131,7 +130,7 @@ func (s *AuthService) RefreshTokens(ctx context.Context, req domain.RefreshReque
 	// Check if token has expired
 	if time.Now().After(storedToken.ExpiresAt) {
 		// Clean up expired token
-		_ = s.tokenStore.DeleteRefreshToken(ctx, storedToken.UserID)
+		_ = s.tokenStore.DeleteRefreshToken(ctx, storedToken.UserID, storedToken.Token)
 		return nil, uuid.Nil, domain.ErrExpiredToken
 	}
 
@@ -158,7 +157,7 @@ func (s *AuthService) RefreshTokens(ctx context.Context, req domain.RefreshReque
 	}
 
 	// Delete old refresh token
-	if err := s.tokenStore.DeleteRefreshToken(ctx, storedToken.UserID); err != nil {
+	if err := s.tokenStore.DeleteRefreshToken(ctx, storedToken.UserID, storedToken.Token); err != nil {
 		return nil, uuid.Nil, fmt.Errorf("failed to delete old refresh token: %w", err)
 	}
 
