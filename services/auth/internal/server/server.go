@@ -171,6 +171,7 @@ func setupRoutes(app *fiber.App, authHandler *handler.AuthHandler, regHandler *h
 	// Public routes
 	api.Post("/register", regHandler.Register)
 	api.Post("/login", authHandler.Login)
+	api.Post("/refresh", authHandler.Refresh)
 	api.Post("/validate", authHandler.Validate)
 
 	// Protected routes (require authentication)

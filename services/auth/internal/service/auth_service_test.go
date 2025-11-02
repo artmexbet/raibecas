@@ -92,6 +92,15 @@ func (m *mockTokenStore) GetRefreshToken(ctx context.Context, userID uuid.UUID) 
 	return token, nil
 }
 
+func (m *mockTokenStore) GetRefreshTokenByValue(ctx context.Context, tokenValue string) (*domain.RefreshToken, error) {
+	for _, token := range m.tokens {
+		if token.Token == tokenValue {
+			return token, nil
+		}
+	}
+	return nil, domain.ErrTokenNotFound
+}
+
 func (m *mockTokenStore) DeleteRefreshToken(ctx context.Context, userID uuid.UUID) error {
 	delete(m.tokens, userID)
 	return nil

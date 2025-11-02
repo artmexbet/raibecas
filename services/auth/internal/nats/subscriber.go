@@ -85,19 +85,19 @@ func (s *Subscriber) handleRegistrationApproved(msg *nats.Msg) {
 	ctx := context.Background()
 
 	// Approve registration and create user
-	userID, err := s.regService.ApproveRegistration(ctx, event.RequestID, event.ApproverID)
+	user, err := s.regService.ApproveRegistration(ctx, event.RequestID, event.ApproverID)
 	if err != nil {
 		log.Printf("Failed to approve registration %s: %v", event.RequestID, err)
 		return
 	}
 
-	log.Printf("Registration %s approved, user %s created", event.RequestID, userID)
+	log.Printf("Registration %s approved, user %s created", event.RequestID, user.ID)
 
-	// Publish user registered event
+	// Publish user registered event with complete user data
 	if err := s.publisher.PublishUserRegistered(UserRegisteredEvent{
-		UserID:    userID,
-		Username:  "", // Would need to fetch from DB or pass in event
-		Email:     "", // Would need to fetch from DB or pass in event
+		UserID:    user.ID,
+		Username:  user.Username,
+		Email:     user.Email,
 		Timestamp: time.Now(),
 	}); err != nil {
 		log.Printf("Failed to publish user registered event: %v", err)

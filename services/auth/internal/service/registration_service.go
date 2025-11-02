@@ -113,16 +113,16 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 }
 
 // ApproveRegistration approves a registration request and creates a user
-func (s *RegistrationService) ApproveRegistration(ctx context.Context, requestID, approverID uuid.UUID) (uuid.UUID, error) {
+func (s *RegistrationService) ApproveRegistration(ctx context.Context, requestID, approverID uuid.UUID) (*domain.User, error) {
 	// Get registration request
 	regReq, err := s.regRepo.GetByID(ctx, requestID)
 	if err != nil {
-		return uuid.Nil, err
+		return nil, err
 	}
 
 	// Check if request is pending
 	if regReq.Status != domain.StatusPending {
-		return uuid.Nil, domain.ErrRegistrationNotPending
+		return nil, domain.ErrRegistrationNotPending
 	}
 
 	// Create user
@@ -138,15 +138,15 @@ func (s *RegistrationService) ApproveRegistration(ctx context.Context, requestID
 	}
 
 	if err := s.userRepo.Create(ctx, user); err != nil {
-		return uuid.Nil, fmt.Errorf("failed to create user: %w", err)
+		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
 	// Update registration request status
 	if err := s.regRepo.UpdateStatus(ctx, requestID, domain.StatusApproved, &approverID); err != nil {
-		return uuid.Nil, fmt.Errorf("failed to update registration status: %w", err)
+		return nil, fmt.Errorf("failed to update registration status: %w", err)
 	}
 
-	return user.ID, nil
+	return user, nil
 }
 
 // RejectRegistration rejects a registration request

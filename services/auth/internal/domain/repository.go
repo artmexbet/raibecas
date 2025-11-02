@@ -31,6 +31,7 @@ type RegistrationRepository interface {
 type TokenStore interface {
 	StoreRefreshToken(ctx context.Context, token *RefreshToken, ttl time.Duration) error
 	GetRefreshToken(ctx context.Context, userID uuid.UUID) (*RefreshToken, error)
+	GetRefreshTokenByValue(ctx context.Context, tokenValue string) (*RefreshToken, error)
 	DeleteRefreshToken(ctx context.Context, userID uuid.UUID) error
 	DeleteAllRefreshTokens(ctx context.Context, userID uuid.UUID) error
 }

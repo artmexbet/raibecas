@@ -170,6 +170,47 @@ type ChangePasswordRequest struct {
 	NewPassword string `json:"new_password" validate:"required,min=8"`
 }
 
+// RefreshRequest represents a token refresh request body
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}
+
+// Refresh handles token refresh
+// POST /refresh
+func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
+	var req RefreshRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	// Get client metadata
+	deviceID := c.Get("X-Device-ID", "")
+	userAgent := c.Get("User-Agent", "")
+	ipAddress := c.IP()
+
+	refreshReq := service.RefreshRequest{
+		RefreshToken: req.RefreshToken,
+		DeviceID:     deviceID,
+		UserAgent:    userAgent,
+		IPAddress:    ipAddress,
+	}
+
+	tokens, _, err := h.authService.RefreshTokens(c.Context(), refreshReq)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid or expired refresh token",
+		})
+	}
+
+	return c.JSON(LoginResponse{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		ExpiresIn:    900, // 15 minutes in seconds
+	})
+}
+
 // ChangePassword handles password change
 // POST /change-password
 func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {

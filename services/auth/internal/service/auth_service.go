@@ -125,16 +125,65 @@ type RefreshRequest struct {
 
 // RefreshTokens refreshes access and refresh tokens
 func (s *AuthService) RefreshTokens(ctx context.Context, req RefreshRequest) (*TokenPair, uuid.UUID, error) {
-	// Parse the old access token (without validation) to get user ID
-	// In a real scenario, you'd need to store user ID with refresh token
-	// For now, we'll get the token from Redis and validate it
-	
-	// Note: In production, you should store user_id mapping with refresh token
-	// For this implementation, we'll iterate through stored tokens
-	// This is a simplified version - in production use a proper token validation strategy
-	
-	// For now, return error - this needs proper implementation with user context
-	return nil, uuid.Nil, fmt.Errorf("refresh token implementation needs user context")
+	// Get refresh token from storage by token value
+	storedToken, err := s.tokenStore.GetRefreshTokenByValue(ctx, req.RefreshToken)
+	if err != nil {
+		return nil, uuid.Nil, domain.ErrInvalidToken
+	}
+
+	// Check if token has expired
+	if time.Now().After(storedToken.ExpiresAt) {
+		// Clean up expired token
+		_ = s.tokenStore.DeleteRefreshToken(ctx, storedToken.UserID)
+		return nil, uuid.Nil, domain.ErrExpiredToken
+	}
+
+	// Verify user still exists and is active
+	user, err := s.userRepo.GetByID(ctx, storedToken.UserID)
+	if err != nil {
+		return nil, uuid.Nil, domain.ErrUserNotFound
+	}
+
+	if !user.IsActive {
+		return nil, uuid.Nil, domain.ErrUserNotActive
+	}
+
+	// Generate new access token
+	accessToken, err := s.jwtManager.GenerateAccessToken(user.ID, string(user.Role))
+	if err != nil {
+		return nil, uuid.Nil, fmt.Errorf("failed to generate access token: %w", err)
+	}
+
+	// Generate new refresh token
+	newRefreshToken, err := s.jwtManager.GenerateRefreshToken()
+	if err != nil {
+		return nil, uuid.Nil, fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
+	// Delete old refresh token
+	if err := s.tokenStore.DeleteRefreshToken(ctx, storedToken.UserID); err != nil {
+		return nil, uuid.Nil, fmt.Errorf("failed to delete old refresh token: %w", err)
+	}
+
+	// Store new refresh token
+	newRefreshTokenData := &domain.RefreshToken{
+		Token:     newRefreshToken,
+		UserID:    user.ID,
+		DeviceID:  req.DeviceID,
+		UserAgent: req.UserAgent,
+		IPAddress: req.IPAddress,
+		ExpiresAt: time.Now().Add(s.jwtManager.GetRefreshTokenTTL()),
+		CreatedAt: time.Now(),
+	}
+
+	if err := s.tokenStore.StoreRefreshToken(ctx, newRefreshTokenData, s.jwtManager.GetRefreshTokenTTL()); err != nil {
+		return nil, uuid.Nil, fmt.Errorf("failed to store refresh token: %w", err)
+	}
+
+	return &TokenPair{
+		AccessToken:  accessToken,
+		RefreshToken: newRefreshToken,
+	}, user.ID, nil
 }
 
 // ValidateAccessToken validates an access token and returns user info

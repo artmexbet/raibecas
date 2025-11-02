@@ -82,6 +82,25 @@ Authenticate user and get tokens.
 }
 ```
 
+#### POST /api/v1/refresh
+Refresh access and refresh tokens.
+
+**Request:**
+```json
+{
+  "refresh_token": "uuid"
+}
+```
+
+**Response:**
+```json
+{
+  "access_token": "eyJhbGc...",
+  "refresh_token": "new-uuid",
+  "expires_in": 900
+}
+```
+
 #### POST /api/v1/validate
 Validate an access token.
 
