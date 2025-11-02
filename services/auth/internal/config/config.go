@@ -2,119 +2,74 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 	"time"
+
+	"github.com/ilyakaznacheev/cleanenv"
 )
 
 // Config holds all configuration for the auth service
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	Redis    RedisConfig
-	NATS     NATSConfig
-	JWT      JWTConfig
+	Server   ServerConfig   `yaml:"server"`
+	Database DatabaseConfig `yaml:"database"`
+	Redis    RedisConfig    `yaml:"redis"`
+	NATS     NATSConfig     `yaml:"nats"`
+	JWT      JWTConfig      `yaml:"jwt"`
 }
 
 // ServerConfig holds server configuration
 type ServerConfig struct {
-	Port            string
-	ReadTimeout     time.Duration
-	WriteTimeout    time.Duration
-	ShutdownTimeout time.Duration
+	Port            string        `env:"SERVER_PORT" env-default:"8081"`
+	ReadTimeout     time.Duration `env:"SERVER_READ_TIMEOUT" env-default:"10s"`
+	WriteTimeout    time.Duration `env:"SERVER_WRITE_TIMEOUT" env-default:"10s"`
+	ShutdownTimeout time.Duration `env:"SERVER_SHUTDOWN_TIMEOUT" env-default:"5s"`
 }
 
 // DatabaseConfig holds PostgreSQL configuration
 type DatabaseConfig struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	DBName   string
-	SSLMode  string
-	MaxConns int
-	MinConns int
+	Host     string `env:"DB_HOST" env-default:"localhost"`
+	Port     string `env:"DB_PORT" env-default:"5432"`
+	User     string `env:"DB_USER" env-default:"raibecas"`
+	Password string `env:"DB_PASSWORD" env-required:"true"`
+	DBName   string `env:"DB_NAME" env-default:"raibecas"`
+	SSLMode  string `env:"DB_SSL_MODE" env-default:"disable"`
+	MaxConns int    `env:"DB_MAX_CONNS" env-default:"25"`
+	MinConns int    `env:"DB_MIN_CONNS" env-default:"5"`
 }
 
 // RedisConfig holds Redis configuration
 type RedisConfig struct {
-	Host     string
-	Port     string
-	Password string
-	DB       int
+	Host     string `env:"REDIS_HOST" env-default:"localhost"`
+	Port     string `env:"REDIS_PORT" env-default:"6379"`
+	Password string `env:"REDIS_PASSWORD"`
+	DB       int    `env:"REDIS_DB" env-default:"0"`
 }
 
 // NATSConfig holds NATS configuration
 type NATSConfig struct {
-	URL             string
-	MaxReconnects   int
-	ReconnectWait   time.Duration
-	ConnectionName  string
+	URL            string        `env:"NATS_URL" env-default:"nats://localhost:4222"`
+	MaxReconnects  int           `env:"NATS_MAX_RECONNECTS" env-default:"10"`
+	ReconnectWait  time.Duration `env:"NATS_RECONNECT_WAIT" env-default:"2s"`
+	ConnectionName string        `env:"NATS_CONNECTION_NAME" env-default:"auth-service"`
 }
 
 // JWTConfig holds JWT configuration
 type JWTConfig struct {
-	Secret              string
-	AccessTokenTTL      time.Duration
-	RefreshTokenTTL     time.Duration
-	Issuer              string
+	Secret          string        `env:"JWT_SECRET" env-required:"true"`
+	AccessTokenTTL  time.Duration `env:"JWT_ACCESS_TTL" env-default:"15m"`
+	RefreshTokenTTL time.Duration `env:"JWT_REFRESH_TTL" env-default:"168h"`
+	Issuer          string        `env:"JWT_ISSUER" env-default:"raibecas-auth"`
 }
 
-// Load loads configuration from environment variables
+// Load loads configuration from environment variables using cleanenv
 func Load() (*Config, error) {
-	cfg := &Config{
-		Server: ServerConfig{
-			Port:            getEnv("SERVER_PORT", "8081"),
-			ReadTimeout:     getDurationEnv("SERVER_READ_TIMEOUT", 10*time.Second),
-			WriteTimeout:    getDurationEnv("SERVER_WRITE_TIMEOUT", 10*time.Second),
-			ShutdownTimeout: getDurationEnv("SERVER_SHUTDOWN_TIMEOUT", 5*time.Second),
-		},
-		Database: DatabaseConfig{
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "5432"),
-			User:     getEnv("DB_USER", "raibecas"),
-			Password: getEnv("DB_PASSWORD", ""),
-			DBName:   getEnv("DB_NAME", "raibecas"),
-			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
-			MaxConns: getIntEnv("DB_MAX_CONNS", 25),
-			MinConns: getIntEnv("DB_MIN_CONNS", 5),
-		},
-		Redis: RedisConfig{
-			Host:     getEnv("REDIS_HOST", "localhost"),
-			Port:     getEnv("REDIS_PORT", "6379"),
-			Password: getEnv("REDIS_PASSWORD", ""),
-			DB:       getIntEnv("REDIS_DB", 0),
-		},
-		NATS: NATSConfig{
-			URL:            getEnv("NATS_URL", "nats://localhost:4222"),
-			MaxReconnects:  getIntEnv("NATS_MAX_RECONNECTS", 10),
-			ReconnectWait:  getDurationEnv("NATS_RECONNECT_WAIT", 2*time.Second),
-			ConnectionName: getEnv("NATS_CONNECTION_NAME", "auth-service"),
-		},
-		JWT: JWTConfig{
-			Secret:          getEnv("JWT_SECRET", ""),
-			AccessTokenTTL:  getDurationEnv("JWT_ACCESS_TTL", 15*time.Minute),
-			RefreshTokenTTL: getDurationEnv("JWT_REFRESH_TTL", 7*24*time.Hour),
-			Issuer:          getEnv("JWT_ISSUER", "raibecas-auth"),
-		},
+	var cfg Config
+
+	// Read environment variables
+	if err := cleanenv.ReadEnv(&cfg); err != nil {
+		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
-	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("config validation failed: %w", err)
-	}
-
-	return cfg, nil
-}
-
-// Validate validates the configuration
-func (c *Config) Validate() error {
-	if c.Database.Password == "" {
-		return fmt.Errorf("DB_PASSWORD is required")
-	}
-	if c.JWT.Secret == "" {
-		return fmt.Errorf("JWT_SECRET is required")
-	}
-	return nil
+	return &cfg, nil
 }
 
 // GetDatabaseDSN returns the PostgreSQL connection string
@@ -133,31 +88,4 @@ func (c *Config) GetDatabaseDSN() string {
 // GetRedisAddr returns the Redis address
 func (c *Config) GetRedisAddr() string {
 	return fmt.Sprintf("%s:%s", c.Redis.Host, c.Redis.Port)
-}
-
-// Helper functions
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-func getIntEnv(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intVal, err := strconv.Atoi(value); err == nil {
-			return intVal
-		}
-	}
-	return defaultValue
-}
-
-func getDurationEnv(key string, defaultValue time.Duration) time.Duration {
-	if value := os.Getenv(key); value != "" {
-		if duration, err := time.ParseDuration(value); err == nil {
-			return duration
-		}
-	}
-	return defaultValue
 }
