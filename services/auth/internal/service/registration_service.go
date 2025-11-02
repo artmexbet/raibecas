@@ -42,16 +42,8 @@ func NewRegistrationService(
 	}
 }
 
-// RegisterRequest represents a registration request
-type RegisterRequest struct {
-	Username string
-	Email    string
-	Password string
-	Metadata map[string]any
-}
-
 // CreateRegistrationRequest creates a new registration request
-func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req RegisterRequest) (uuid.UUID, error) {
+func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req domain.RegisterRequest) (uuid.UUID, error) {
 	// Validate email format
 	if !emailRegex.MatchString(req.Email) {
 		return uuid.Nil, domain.ErrInvalidEmail
@@ -63,7 +55,7 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 	}
 
 	// Check if user already exists
-	exists, err := s.userRepo.ExistsByEmail(ctx, req.Email)
+	exists, err := s.userRepo.ExistsUserByEmail(ctx, req.Email)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to check user existence: %w", err)
 	}
@@ -71,7 +63,7 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 		return uuid.Nil, domain.ErrEmailAlreadyExists
 	}
 
-	exists, err = s.userRepo.ExistsByUsername(ctx, req.Username)
+	exists, err = s.userRepo.ExistsUserByUsername(ctx, req.Username)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to check user existence: %w", err)
 	}
@@ -102,16 +94,12 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 		return uuid.Nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// Create registration request
+	// CreateUser registration request
 	regReq := &domain.RegistrationRequest{
-		ID:        uuid.New(),
-		Username:  req.Username,
-		Email:     req.Email,
-		Password:  string(hashedPassword),
-		Status:    domain.StatusPending,
-		Metadata:  req.Metadata,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Username: req.Username,
+		Email:    req.Email,
+		Password: string(hashedPassword),
+		Metadata: req.Metadata,
 	}
 
 	if err := s.regRepo.Create(ctx, regReq); err != nil {
@@ -134,19 +122,14 @@ func (s *RegistrationService) ApproveRegistration(ctx context.Context, requestID
 		return nil, domain.ErrRegistrationNotPending
 	}
 
-	// Create user
+	// CreateUser user
 	user := &domain.User{
-		ID:           uuid.New(),
 		Username:     regReq.Username,
 		Email:        regReq.Email,
 		PasswordHash: regReq.Password, // Already hashed
-		Role:         domain.RoleUser,
-		IsActive:     true,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
 	}
 
-	if err := s.userRepo.Create(ctx, user); err != nil {
+	if err := s.userRepo.CreateUser(ctx, user); err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 

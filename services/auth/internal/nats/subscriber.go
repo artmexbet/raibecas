@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"auth/internal/domain"
 	"auth/internal/service"
 
 	"github.com/google/uuid"
@@ -17,12 +18,12 @@ import (
 type Subscriber struct {
 	conn        *nats.Conn
 	regService  *service.RegistrationService
-	publisher   *Publisher
+	publisher   IEventPublisher
 	subscribers []*nats.Subscription
 }
 
 // NewSubscriber creates a new NATS subscriber
-func NewSubscriber(conn *nats.Conn, regService *service.RegistrationService, publisher *Publisher) *Subscriber {
+func NewSubscriber(conn *nats.Conn, regService *service.RegistrationService, publisher IEventPublisher) *Subscriber {
 	return &Subscriber{
 		conn:       conn,
 		regService: regService,
@@ -94,7 +95,7 @@ func (s *Subscriber) handleRegistrationApproved(msg *nats.Msg) {
 	log.Printf("Registration %s approved, user %s created", event.RequestID, user.ID)
 
 	// Publish user registered event with complete user data
-	if err := s.publisher.PublishUserRegistered(UserRegisteredEvent{
+	if err := s.publisher.PublishUserRegistered(domain.UserRegisteredEvent{
 		UserID:    user.ID,
 		Username:  user.Username,
 		Email:     user.Email,

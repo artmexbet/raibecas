@@ -1,6 +1,6 @@
--- Create users table
+-- CreateUser users table
 CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username VARCHAR(255) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
@@ -10,11 +10,11 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
--- Create index on email for faster lookups
+-- CreateUser index on email for faster lookups
 CREATE INDEX idx_users_email ON users(email);
 
--- Create index on username for faster lookups
+-- CreateUser index on username for faster lookups
 CREATE INDEX idx_users_username ON users(username);
 
--- Create index on role for filtering
+-- CreateUser index on role for filtering
 CREATE INDEX idx_users_role ON users(role);

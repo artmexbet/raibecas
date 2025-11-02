@@ -16,7 +16,7 @@ func main() {
 
 	log.Println("Starting Auth service with NATS...")
 
-	// Create NATS-based server
+	// CreateUser NATS-based server
 	srv, err := server.NewNATS(cfg)
 	if err != nil {
 		log.Fatalf("Failed to create server: %v", err)

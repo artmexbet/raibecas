@@ -3,6 +3,7 @@ package storeredis
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -51,7 +52,7 @@ func (s *TokenStore) GetRefreshToken(ctx context.Context, userID uuid.UUID) (*do
 
 	data, err := s.client.Get(ctx, key).Bytes()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return nil, domain.ErrTokenNotFound
 		}
 		return nil, fmt.Errorf("failed to get refresh token: %w", err)
@@ -71,7 +72,7 @@ func (s *TokenStore) GetRefreshTokenByValue(ctx context.Context, tokenValue stri
 	tokenKey := fmt.Sprintf("refresh_token:value:%s", tokenValue)
 	userIDStr, err := s.client.Get(ctx, tokenKey).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return nil, domain.ErrTokenNotFound
 		}
 		return nil, fmt.Errorf("failed to get token mapping: %w", err)
@@ -91,7 +92,7 @@ func (s *TokenStore) GetRefreshTokenByValue(ctx context.Context, tokenValue stri
 func (s *TokenStore) DeleteRefreshToken(ctx context.Context, userID uuid.UUID) error {
 	// Get token to find its value for deletion
 	token, err := s.GetRefreshToken(ctx, userID)
-	if err != nil && err != domain.ErrTokenNotFound {
+	if err != nil && !errors.Is(err, domain.ErrTokenNotFound) {
 		return fmt.Errorf("failed to get refresh token: %w", err)
 	}
 
@@ -116,7 +117,7 @@ func (s *TokenStore) DeleteRefreshToken(ctx context.Context, userID uuid.UUID) e
 func (s *TokenStore) DeleteAllRefreshTokens(ctx context.Context, userID uuid.UUID) error {
 	// Get token to find its value for deletion
 	token, err := s.GetRefreshToken(ctx, userID)
-	if err != nil && err != domain.ErrTokenNotFound {
+	if err != nil && !errors.Is(err, domain.ErrTokenNotFound) {
 		return fmt.Errorf("failed to get refresh token: %w", err)
 	}
 

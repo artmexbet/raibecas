@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -138,7 +139,7 @@ func TestAuthService_Login_Success(t *testing.T) {
 	authService := NewAuthService(mockUsers, mockTokens, jwtManager)
 
 	// Test
-	req := LoginRequest{
+	req := domain.LoginRequest{
 		Email:     email,
 		Password:  password,
 		DeviceID:  "test-device",
@@ -202,7 +203,7 @@ func TestAuthService_Login_InvalidPassword(t *testing.T) {
 	authService := NewAuthService(mockUsers, mockTokens, jwtManager)
 
 	// Test
-	req := LoginRequest{
+	req := domain.LoginRequest{
 		Email:    email,
 		Password: "wrongpassword",
 	}
@@ -210,7 +211,7 @@ func TestAuthService_Login_InvalidPassword(t *testing.T) {
 	_, _, err := authService.Login(context.Background(), req)
 
 	// Assert
-	if err != domain.ErrInvalidCredentials {
+	if !errors.Is(err, domain.ErrInvalidCredentials) {
 		t.Errorf("Expected ErrInvalidCredentials, got: %v", err)
 	}
 }
@@ -242,7 +243,7 @@ func TestAuthService_Login_UserNotActive(t *testing.T) {
 	authService := NewAuthService(mockUsers, mockTokens, jwtManager)
 
 	// Test
-	req := LoginRequest{
+	req := domain.LoginRequest{
 		Email:    email,
 		Password: password,
 	}
@@ -250,7 +251,7 @@ func TestAuthService_Login_UserNotActive(t *testing.T) {
 	_, _, err := authService.Login(context.Background(), req)
 
 	// Assert
-	if err != domain.ErrUserNotActive {
+	if !errors.Is(err, domain.ErrUserNotActive) {
 		t.Errorf("Expected ErrUserNotActive, got: %v", err)
 	}
 }

@@ -3,9 +3,9 @@ package nats
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
-	"github.com/google/uuid"
+	"auth/internal/domain"
+
 	"github.com/nats-io/nats.go"
 )
 
@@ -19,47 +19,8 @@ func NewPublisher(conn *nats.Conn) *Publisher {
 	return &Publisher{conn: conn}
 }
 
-// UserRegisteredEvent represents a user registration event
-type UserRegisteredEvent struct {
-	UserID    uuid.UUID `json:"user_id"`
-	Username  string    `json:"username"`
-	Email     string    `json:"email"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
-// UserLoginEvent represents a user login event
-type UserLoginEvent struct {
-	UserID    uuid.UUID `json:"user_id"`
-	DeviceID  string    `json:"device_id"`
-	UserAgent string    `json:"user_agent"`
-	IPAddress string    `json:"ip_address"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
-// UserLogoutEvent represents a user logout event
-type UserLogoutEvent struct {
-	UserID    uuid.UUID `json:"user_id"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
-// PasswordResetEvent represents a password reset event
-type PasswordResetEvent struct {
-	UserID    uuid.UUID `json:"user_id"`
-	Method    string    `json:"method"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
-// RegistrationRequestedEvent represents a registration request event
-type RegistrationRequestedEvent struct {
-	RequestID uuid.UUID      `json:"request_id"`
-	Username  string         `json:"username"`
-	Email     string         `json:"email"`
-	Metadata  map[string]any `json:"metadata,omitempty"`
-	Timestamp time.Time      `json:"timestamp"`
-}
-
 // PublishUserRegistered publishes a user registered event
-func (p *Publisher) PublishUserRegistered(event UserRegisteredEvent) error {
+func (p *Publisher) PublishUserRegistered(event domain.UserRegisteredEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal event: %w", err)
@@ -73,7 +34,7 @@ func (p *Publisher) PublishUserRegistered(event UserRegisteredEvent) error {
 }
 
 // PublishUserLogin publishes a user login event
-func (p *Publisher) PublishUserLogin(event UserLoginEvent) error {
+func (p *Publisher) PublishUserLogin(event domain.UserLoginEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal event: %w", err)
@@ -87,7 +48,7 @@ func (p *Publisher) PublishUserLogin(event UserLoginEvent) error {
 }
 
 // PublishUserLogout publishes a user logout event
-func (p *Publisher) PublishUserLogout(event UserLogoutEvent) error {
+func (p *Publisher) PublishUserLogout(event domain.UserLogoutEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal event: %w", err)
@@ -101,7 +62,7 @@ func (p *Publisher) PublishUserLogout(event UserLogoutEvent) error {
 }
 
 // PublishPasswordReset publishes a password reset event
-func (p *Publisher) PublishPasswordReset(event PasswordResetEvent) error {
+func (p *Publisher) PublishPasswordReset(event domain.PasswordResetEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal event: %w", err)
@@ -115,7 +76,7 @@ func (p *Publisher) PublishPasswordReset(event PasswordResetEvent) error {
 }
 
 // PublishRegistrationRequested publishes a registration requested event
-func (p *Publisher) PublishRegistrationRequested(event RegistrationRequestedEvent) error {
+func (p *Publisher) PublishRegistrationRequested(event domain.RegistrationRequestedEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal event: %w", err)

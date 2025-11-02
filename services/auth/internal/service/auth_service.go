@@ -14,12 +14,12 @@ import (
 
 // UserRepository defines the interface for user data access
 type UserRepository interface {
-	Create(ctx context.Context, user *domain.User) error
-	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
-	GetByEmail(ctx context.Context, email string) (*domain.User, error)
-	GetByUsername(ctx context.Context, username string) (*domain.User, error)
-	ExistsByEmail(ctx context.Context, email string) (bool, error)
-	ExistsByUsername(ctx context.Context, username string) (bool, error)
+	CreateUser(ctx context.Context, user *domain.User) error
+	GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
+	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
+	GetUserByUsername(ctx context.Context, username string) (*domain.User, error)
+	ExistsUserByEmail(ctx context.Context, email string) (bool, error)
+	ExistsUserByUsername(ctx context.Context, username string) (bool, error)
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
 }
 
@@ -54,25 +54,10 @@ func NewAuthService(
 	}
 }
 
-// LoginRequest represents a login request
-type LoginRequest struct {
-	Email     string
-	Password  string
-	DeviceID  string
-	UserAgent string
-	IPAddress string
-}
-
-// TokenPair represents access and refresh tokens
-type TokenPair struct {
-	AccessToken  string
-	RefreshToken string
-}
-
 // Login authenticates a user and returns tokens
-func (s *AuthService) Login(ctx context.Context, req LoginRequest) (*TokenPair, uuid.UUID, error) {
+func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*domain.TokenPair, uuid.UUID, error) {
 	// Get user by email
-	user, err := s.userRepo.GetByEmail(ctx, req.Email)
+	user, err := s.userRepo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, uuid.Nil, domain.ErrInvalidCredentials
 	}
@@ -113,7 +98,7 @@ func (s *AuthService) Login(ctx context.Context, req LoginRequest) (*TokenPair, 
 		return nil, uuid.Nil, fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
-	return &TokenPair{
+	return &domain.TokenPair{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, user.ID, nil
@@ -135,16 +120,8 @@ func (s *AuthService) LogoutAll(ctx context.Context, userID uuid.UUID) error {
 	return nil
 }
 
-// RefreshRequest represents a token refresh request
-type RefreshRequest struct {
-	RefreshToken string
-	DeviceID     string
-	UserAgent    string
-	IPAddress    string
-}
-
 // RefreshTokens refreshes access and refresh tokens
-func (s *AuthService) RefreshTokens(ctx context.Context, req RefreshRequest) (*TokenPair, uuid.UUID, error) {
+func (s *AuthService) RefreshTokens(ctx context.Context, req domain.RefreshRequest) (*domain.TokenPair, uuid.UUID, error) {
 	// Get refresh token from storage by token value
 	storedToken, err := s.tokenStore.GetRefreshTokenByValue(ctx, req.RefreshToken)
 	if err != nil {
@@ -159,7 +136,7 @@ func (s *AuthService) RefreshTokens(ctx context.Context, req RefreshRequest) (*T
 	}
 
 	// Verify user still exists and is active
-	user, err := s.userRepo.GetByID(ctx, storedToken.UserID)
+	user, err := s.userRepo.GetUserByID(ctx, storedToken.UserID)
 	if err != nil {
 		return nil, uuid.Nil, domain.ErrUserNotFound
 	}
@@ -200,7 +177,7 @@ func (s *AuthService) RefreshTokens(ctx context.Context, req RefreshRequest) (*T
 		return nil, uuid.Nil, fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
-	return &TokenPair{
+	return &domain.TokenPair{
 		AccessToken:  accessToken,
 		RefreshToken: newRefreshToken,
 	}, user.ID, nil
@@ -214,7 +191,7 @@ func (s *AuthService) ValidateAccessToken(ctx context.Context, token string) (*j
 	}
 
 	// Optionally verify user still exists and is active
-	user, err := s.userRepo.GetByID(ctx, claims.UserID)
+	user, err := s.userRepo.GetUserByID(ctx, claims.UserID)
 	if err != nil {
 		return nil, domain.ErrUserNotFound
 	}
@@ -226,17 +203,10 @@ func (s *AuthService) ValidateAccessToken(ctx context.Context, token string) (*j
 	return claims, nil
 }
 
-// ChangePasswordRequest represents a password change request
-type ChangePasswordRequest struct {
-	UserID      uuid.UUID
-	OldPassword string
-	NewPassword string
-}
-
 // ChangePassword changes a user's password
-func (s *AuthService) ChangePassword(ctx context.Context, req ChangePasswordRequest) error {
+func (s *AuthService) ChangePassword(ctx context.Context, req domain.ChangePasswordRequest) error {
 	// Get user
-	user, err := s.userRepo.GetByID(ctx, req.UserID)
+	user, err := s.userRepo.GetUserByID(ctx, req.UserID)
 	if err != nil {
 		return err
 	}

@@ -1,79 +1,99 @@
 package handler
 
 import (
+	"context"
+	"encoding/json"
+	"log"
 	"time"
 
-	"auth/internal/nats"
+	"auth/internal/domain"
 	"auth/internal/service"
 
-	"github.com/gofiber/fiber/v2"
+	natspkg "github.com/nats-io/nats.go"
 )
 
-// RegistrationHandler handles registration HTTP requests
+// RegistrationHandler handles registration NATS requests
 type RegistrationHandler struct {
 	regService *service.RegistrationService
-	publisher  *nats.Publisher
+	publisher  IEventPublisher
 }
 
-// NewRegistrationHandler creates a new registration handler
-func NewRegistrationHandler(regService *service.RegistrationService, publisher *nats.Publisher) *RegistrationHandler {
+// NewRegistrationHandler creates a new NATS registration handler
+func NewRegistrationHandler(regService *service.RegistrationService, publisher IEventPublisher) *RegistrationHandler {
 	return &RegistrationHandler{
 		regService: regService,
 		publisher:  publisher,
 	}
 }
 
-// RegisterRequest represents a registration request body
-type RegisterRequest struct {
-	Username string         `json:"username" validate:"required,min=3,max=50"`
-	Email    string         `json:"email" validate:"required,email"`
-	Password string         `json:"password" validate:"required,min=8"`
-	Metadata map[string]any `json:"metadata,omitempty"`
-}
-
-// RegisterResponse represents a registration response body
-type RegisterResponse struct {
-	RequestID string `json:"request_id"`
-	Status    string `json:"status"`
-	Message   string `json:"message"`
-}
-
-// Register handles user registration
-// POST /register
-func (h *RegistrationHandler) Register(c *fiber.Ctx) error {
+// HandleRegister handles registration requests via NATS
+func (h *RegistrationHandler) HandleRegister(msg *natspkg.Msg) {
 	var req RegisterRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+	if err := json.Unmarshal(msg.Data, &req); err != nil {
+		h.respondError(msg, "Invalid request format")
+		return
 	}
 
-	registerReq := service.RegisterRequest{
-		Username: req.Username,
-		Email:    req.Email,
-		Password: req.Password,
-		Metadata: req.Metadata,
-	}
+	ctx := context.Background()
+	regReq := req.ToDomain()
 
-	requestID, err := h.regService.CreateRegistrationRequest(c.Context(), registerReq)
+	requestID, err := h.regService.CreateRegistrationRequest(ctx, regReq)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		h.respondError(msg, err.Error())
+		return
 	}
 
 	// Publish registration requested event
-	_ = h.publisher.PublishRegistrationRequested(nats.RegistrationRequestedEvent{
+	_ = h.publisher.PublishRegistrationRequested(domain.RegistrationRequestedEvent{
 		RequestID: requestID,
 		Username:  req.Username,
 		Email:     req.Email,
-		Metadata:  req.Metadata,
 		Timestamp: time.Now(),
 	})
 
-	return c.Status(fiber.StatusAccepted).JSON(RegisterResponse{
-		RequestID: requestID.String(),
+	response := RegisterResponse{
+		RequestID: requestID,
 		Status:    "pending",
 		Message:   "Registration request submitted successfully. Waiting for admin approval.",
-	})
+	}
+
+	h.respond(msg, response, nil)
+}
+
+// Helper methods
+func (h *RegistrationHandler) respond(msg *natspkg.Msg, data any, err error) {
+	resp := Response{
+		Success: err == nil,
+		Data:    data,
+	}
+	if err != nil {
+		resp.Error = err.Error()
+	}
+
+	response, err := json.Marshal(resp)
+	if err != nil {
+		log.Printf("Failed to marshal response: %v", err)
+		return
+	}
+
+	if err := msg.Respond(response); err != nil {
+		log.Printf("Failed to send response: %v", err)
+	}
+}
+
+func (h *RegistrationHandler) respondError(msg *natspkg.Msg, errorMsg string) {
+	resp := Response{
+		Success: false,
+		Error:   errorMsg,
+	}
+
+	response, err := json.Marshal(resp)
+	if err != nil {
+		log.Printf("Failed to marshal error response: %v", err)
+		return
+	}
+
+	if err := msg.Respond(response); err != nil {
+		log.Printf("Failed to send error response: %v", err)
+	}
 }
