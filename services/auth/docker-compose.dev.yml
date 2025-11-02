@@ -51,7 +51,6 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      SERVER_PORT: 8081
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: raibecas
@@ -61,11 +60,10 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       NATS_URL: nats://nats:4222
+      NATS_CONNECTION_NAME: auth-service
       JWT_SECRET: dev_secret_change_in_production
       JWT_ACCESS_TTL: 15m
       JWT_REFRESH_TTL: 168h
-    ports:
-      - "8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
