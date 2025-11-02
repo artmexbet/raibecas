@@ -1,305 +1,322 @@
-# Auth Service Implementation Summary
+# Документация по реализации сервиса аутентификации
 
-## Overview
+## Обзор
 
-This document summarizes the implementation of the Auth service for the Raibecas platform, following the specifications in `docs/SPECS.md`.
+Этот документ описывает реализацию сервиса аутентификации для платформы Raibecas в соответствии со спецификацией в `docs/SPECS.md`.
 
-## What Was Implemented
+## Что было реализовано
 
-### 1. Core Authentication Features
+### 1. Основной функционал аутентификации
 
-✅ **User Registration with Moderation**
-- Users submit registration requests via `POST /api/v1/register`
-- Requests are stored with `pending` status in PostgreSQL
-- System publishes `auth.registration.requested` event to NATS
-- Admin service can approve/reject via NATS events
-- Upon approval, user account is created and `auth.user.registered` event is published
+✅ **Регистрация пользователей с модерацией**
+- Пользователи отправляют заявки через топик NATS `auth.register`
+- Заявки сохраняются со статусом `pending` в PostgreSQL
+- Система публикует событие `auth.registration.requested` в NATS
+- Admin-сервис может одобрить/отклонить через события NATS
+- При одобрении создаётся аккаунт пользователя и публикуется событие `auth.user.registered`
 
-✅ **JWT-Based Authentication**
-- Secure login via `POST /api/v1/login`
-- JWT access tokens (15 min TTL) using HS256 signing
-- Refresh tokens (7 days TTL) stored in Redis
-- Token validation via `POST /api/v1/validate`
-- Token refresh with rotation via `POST /api/v1/refresh`
+✅ **JWT-based аутентификация**
+- Безопасный вход через топик `auth.login`
+- JWT access токены (TTL 15 мин) с подписью HS256
+- Refresh токены (TTL 7 дней) хранятся в Redis
+- Валидация токенов через топик `auth.validate`
+- Обновление токенов с ротацией через топик `auth.refresh`
 
-✅ **Session Management**
-- Redis-backed refresh token storage
-- Bidirectional lookup (by user ID and token value)
-- Logout from current device: `POST /api/v1/logout`
-- Logout from all devices: `POST /api/v1/logout-all`
+✅ **Управление сессиями**
+- Хранилище refresh-токенов на базе Redis
+- Двунаправленный поиск (по user ID и значению токена)
+- Выход с текущего устройства: топик `auth.logout`
+- Выход со всех устройств: топик `auth.logout_all`
 
-✅ **Password Management**
-- bcrypt hashing with cost factor 12
-- Self-service password change: `POST /api/v1/change-password`
-- Automatic logout from all devices after password change
+✅ **Управление паролями**
+- Хеширование bcrypt с фактором сложности 12
+- Самостоятельная смена пароля: топик `auth.change_password`
+- Автоматический выход со всех устройств после смены пароля
 
-### 2. Architecture & Design
+### 2. Архитектура и дизайн
 
-✅ **Clean Architecture**
+✅ **Чистая архитектура**
 ```
 auth/
-├── cmd/auth/              # Application entry point
+├── cmd/auth/              # Точка входа приложения
 ├── internal/
-│   ├── config/           # Configuration management
-│   ├── domain/           # Domain models and interfaces
-│   ├── repository/       # PostgreSQL data access
-│   ├── storeredis/       # Redis token storage
-│   ├── service/          # Business logic
-│   ├── handler/          # HTTP API handlers
-│   ├── middleware/       # Authentication middleware
-│   ├── nats/            # Event pub/sub
-│   └── server/          # Server setup
+│   ├── config/           # Управление конфигурацией (cleanenv)
+│   ├── domain/           # Доменные модели и интерфейсы
+│   ├── repository/       # Доступ к данным PostgreSQL (SQLC)
+│   ├── storeredis/       # Хранилище токенов Redis
+│   ├── service/          # Бизнес-логика
+│   ├── handler/          # NATS обработчики
+│   ├── nats/            # Событийная pub/sub
+│   └── server/          # Настройка сервера
 ├── pkg/
-│   └── jwt/             # JWT token management
-└── migrations/          # Database migrations
+│   └── jwt/             # Управление JWT токенами
+├── migrations/          # Миграции базы данных
+└── sqlc/                # SQLC конфигурация и запросы
 ```
 
-✅ **Dependency Injection**
-- Services use interfaces instead of concrete types
-- Easy to mock for testing
-- Loose coupling between layers
+✅ **Внедрение зависимостей**
+- Сервисы используют интерфейсы вместо конкретных типов
+- Легко мокировать для тестирования
+- Слабая связанность между слоями
 
-✅ **Event-Driven Communication**
-- NATS Pub/Sub for asynchronous communication
-- Published events:
-  - `auth.user.registered` (with username and email)
+✅ **Event-Driven коммуникация**
+- NATS Pub/Sub для асинхронной коммуникации
+- NATS Request/Reply для синхронных запросов
+- Публикуемые события:
+  - `auth.user.registered` (с username и email)
   - `auth.user.login`
   - `auth.user.logout`
   - `auth.password.reset`
   - `auth.registration.requested`
-- Subscribed events:
+- Подписанные события:
   - `admin.registration.approved`
   - `admin.registration.rejected`
 
-### 3. Data Storage
+### 3. Хранение данных
 
-✅ **PostgreSQL Tables**
-- `users` - User accounts with roles and status
-- `registration_requests` - Pending registration requests with metadata
+✅ **Таблицы PostgreSQL**
+- `users` - Аккаунты пользователей с ролями и статусом
+- `registration_requests` - Заявки на регистрацию с метаданными
 
-✅ **Redis Storage**
-- `refresh_token:user:{user_id}` - Token data by user ID
-- `refresh_token:value:{token}` - User ID by token value
-- Automatic TTL expiration
+✅ **Хранилище Redis**
+- `refresh_token:user:{user_id}` - Данные токена по user ID
+- `refresh_token:value:{token}` - User ID по значению токена
+- Автоматическое истечение TTL
 
-### 4. Security
+### 4. Безопасность
 
-✅ **Password Security**
-- bcrypt hashing with cost 12
-- Passwords never stored in plain text
-- Password strength validation (min 8 characters)
+✅ **Безопасность паролей**
+- Хеширование bcrypt с cost 12
+- Пароли никогда не хранятся в открытом виде
+- Валидация надёжности пароля (минимум 8 символов)
 
-✅ **Token Security**
-- JWT signed with HMAC-SHA256
-- Short-lived access tokens (15 min)
-- Token rotation on refresh
-- Old refresh tokens invalidated immediately
+✅ **Безопасность токенов**
+- JWT подписаны с HMAC-SHA256
+- Короткоживущие access токены (15 мин)
+- Ротация токенов при обновлении
+- Старые refresh токены немедленно аннулируются
 
-✅ **Vulnerability Management**
-- All dependencies checked against GitHub Advisory Database
-- Updated to secure versions:
-  - `github.com/gofiber/fiber/v2` v2.52.9 (patched)
-  - `github.com/golang-jwt/jwt/v5` v5.2.2 (patched)
+✅ **Управление уязвимостями**
+- Все зависимости проверены через GitHub Advisory Database
+- Обновлены до безопасных версий:
+  - `github.com/gofiber/fiber/v2` v2.52.9 (исправлена)
+  - `github.com/golang-jwt/jwt/v5` v5.2.2 (исправлена)
 
-✅ **API Security**
-- Protected endpoints require authentication
-- Bearer token authentication
-- User context propagation via middleware
+✅ **Безопасность API**
+- Защищённые операции требуют аутентификации
+- Валидация JWT токенов
+- Распространение контекста пользователя
 
-### 5. Testing
+### 5. Тестирование
 
-✅ **Comprehensive Test Suite**
-- **JWT Manager**: 5 tests covering token generation and validation
-- **Auth Service**: 4 tests covering login, logout, and validation
-- **Refresh Token**: 3 tests covering success, invalid token, and inactive user scenarios
-- **Total**: 12 tests, all passing
+✅ **Комплексный набор тестов**
+- **JWT Manager**: 5 тестов, покрывающих генерацию и валидацию токенов
+- **Auth Service**: 4 теста, покрывающих вход, выход и валидацию
+- **Refresh Token**: 3 теста, покрывающих успех, недействительный токен и неактивного пользователя
+- **Всего**: 12 тестов, все проходят
 
-✅ **Test Infrastructure**
-- Mock implementations for repositories and stores
-- Isolated unit tests without external dependencies
-- Clear test cases with setup, action, and assertion phases
+✅ **Тестовая инфраструктура**
+- Мок-реализации для репозиториев и хранилищ
+- Изолированные unit-тесты без внешних зависимостей
+- Чёткие тест-кейсы с фазами setup, action и assertion
 
-### 6. Documentation
+### 6. Документация
 
-✅ **API Documentation**
-- Complete API reference in README.md
-- Request/response examples for all endpoints
-- Environment configuration guide
+✅ **API документация**
+- Полная справка по API в README.md
+- Примеры запросов/ответов для всех топиков
+- Руководство по конфигурации окружения
 
-✅ **Development Tools**
-- `.env.example` with all configuration options
-- `test_api.sh` bash script for manual API testing
-- Docker Compose for local development
+✅ **Инструменты разработки**
+- `.env.example` со всеми опциями конфигурации
+- Docker Compose для локальной разработки
+- SQLC для генерации кода работы с БД
 
-✅ **Code Documentation**
-- Inline comments for complex logic
-- Interface definitions with clear responsibilities
-- Package-level documentation
+✅ **Документация кода**
+- Инлайн комментарии для сложной логики
+- Определения интерфейсов с чёткими обязанностями
+- Документация на уровне пакетов
 
-## Technology Stack
+## Технологический стек
 
-| Component | Technology | Version |
-|-----------|-----------|---------|
-| Language | Go | 1.25.1 |
-| Web Framework | Fiber | 2.52.9 |
-| Database | PostgreSQL | 16 with pgvector |
-| Cache/Session | Redis | 7 |
+| Компонент | Технология | Версия |
+|-----------|-----------|--------|
+| Язык | Go | 1.25.1 |
+| Конфигурация | cleanenv | latest |
+| Генерация кода БД | SQLC | latest |
+| База данных | PostgreSQL | 16 с pgvector |
+| Кэш/Сессии | Redis | 7 |
 | Message Broker | NATS | Latest |
 | JWT | golang-jwt | 5.2.2 |
-| Password Hashing | bcrypt | Latest |
-| Testing | Go test | Built-in |
+| Хеширование паролей | bcrypt | Latest |
+| Тестирование | Go test | Встроенный |
 
-## API Endpoints
+## NATS топики
 
-| Method | Path | Auth Required | Description |
-|--------|------|---------------|-------------|
-| POST | `/api/v1/register` | No | Submit registration request |
-| POST | `/api/v1/login` | No | Authenticate and get tokens |
-| POST | `/api/v1/refresh` | No | Refresh access token |
-| POST | `/api/v1/validate` | No | Validate access token |
-| POST | `/api/v1/logout` | Yes | Logout from current device |
-| POST | `/api/v1/logout-all` | Yes | Logout from all devices |
-| POST | `/api/v1/change-password` | Yes | Change password |
-| GET | `/health` | No | Health check |
+| Топик | Тип | Описание |
+|-------|-----|----------|
+| `auth.register` | Request/Reply | Отправить заявку на регистрацию |
+| `auth.login` | Request/Reply | Аутентифицировать и получить токены |
+| `auth.refresh` | Request/Reply | Обновить access токен |
+| `auth.validate` | Request/Reply | Валидировать access токен |
+| `auth.logout` | Request/Reply | Выход с текущего устройства |
+| `auth.logout_all` | Request/Reply | Выход со всех устройств |
+| `auth.change_password` | Request/Reply | Изменить пароль |
 
-## NATS Event Flow
+## Поток событий NATS
 
-### Registration Flow
+### Поток регистрации
 ```
-User → POST /register → Auth Service
-                            ↓
-                 auth.registration.requested
-                            ↓
-                       Admin Service
-                            ↓
-              admin.registration.approved
-                            ↓
-                      Auth Service
-                            ↓
-                   (creates user)
-                            ↓
-                  auth.user.registered
-```
-
-### Authentication Flow
-```
-User → POST /login → Auth Service
-                          ↓
-                  (validates credentials)
-                          ↓
-                   (generates tokens)
-                          ↓
-                   (stores in Redis)
-                          ↓
-                   auth.user.login
+Пользователь → auth.register → Auth Service
+                                     ↓
+                          auth.registration.requested
+                                     ↓
+                                Admin Service
+                                     ↓
+                       admin.registration.approved
+                                     ↓
+                               Auth Service
+                                     ↓
+                            (создаёт пользователя)
+                                     ↓
+                           auth.user.registered
 ```
 
-## Configuration
+### Поток аутентификации
+```
+Пользователь → auth.login → Auth Service
+                                  ↓
+                       (валидирует credentials)
+                                  ↓
+                          (генерирует токены)
+                                  ↓
+                          (сохраняет в Redis)
+                                  ↓
+                          auth.user.login
+```
 
-All configuration is via environment variables. See `.env.example` for complete list.
+## Конфигурация
 
-**Critical Configuration:**
-- `JWT_SECRET` - Must be set (no default)
-- `DB_PASSWORD` - Must be set (no default)
-- `JWT_ACCESS_TTL` - Default 15m
-- `JWT_REFRESH_TTL` - Default 168h (7 days)
+Вся конфигурация через переменные окружения с использованием cleanenv. См. `.env.example` для полного списка.
 
-## Development Setup
+**Критичная конфигурация:**
+- `JWT_SECRET` - Должна быть установлена (нет значения по умолчанию)
+- `DB_PASSWORD` - Должна быть установлена (нет значения по умолчанию)
+- `JWT_ACCESS_TTL` - По умолчанию 15m
+- `JWT_REFRESH_TTL` - По умолчанию 168h (7 дней)
 
-1. **Start infrastructure:**
+## Настройка разработки
+
+1. **Запустите инфраструктуру:**
    ```bash
    docker-compose -f docker-compose.dev.yml up -d postgres redis nats
    ```
 
-2. **Run migrations:**
+2. **Выполните миграции:**
    ```bash
    psql -h localhost -U raibecas -d raibecas -f migrations/001_create_users_table.sql
    psql -h localhost -U raibecas -d raibecas -f migrations/002_create_registration_requests_table.sql
    ```
 
-3. **Set environment:**
+3. **Сгенерируйте код SQLC:**
+   ```bash
+   cd services/auth
+   sqlc generate
+   ```
+
+4. **Установите переменные окружения:**
    ```bash
    export DB_PASSWORD=raibecas_dev
    export JWT_SECRET=dev_secret_change_in_production
    ```
 
-4. **Run service:**
+5. **Запустите сервис:**
    ```bash
    go run cmd/auth/main.go
    ```
 
-5. **Run tests:**
+6. **Запустите тесты:**
    ```bash
    go test ./... -v
    ```
 
-## Design Decisions
+## Архитектурные решения
 
-### Why Interfaces?
-Using interfaces (domain.UserRepository, domain.TokenStore) allows:
-- Easy mocking in tests
-- Flexibility to change implementations
-- Loose coupling between layers
+### Почему интерфейсы?
+Использование интерфейсов (domain.UserRepository, domain.TokenStore) позволяет:
+- Легко мокировать в тестах
+- Гибкость смены реализаций
+- Слабую связанность между слоями
 
-### Why Bidirectional Token Lookup?
-Storing tokens by both user ID and token value allows:
-- Fast refresh token validation (by token value)
-- Easy logout by user ID
-- Efficient token cleanup
+### Почему двунаправленный поиск токенов?
+Хранение токенов по user ID и значению токена позволяет:
+- Быструю валидацию refresh токенов (по значению токена)
+- Лёгкий выход по user ID
+- Эффективную очистку токенов
 
-### Why Token Rotation?
-Rotating refresh tokens on each refresh:
-- Limits damage from token theft
-- Provides audit trail
-- Industry best practice
+### Почему ротация токенов?
+Ротация refresh токенов при каждом обновлении:
+- Ограничивает ущерб от кражи токена
+- Предоставляет audit trail
+- Индустриальная лучшая практика
 
-### Why Event-Driven?
-Using NATS Pub/Sub:
-- Decouples services
-- Enables async processing
-- Scales horizontally
-- Supports event sourcing if needed
+### Почему Event-Driven?
+Использование NATS Pub/Sub:
+- Разделяет сервисы
+- Включает асинхронную обработку
+- Горизонтально масштабируется
+- Поддерживает event sourcing при необходимости
 
-## Performance Considerations
+### Почему NATS вместо HTTP?
+- Меньшая задержка
+- Встроенное балансирование нагрузки
+- Лучше для микросервисов
+- Поддержка request/reply и pub/sub
+- Автоматическое переподключение
 
-- **Redis**: O(1) lookup for tokens
-- **PostgreSQL**: Indexed queries for users and registrations
-- **JWT**: Stateless validation (no DB lookup)
-- **Connection Pooling**: Configurable min/max connections
+## Соображения производительности
 
-## Future Enhancements
+- **Redis**: O(1) поиск токенов
+- **PostgreSQL**: Индексированные запросы для пользователей и регистраций
+- **JWT**: Stateless валидация (без запроса к БД)
+- **Connection Pooling**: Настраиваемые min/max соединения
+- **NATS**: Высокая пропускная способность, низкая задержка
 
-Potential improvements not in scope:
+## Будущие улучшения
 
-1. **OAuth2/OIDC Support** - Integration with external identity providers
-2. **Multi-Factor Authentication** - TOTP or SMS-based 2FA
-3. **Rate Limiting per User** - Prevent brute force attacks
-4. **Password Reset via Email** - Self-service password recovery
-5. **Session Analytics** - Track login locations and devices
-6. **Audit Logging** - Detailed security event logging
-7. **Token Blacklisting** - Revoke specific access tokens
-8. **Refresh Token Families** - Detect token reuse attacks
+Потенциальные улучшения, не входящие в объём:
 
-## Compliance & Security
+1. **Поддержка OAuth2/OIDC** - Интеграция с внешними identity провайдерами
+2. **Многофакторная аутентификация** - 2FA на основе TOTP или SMS
+3. **Rate Limiting по пользователю** - Предотвращение brute force атак
+4. **Сброс пароля через Email** - Самостоятельное восстановление пароля
+5. **Аналитика сессий** - Отслеживание мест входа и устройств
+6. **Audit логирование** - Детальное логирование событий безопасности
+7. **Blacklist токенов** - Отзыв конкретных access токенов
+8. **Семейства Refresh токенов** - Обнаружение атак повторного использования токенов
 
-✅ Password hashing with industry-standard bcrypt
-✅ Secure token generation and validation
-✅ No secrets in code or logs
-✅ Dependencies scanned for vulnerabilities
-✅ Protected endpoints with authentication
-✅ Graceful error handling
-✅ Input validation
-✅ SQL injection prevention (parameterized queries)
+## Соответствие и безопасность
 
-## Conclusion
+✅ Хеширование паролей с индустриальным стандартом bcrypt
+✅ Безопасная генерация и валидация токенов
+✅ Нет секретов в коде или логах
+✅ Зависимости проверены на уязвимости
+✅ Защищённые операции требуют аутентификации
+✅ Изящная обработка ошибок
+✅ Валидация ввода
+✅ Предотвращение SQL инъекций (параметризованные запросы с SQLC)
 
-The Auth service is production-ready with:
-- ✅ Complete feature implementation
-- ✅ Clean, maintainable code
-- ✅ Comprehensive test coverage
-- ✅ Security best practices
-- ✅ Event-driven architecture
-- ✅ Excellent documentation
-- ✅ Easy deployment with Docker
+## Заключение
 
-The service follows modern Go patterns and is fully aligned with the microservices architecture specified in the project documentation.
+Сервис аутентификации готов к продакшену с:
+- ✅ Полной реализацией функционала
+- ✅ Чистым, поддерживаемым кодом
+- ✅ Комплексным покрытием тестами
+- ✅ Лучшими практиками безопасности
+- ✅ Event-driven архитектурой через NATS
+- ✅ Отличной документацией
+- ✅ Лёгким развёртыванием с Docker
+- ✅ SQLC для типобезопасной работы с БД
+- ✅ Cleanenv для управления конфигурацией
+
+Сервис следует современным Go паттернам и полностью соответствует микросервисной архитектуре, указанной в документации проекта.

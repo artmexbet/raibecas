@@ -1,79 +1,104 @@
-# Auth Service
+# Сервис Аутентификации
 
-Authentication microservice for the Raibecas platform. Handles user registration, login, logout, and token management using JWT, PostgreSQL, and Redis.
+Микросервис аутентификации для платформы Raibecas. Обрабатывает регистрацию пользователей, вход, выход и управление токенами с использованием JWT, PostgreSQL и Redis.
 
-## Features
+## Возможности
 
-- **Registration with Moderation**: Users submit registration requests that require admin approval
-- **JWT Authentication**: Secure token-based authentication with access and refresh tokens
-- **Session Management**: Redis-backed session storage for refresh tokens
-- **Event-Driven Architecture**: NATS Pub/Sub for event communication with other services
-- **Password Security**: bcrypt password hashing with configurable cost
-- **Modern Go Patterns**: Clean architecture with dependency injection
+- **Регистрация с модерацией**: Пользователи отправляют заявки на регистрацию, требующие одобрения администратора
+- **JWT аутентификация**: Безопасная токен-based аутентификация с access и refresh токенами
+- **Управление сессиями**: Хранение refresh-токенов в Redis
+- **Event-Driven архитектура**: NATS Pub/Sub для коммуникации с другими сервисами
+- **Безопасность паролей**: Хеширование паролей bcrypt с настраиваемым уровнем сложности
+- **Современные Go паттерны**: Чистая архитектура с внедрением зависимостей
 
-## Architecture
+## Архитектура
 
-The service follows clean architecture principles:
+Сервис следует принципам чистой архитектуры:
 
 ```
 auth/
 ├── cmd/
-│   └── auth/           # Application entry point
+│   └── auth/           # Точка входа приложения
 ├── internal/
-│   ├── config/         # Configuration management
-│   ├── domain/         # Domain models and errors
-│   ├── repository/     # Data access layer (PostgreSQL)
-│   ├── storeredis/     # Redis token storage
-│   ├── service/        # Business logic
-│   ├── handler/        # HTTP handlers
-│   ├── middleware/     # HTTP middleware
-│   ├── nats/          # NATS event pub/sub
-│   └── server/        # Server setup
+│   ├── config/         # Управление конфигурацией
+│   ├── domain/         # Доменные модели и ошибки
+│   ├── repository/     # Слой доступа к данным (PostgreSQL)
+│   ├── storeredis/     # Хранилище токенов в Redis
+│   ├── service/        # Бизнес-логика
+│   ├── handler/        # NATS обработчики
+│   ├── nats/          # NATS событийная pub/sub
+│   └── server/        # Настройка сервера
 ├── pkg/
-│   └── jwt/           # JWT token management
-└── migrations/        # Database migrations
+│   └── jwt/           # Управление JWT токенами
+└── migrations/        # Миграции базы данных
 ```
 
-## API Endpoints
+## NATS топики
 
-### Public Endpoints
+Сервис работает через NATS, подписываясь на следующие топики:
 
-#### POST /api/v1/register
-Create a registration request (pending admin approval).
+### Входящие запросы (Request/Reply)
 
-**Request:**
+- `auth.register` - Создать заявку на регистрацию
+- `auth.login` - Аутентифицировать пользователя
+- `auth.refresh` - Обновить токены
+- `auth.validate` - Валидировать access token
+- `auth.logout` - Выход с текущего устройства
+- `auth.logout_all` - Выход со всех устройств
+- `auth.change_password` - Изменить пароль
+
+### Публикуемые события
+
+- `auth.user.registered` - Когда новый пользователь создан (после одобрения)
+- `auth.user.login` - Когда пользователь входит
+- `auth.user.logout` - Когда пользователь выходит
+- `auth.password.reset` - Когда пароль изменён
+- `auth.registration.requested` - Когда создана заявка на регистрацию
+
+### Подписки на события
+
+- `admin.registration.approved` - Администратор одобрил заявку
+- `admin.registration.rejected` - Администратор отклонил заявку
+
+## Формат сообщений
+
+### Регистрация (auth.register)
+
+**Запрос:**
 ```json
 {
   "username": "johndoe",
   "email": "john@example.com",
   "password": "SecurePassword123",
   "metadata": {
-    "reason": "Research purposes"
+    "reason": "Для исследований"
   }
 }
 ```
 
-**Response:**
+**Ответ:**
 ```json
 {
   "request_id": "uuid",
   "status": "pending",
-  "message": "Registration request submitted successfully. Waiting for admin approval."
+  "message": "Заявка на регистрацию отправлена. Ожидается одобрение администратора."
 }
 ```
 
-#### POST /api/v1/login
-Authenticate user and get tokens.
+### Вход (auth.login)
 
-**Request:**
+**Запрос:**
 ```json
 {
   "email": "john@example.com",
-  "password": "SecurePassword123"
+  "password": "SecurePassword123",
+  "device_id": "device-uuid",
+  "user_agent": "Mozilla/5.0...",
+  "ip_address": "192.168.1.1"
 }
 ```
 
-**Response:**
+**Ответ:**
 ```json
 {
   "access_token": "eyJhbGc...",
@@ -82,17 +107,19 @@ Authenticate user and get tokens.
 }
 ```
 
-#### POST /api/v1/refresh
-Refresh access and refresh tokens.
+### Обновление токенов (auth.refresh)
 
-**Request:**
+**Запрос:**
 ```json
 {
-  "refresh_token": "uuid"
+  "refresh_token": "uuid",
+  "device_id": "device-uuid",
+  "user_agent": "Mozilla/5.0...",
+  "ip_address": "192.168.1.1"
 }
 ```
 
-**Response:**
+**Ответ:**
 ```json
 {
   "access_token": "eyJhbGc...",
@@ -101,17 +128,16 @@ Refresh access and refresh tokens.
 }
 ```
 
-#### POST /api/v1/validate
-Validate an access token.
+### Валидация токена (auth.validate)
 
-**Request:**
+**Запрос:**
 ```json
 {
   "token": "eyJhbGc..."
 }
 ```
 
-**Response:**
+**Ответ:**
 ```json
 {
   "valid": true,
@@ -120,183 +146,177 @@ Validate an access token.
 }
 ```
 
-### Protected Endpoints (Require Authorization: Bearer <token>)
+### Выход (auth.logout)
 
-#### POST /api/v1/logout
-Logout from current device.
-
-**Response:**
+**Запрос:**
 ```json
 {
-  "message": "Logged out successfully"
+  "user_id": "uuid",
+  "token": "eyJhbGc..."
 }
 ```
 
-#### POST /api/v1/logout-all
-Logout from all devices.
-
-**Response:**
+**Ответ:**
 ```json
 {
-  "message": "Logged out from all devices successfully"
+  "message": "Выход выполнен успешно"
 }
 ```
 
-#### POST /api/v1/change-password
-Change user password.
+### Изменение пароля (auth.change_password)
 
-**Request:**
+**Запрос:**
 ```json
 {
+  "user_id": "uuid",
+  "token": "eyJhbGc...",
   "old_password": "OldPassword123",
   "new_password": "NewPassword456"
 }
 ```
 
-**Response:**
+**Ответ:**
 ```json
 {
-  "message": "Password changed successfully"
+  "message": "Пароль успешно изменён"
 }
 ```
 
-## NATS Events
+## Конфигурация
 
-### Published Events
+Конфигурация загружается из переменных окружения с использованием cleanenv:
 
-- `auth.user.registered` - When a new user is created (after approval)
-- `auth.user.login` - When a user logs in
-- `auth.user.logout` - When a user logs out
-- `auth.password.reset` - When a password is changed
-- `auth.registration.requested` - When a registration request is created
+### Конфигурация сервера
+- `SERVER_PORT` - Порт сервера (по умолчанию: 8081)
+- `SERVER_READ_TIMEOUT` - Timeout чтения (по умолчанию: 10s)
+- `SERVER_WRITE_TIMEOUT` - Timeout записи (по умолчанию: 10s)
+- `SERVER_SHUTDOWN_TIMEOUT` - Timeout остановки (по умолчанию: 5s)
 
-### Subscribed Events
+### Конфигурация базы данных
+- `DB_HOST` - Хост PostgreSQL (по умолчанию: localhost)
+- `DB_PORT` - Порт PostgreSQL (по умолчанию: 5432)
+- `DB_USER` - Пользователь PostgreSQL (по умолчанию: raibecas)
+- `DB_PASSWORD` - Пароль PostgreSQL (обязательно)
+- `DB_NAME` - Имя базы данных (по умолчанию: raibecas)
+- `DB_SSL_MODE` - Режим SSL (по умолчанию: disable)
+- `DB_MAX_CONNS` - Максимум соединений (по умолчанию: 25)
+- `DB_MIN_CONNS` - Минимум соединений (по умолчанию: 5)
 
-- `admin.registration.approved` - Admin approves a registration request
-- `admin.registration.rejected` - Admin rejects a registration request
+### Конфигурация Redis
+- `REDIS_HOST` - Хост Redis (по умолчанию: localhost)
+- `REDIS_PORT` - Порт Redis (по умолчанию: 6379)
+- `REDIS_PASSWORD` - Пароль Redis (опционально)
+- `REDIS_DB` - Номер БД Redis (по умолчанию: 0)
 
-## Configuration
+### Конфигурация NATS
+- `NATS_URL` - URL NATS сервера (по умолчанию: nats://localhost:4222)
+- `NATS_MAX_RECONNECTS` - Максимум попыток переподключения (по умолчанию: 10)
+- `NATS_RECONNECT_WAIT` - Время ожидания переподключения (по умолчанию: 2s)
 
-Configuration is loaded from environment variables:
+### Конфигурация JWT
+- `JWT_SECRET` - Секретный ключ JWT (обязательно)
+- `JWT_ACCESS_TTL` - TTL access токена (по умолчанию: 15m)
+- `JWT_REFRESH_TTL` - TTL refresh токена (по умолчанию: 168h / 7 дней)
+- `JWT_ISSUER` - Издатель токена (по умолчанию: raibecas-auth)
 
-### Server Configuration
-- `SERVER_PORT` - Server port (default: 8081)
-- `SERVER_READ_TIMEOUT` - Read timeout (default: 10s)
-- `SERVER_WRITE_TIMEOUT` - Write timeout (default: 10s)
-- `SERVER_SHUTDOWN_TIMEOUT` - Shutdown timeout (default: 5s)
+## Разработка
 
-### Database Configuration
-- `DB_HOST` - PostgreSQL host (default: localhost)
-- `DB_PORT` - PostgreSQL port (default: 5432)
-- `DB_USER` - PostgreSQL user (default: raibecas)
-- `DB_PASSWORD` - PostgreSQL password (required)
-- `DB_NAME` - Database name (default: raibecas)
-- `DB_SSL_MODE` - SSL mode (default: disable)
-- `DB_MAX_CONNS` - Max connections (default: 25)
-- `DB_MIN_CONNS` - Min connections (default: 5)
-
-### Redis Configuration
-- `REDIS_HOST` - Redis host (default: localhost)
-- `REDIS_PORT` - Redis port (default: 6379)
-- `REDIS_PASSWORD` - Redis password (optional)
-- `REDIS_DB` - Redis database number (default: 0)
-
-### NATS Configuration
-- `NATS_URL` - NATS server URL (default: nats://localhost:4222)
-- `NATS_MAX_RECONNECTS` - Max reconnection attempts (default: 10)
-- `NATS_RECONNECT_WAIT` - Reconnection wait time (default: 2s)
-
-### JWT Configuration
-- `JWT_SECRET` - JWT signing secret (required)
-- `JWT_ACCESS_TTL` - Access token TTL (default: 15m)
-- `JWT_REFRESH_TTL` - Refresh token TTL (default: 168h / 7 days)
-- `JWT_ISSUER` - Token issuer (default: raibecas-auth)
-
-## Development
-
-### Prerequisites
-- Go 1.25.1 or later
-- Docker and Docker Compose
-- PostgreSQL 16 with pgvector extension
+### Требования
+- Go 1.25.1 или выше
+- Docker и Docker Compose
+- PostgreSQL 16 с расширением pgvector
 - Redis 7
 - NATS Server
+- SQLC для генерации кода
 
-### Setup
+### Установка SQLC
 
-1. Start dependencies:
+```bash
+go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+```
+
+### Генерация кода с SQLC
+
+```bash
+cd services/auth
+sqlc generate
+```
+
+### Настройка
+
+1. Запустите зависимости:
 ```bash
 docker-compose -f docker-compose.dev.yml up -d postgres redis nats
 ```
 
-2. Run migrations:
+2. Выполните миграции:
 ```bash
-# Connect to PostgreSQL and run migration files in migrations/ directory
 psql -h localhost -U raibecas -d raibecas -f migrations/001_create_users_table.sql
 psql -h localhost -U raibecas -d raibecas -f migrations/002_create_registration_requests_table.sql
 ```
 
-3. Set environment variables:
+3. Установите переменные окружения:
 ```bash
 export DB_PASSWORD=raibecas_dev
 export JWT_SECRET=dev_secret_change_in_production
 ```
 
-4. Run the service:
+4. Запустите сервис:
 ```bash
 go run cmd/auth/main.go
 ```
 
-### Running with Docker Compose
+### Запуск с Docker Compose
 
 ```bash
 docker-compose -f docker-compose.dev.yml up --build
 ```
 
-## Testing
+## Тестирование
 
-Run unit tests:
+Запустите unit-тесты:
 ```bash
 go test ./... -v
 ```
 
-Run integration tests (requires testcontainers):
+Запустите интеграционные тесты (требуется testcontainers):
 ```bash
 go test ./... -v -tags=integration
 ```
 
-## Security
+## Безопасность
 
-- Passwords are hashed using bcrypt with cost 12
-- JWT tokens are signed using HS256
-- Access tokens expire after 15 minutes
-- Refresh tokens expire after 7 days
-- All sensitive endpoints require authentication
-- Password change automatically logs out all devices
+- Пароли хешируются с использованием bcrypt с cost 12
+- JWT токены подписываются с использованием HS256
+- Access токены истекают через 15 минут
+- Refresh токены истекают через 7 дней
+- Все защищённые эндпоинты требуют аутентификации
+- Изменение пароля автоматически выполняет выход со всех устройств
 
-## Database Schema
+## Схема базы данных
 
-### users table
-- `id` - UUID primary key
-- `username` - Unique username
-- `email` - Unique email
-- `password_hash` - bcrypt hashed password
-- `role` - User role (user/admin)
-- `is_active` - Account active status
-- `created_at` - Creation timestamp
-- `updated_at` - Update timestamp
+### Таблица users
+- `id` - UUID первичный ключ
+- `username` - Уникальное имя пользователя
+- `email` - Уникальный email
+- `password_hash` - Хеш пароля bcrypt
+- `role` - Роль пользователя (user/admin)
+- `is_active` - Статус активности аккаунта
+- `created_at` - Метка времени создания
+- `updated_at` - Метка времени обновления
 
-### registration_requests table
-- `id` - UUID primary key
-- `username` - Requested username
-- `email` - Requested email
-- `password` - Hashed password
-- `status` - Request status (pending/approved/rejected)
-- `metadata` - Additional JSON metadata
-- `created_at` - Creation timestamp
-- `updated_at` - Update timestamp
-- `approved_by` - UUID of approver (foreign key to users)
-- `approved_at` - Approval timestamp
+### Таблица registration_requests
+- `id` - UUID первичный ключ
+- `username` - Запрошенное имя пользователя
+- `email` - Запрошенный email
+- `password` - Хешированный пароль
+- `status` - Статус заявки (pending/approved/rejected)
+- `metadata` - Дополнительные JSON метаданные
+- `created_at` - Метка времени создания
+- `updated_at` - Метка времени обновления
+- `approved_by` - UUID утверждающего (внешний ключ к users)
+- `approved_at` - Метка времени одобрения
 
-## License
+## Лицензия
 
 MIT
