@@ -19,18 +19,16 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5/pgxpool"
 	natsgo "github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
-
-	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 // Server represents the auth service server
 type Server struct {
 	cfg        *config.Config
 	app        *fiber.App
-	db         *sqlx.DB
+	pool       *pgxpool.Pool
 	redis      *redis.Client
 	natsConn   *natsgo.Conn
 	subscriber *nats.Subscriber
@@ -38,14 +36,21 @@ type Server struct {
 
 // New creates a new server instance
 func New(cfg *config.Config) (*Server, error) {
-	// Initialize database connection
-	db, err := sqlx.Connect("pgx", cfg.GetDatabaseDSN())
+	ctx := context.Background()
+
+	// Initialize database connection pool
+	poolConfig, err := pgxpool.ParseConfig(cfg.GetDatabaseDSN())
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+		return nil, fmt.Errorf("failed to parse database config: %w", err)
 	}
-	db.SetMaxOpenConns(cfg.Database.MaxConns)
-	db.SetMaxIdleConns(cfg.Database.MinConns)
-	db.SetConnMaxLifetime(time.Hour)
+	poolConfig.MaxConns = int32(cfg.Database.MaxConns)
+	poolConfig.MinConns = int32(cfg.Database.MinConns)
+	poolConfig.MaxConnLifetime = time.Hour
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection pool: %w", err)
+	}
 
 	// Initialize Redis client
 	redisClient := redis.NewClient(&redis.Options{
@@ -85,8 +90,8 @@ func New(cfg *config.Config) (*Server, error) {
 	app.Use(cors.New())
 
 	// Initialize repositories
-	userRepo := repository.NewUserRepository(db)
-	regRepo := repository.NewRegistrationRepository(db)
+	userRepo := repository.NewUserRepository(pool)
+	regRepo := repository.NewRegistrationRepository(pool)
 
 	// Initialize stores
 	tokenStore := storeredis.NewTokenStore(redisClient)
@@ -117,7 +122,7 @@ func New(cfg *config.Config) (*Server, error) {
 	return &Server{
 		cfg:        cfg,
 		app:        app,
-		db:         db,
+		pool:       pool,
 		redis:      redisClient,
 		natsConn:   natsConn,
 		subscriber: subscriber,
@@ -152,10 +157,8 @@ func (s *Server) Shutdown() error {
 		log.Printf("Error closing Redis connection: %v", err)
 	}
 
-	// Close database connection
-	if err := s.db.Close(); err != nil {
-		log.Printf("Error closing database connection: %v", err)
-	}
+	// Close database connection pool
+	s.pool.Close()
 
 	// Shutdown Fiber app
 	ctx, cancel := context.WithTimeout(context.Background(), s.cfg.Server.ShutdownTimeout)

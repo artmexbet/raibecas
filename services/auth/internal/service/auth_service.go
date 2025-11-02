@@ -12,18 +12,38 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// UserRepository defines the interface for user data access
+type UserRepository interface {
+	Create(ctx context.Context, user *domain.User) error
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
+	GetByEmail(ctx context.Context, email string) (*domain.User, error)
+	GetByUsername(ctx context.Context, username string) (*domain.User, error)
+	ExistsByEmail(ctx context.Context, email string) (bool, error)
+	ExistsByUsername(ctx context.Context, username string) (bool, error)
+	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
+}
+
+// TokenStore defines the interface for token storage
+type TokenStore interface {
+	StoreRefreshToken(ctx context.Context, token *domain.RefreshToken, ttl time.Duration) error
+	GetRefreshToken(ctx context.Context, userID uuid.UUID) (*domain.RefreshToken, error)
+	GetRefreshTokenByValue(ctx context.Context, tokenValue string) (*domain.RefreshToken, error)
+	DeleteRefreshToken(ctx context.Context, userID uuid.UUID) error
+	DeleteAllRefreshTokens(ctx context.Context, userID uuid.UUID) error
+}
+
 // AuthService handles authentication business logic
 type AuthService struct {
-	userRepo   domain.UserRepository
-	tokenStore domain.TokenStore
+	userRepo   UserRepository
+	tokenStore TokenStore
 	jwtManager *jwt.Manager
 	bcryptCost int
 }
 
 // NewAuthService creates a new auth service
 func NewAuthService(
-	userRepo domain.UserRepository,
-	tokenStore domain.TokenStore,
+	userRepo UserRepository,
+	tokenStore TokenStore,
 	jwtManager *jwt.Manager,
 ) *AuthService {
 	return &AuthService{

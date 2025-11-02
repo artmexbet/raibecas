@@ -14,17 +14,26 @@ import (
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 
+// RegistrationRepository defines the interface for registration request data access
+type RegistrationRepository interface {
+	Create(ctx context.Context, req *domain.RegistrationRequest) error
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.RegistrationRequest, error)
+	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.RegistrationStatus, approvedBy *uuid.UUID) error
+	ExistsByEmail(ctx context.Context, email string) (bool, error)
+	ExistsByUsername(ctx context.Context, username string) (bool, error)
+}
+
 // RegistrationService handles registration business logic
 type RegistrationService struct {
-	regRepo    domain.RegistrationRepository
-	userRepo   domain.UserRepository
+	regRepo    RegistrationRepository
+	userRepo   UserRepository
 	bcryptCost int
 }
 
 // NewRegistrationService creates a new registration service
 func NewRegistrationService(
-	regRepo domain.RegistrationRepository,
-	userRepo domain.UserRepository,
+	regRepo RegistrationRepository,
+	userRepo UserRepository,
 ) *RegistrationService {
 	return &RegistrationService{
 		regRepo:    regRepo,

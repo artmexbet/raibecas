@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,17 +9,18 @@ import (
 	"auth/internal/domain"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // RegistrationRepository handles registration request data access
 type RegistrationRepository struct {
-	db *sqlx.DB
+	pool *pgxpool.Pool
 }
 
 // NewRegistrationRepository creates a new registration repository
-func NewRegistrationRepository(db *sqlx.DB) *RegistrationRepository {
-	return &RegistrationRepository{db: db}
+func NewRegistrationRepository(pool *pgxpool.Pool) *RegistrationRepository {
+	return &RegistrationRepository{pool: pool}
 }
 
 // Create creates a new registration request
@@ -35,7 +35,7 @@ func (r *RegistrationRepository) Create(ctx context.Context, req *domain.Registr
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 
-	_, err = r.db.ExecContext(ctx, query,
+	_, err = r.pool.Exec(ctx, query,
 		req.ID,
 		req.Username,
 		req.Email,
@@ -64,7 +64,7 @@ func (r *RegistrationRepository) GetByID(ctx context.Context, id uuid.UUID) (*do
 		WHERE id = $1
 	`
 
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
+	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&req.ID,
 		&req.Username,
 		&req.Email,
@@ -78,7 +78,7 @@ func (r *RegistrationRepository) GetByID(ctx context.Context, id uuid.UUID) (*do
 	)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrRegistrationNotFound
 		}
 		return nil, fmt.Errorf("failed to get registration request: %w", err)
@@ -101,17 +101,12 @@ func (r *RegistrationRepository) UpdateStatus(ctx context.Context, id uuid.UUID,
 		WHERE id = $3
 	`
 
-	result, err := r.db.ExecContext(ctx, query, status, approvedBy, id)
+	result, err := r.pool.Exec(ctx, query, status, approvedBy, id)
 	if err != nil {
 		return fmt.Errorf("failed to update registration status: %w", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rowsAffected == 0 {
+	if result.RowsAffected() == 0 {
 		return domain.ErrRegistrationNotFound
 	}
 
@@ -123,7 +118,7 @@ func (r *RegistrationRepository) ExistsByEmail(ctx context.Context, email string
 	var exists bool
 	query := `SELECT EXISTS(SELECT 1 FROM registration_requests WHERE email = $1 AND status = 'pending')`
 
-	err := r.db.GetContext(ctx, &exists, query, email)
+	err := r.pool.QueryRow(ctx, query, email).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("failed to check registration existence by email: %w", err)
 	}
@@ -136,7 +131,7 @@ func (r *RegistrationRepository) ExistsByUsername(ctx context.Context, username 
 	var exists bool
 	query := `SELECT EXISTS(SELECT 1 FROM registration_requests WHERE username = $1 AND status = 'pending')`
 
-	err := r.db.GetContext(ctx, &exists, query, username)
+	err := r.pool.QueryRow(ctx, query, username).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("failed to check registration existence by username: %w", err)
 	}
