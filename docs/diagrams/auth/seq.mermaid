@@ -1,0 +1,58 @@
+sequenceDiagram
+    autonumber
+    actor Client as Клиент
+    participant Gateway as API Gateway
+    participant Auth as Auth Service
+    participant PG as PostgreSQL
+    participant Redis as Redis
+    participant NATS as NATS (JetStream)
+    participant Admin as Admin Service
+
+%% --- Registration request (user -> admin moderation) ---
+    Client->>Gateway: POST /api/v1/auth/register {email, name, meta}
+    Gateway->>Auth: Forward /register
+    Auth->>PG: INSERT INTO registration_requests (status=pending, payload)
+    Auth->>NATS: Publish auth.registration.requested {request_id, email, meta}
+    NATS->>Admin: Event auth.registration.requested (Admin модерация)
+    Gateway-->>Client: 202 Accepted (registration pending)
+
+%% --- Admin approves -> Auth creates user ---
+    Admin->>Admin: Approve request (UI)
+    Admin->>NATS: Publish admin.registration.approved {request_id, approver_id}
+    NATS->>Auth: Subscribe admin.registration.approved {request_id, approver_id}
+    Auth->>PG: SELECT registration_requests WHERE id=request_id
+    Auth->>PG: INSERT INTO users (username, email, password_hash, roles...)
+    Auth->>PG: UPDATE registration_requests SET status=approved
+    Auth->>NATS: Publish auth.user.registered {user_id, username, email}
+    NATS->>Audit: (optional) Mirror to AUDIT_LOG stream
+    Auth-->>Admin: Ack (user created)
+
+%% --- Login flow ---
+    Client->>Gateway: POST /api/v1/auth/login {email,password}
+    Gateway->>Auth: Forward /login
+    Auth->>PG: SELECT users WHERE email
+    Auth->>Auth: Verify password (bcrypt)
+    Auth->>Redis: SET refresh:{user_id} = refresh_token (TTL)
+    Auth->>Auth: Generate JWT (access_token)
+    Auth->>NATS: Publish auth.user.login {user_id, ts, client_meta}
+    Auth-->>Gateway: 200 {access_token, refresh_token}
+    Gateway-->>Client: 200 OK
+
+%% --- Logout flow ---
+    Client->>Gateway: POST /api/v1/auth/logout {refresh_token}
+    Gateway->>Auth: Forward /logout
+    Auth->>Redis: DEL refresh:{user_id}
+    Auth->>NATS: Publish auth.user.logout {user_id, ts}
+    Auth-->>Gateway: 200 OK
+
+%% --- Password reset (admin-initiated or self-request) ---
+    Client->>Gateway: POST /api/v1/auth/request-password-reset {email}
+    Gateway->>Auth: Forward
+    Auth->>PG: CREATE password_reset_token
+    Auth->>NATS: Publish auth.password.reset.requested {user_id, token_id}
+    NATS->>Admin: (optional) admin workflow / email service
+    Admin->>NATS: Publish admin.password.reset.approve {user_id, token_id}
+    NATS->>Auth: Subscribe admin.password.reset.approve
+    Auth->>PG: UPDATE users SET password_hash=new_hash
+    Auth->>NATS: Publish auth.password.reset {user_id, method, ts}
+    Auth-->>Gateway: 200 Password reset done

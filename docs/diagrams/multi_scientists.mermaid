@@ -4,41 +4,41 @@ Home["/ Home Page"]
 PhilList["/philosophers"]
 
 subgraph "Raibecas Namespace"
-RHome[/philosophers/raibecas]
-RDocs[/philosophers/raibecas/documents]
-RChat[/philosophers/raibecas/chat]
+RHome["/philosophers/raibecas"]
+RDocs["/philosophers/raibecas/documents"]
+RChat["/philosophers/raibecas/chat"]
 end
 
 subgraph "Kant Namespace (Future)"
-KHome[/philosophers/kant]
-KDocs[/philosophers/kant/documents]
-KChat[/philosophers/kant/chat]
+KHome["/philosophers/kant"]
+KDocs["/philosophers/kant/documents"]
+KChat["/philosophers/kant/chat"]
 end
 end
 
 subgraph "Backend - Author Configs"
-AuthorTable[(authors table)]
-ConfigTable[(author_chat_configs)]
+AuthorTable[("authors table")]
+ConfigTable[("author_chat_configs")]
 
-RConfig[Raibecas Config<br/>- system_prompt<br/>- model: llama3.1:8b<br/>- collection: raibecas_embeddings]
+RConfig["Raibecas Config<br/>- system_prompt<br/>- model: llama3.1:8b<br/>- collection: raibecas_embeddings"]
 
-KConfig[Kant Config<br/>- system_prompt<br/>- model: mistral:7b<br/>- collection: kant_embeddings]
+KConfig["Kant Config<br/>- system_prompt<br/>- model: mistral:7b<br/>- collection: kant_embeddings"]
 end
 
 subgraph "Vector Collections (pgvector)"
-RVectors[(raibecas_embeddings<br/>document_embeddings<br/>WHERE author_id='raibecas')]
+RVectors[("raibecas_embeddings<br/>document_embeddings<br/>WHERE author_id='raibecas'")]
 
-KVectors[(kant_embeddings<br/>document_embeddings<br/>WHERE author_id='kant')]
+KVectors[("kant_embeddings<br/>document_embeddings<br/>WHERE author_id='kant'")]
 end
 
 subgraph "Chat Service - Dynamic Routing"
-ChatSvc[Chat Service]
+ChatSvc["Chat Service"]
 
-ChatSvc -->|Load Config| RConfig
-ChatSvc -->|Load Config| KConfig
+ChatSvc -->|"Load Config"| RConfig
+ChatSvc -->|"Load Config"| KConfig
 
-ChatSvc -->|Query| RVectors
-ChatSvc -->|Query| KVectors
+ChatSvc -->|"Query"| RVectors
+ChatSvc -->|"Query"| KVectors
 end
 
 Home --> PhilList

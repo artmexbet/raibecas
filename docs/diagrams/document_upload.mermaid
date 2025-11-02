@@ -7,10 +7,10 @@ sequenceDiagram
     participant NATS
     participant Indexing as Indexing Service
     participant Ollama
-    participant PG as PostgreSQL<br/>(pgvector)
-    participant Meili as Meilisearch
+    participant PG as PostgreSQL (pgvector)
+    participant Qdrant as Qdrant
 
-    Admin->>Gateway: POST /api/v1/documents<br/>(upload MD file)
+    Admin->>Gateway: POST /api/v1/documents\n(upload MD file)
     Gateway->>Gateway: Validate JWT & Role
     Gateway->>Corpus: Forward request
 
@@ -19,9 +19,9 @@ sequenceDiagram
 
     Corpus->>PG: INSERT INTO document_versions
 
-    Corpus->>NATS: Publish:<br/>corpus.document.created<br/>{document_id, content, metadata}
+    Corpus->>NATS: Publish:\ncorpus.document.created\n{document_id, content, metadata}
 
-    Corpus-->>Gateway: 201 Created<br/>{document_id}
+    Corpus-->>Gateway: 201 Created\n{document_id}
     Gateway-->>Admin: Success Response
 
     Note over NATS,Indexing: Async Processing Starts
@@ -31,20 +31,20 @@ sequenceDiagram
     Indexing->>PG: SELECT content FROM documents
     PG-->>Indexing: document content
 
-    Indexing->>Indexing: Split into chunks<br/>(~1000 tokens, 100 overlap)
+    Indexing->>Indexing: Split into chunks\n(~1000 tokens, 100 overlap)
 
     loop For each chunk
-        Indexing->>Ollama: POST /api/embeddings<br/>{model: nomic-embed-text}
+        Indexing->>Ollama: POST /api/embeddings\n{model: nomic-embed-text}
         Ollama-->>Indexing: embedding vector (768d)
-        Indexing->>PG: INSERT INTO document_embeddings<br/>(document_id, chunk, embedding)
+        Indexing->>Qdrant: Upsert vector\n(document_id, chunk_id, embedding, metadata)
     end
 
-    Indexing->>Meili: POST /indexes/documents<br/>(fulltext indexing)
-    Meili-->>Indexing: OK
+    Indexing->>Qdrant: Commit / Ensure indexed
+    Qdrant-->>Indexing: OK
 
-    Indexing->>NATS: Publish:<br/>indexing.document.indexed<br/>{document_id, chunks_count}
+    Indexing->>NATS: Publish:\nindexing.document.indexed\n{document_id, chunks_count}
 
     NATS->>Corpus: Event: indexing.document.indexed
-    Corpus->>PG: UPDATE documents<br/>SET indexed=true
+    Corpus->>PG: UPDATE documents\nSET indexed=true
 
     Note over Admin,PG: Document ready for RAG queries

@@ -33,12 +33,14 @@ graph TB
     end
 
     subgraph "Data Layer"
-        Postgres[(PostgreSQL<br/>+ pgvector<br/>Port 5432)]
+        Postgres[(PostgreSQL<br/>storing<br/>Port 5432)]
         Redis[(Redis<br/>Cache & Sessions<br/>Port 6379)]
         Meili[(Meilisearch<br/>Fulltext Search<br/>Port 7700)]
+        Qdrant[(Qdrant<br/>Vector Search<br/>Port 6333)]
     end
 
     subgraph "AI Layer"
+        AIAPI[AI API Proxy<br/>Go - Port 8086<br/>- Rate Limiting<br/>- Model Routing]
         Ollama[Ollama Server<br/>Port 11434<br/>- llama3.1:8b<br/>- nomic-embed-text]
     end
 
@@ -66,17 +68,21 @@ graph TB
     Auth --> Redis
 
     Corpus --> Postgres
+    %% Возможно нужно сделать обёртку над Qdrant и Meili для Corpus
+    Corpus --> Qdrant
     Corpus --> Meili
 
     User --> Postgres
 
-    Indexing --> Postgres
+    Indexing --> Qdrant
     Indexing --> Meili
-    Indexing --> Ollama
+    Indexing --> AIAPI
 
-    Chat --> Postgres
+    Chat --> Qdrant
     Chat --> Redis
-    Chat --> Ollama
+    Chat --> AIAPI
+
+    AIAPI <--> Ollama
 
     Auth -.-> Prometheus
     Corpus -.-> Prometheus
@@ -106,7 +112,7 @@ graph TB
     style Postgres fill:#336791
     style Redis fill:#dc382d
     style Meili fill:#ff5c8d
-    style Ollama fill:#000000
+    style Ollama fill:#f1f1f1
     style Prometheus fill:#e6522c
     style Grafana fill:#f46800
     style Loki fill:#f46800

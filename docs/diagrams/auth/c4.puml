@@ -1,0 +1,72 @@
+@startuml Auth Service C4 Context
+!define AWSPUML https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v14.0/Dist
+skinparam rectangle {
+  Shadowing false
+}
+
+title Auth Service C4 Diagram
+
+package "External Systems" {
+  [API Gateway] as GW
+  [Admin Service] as ADMIN
+}
+
+package "Auth Service Boundary" {
+  component "Auth Service\n(Go, Port 8081)\n- Registration/Login/Logout\n- JWT & Refresh Tokens\n- Password Reset" as AUTH
+
+  package "Data Stores" {
+    database "PostgreSQL\n(users, registration_requests)" as PG
+    queue "Redis\n(refresh tokens, sessions)" as RDS
+  }
+}
+
+package "Message Broker" {
+  component "NATS JetStream\n(Port 4222)" as NATS
+
+  package "Published Subjects" {
+    note right: Auth Service Publishes
+    component "auth.user.registered" as P1
+    component "auth.user.login" as P2
+    component "auth.user.logout" as P3
+    component "auth.password.reset" as P4
+    component "auth.registration.requested" as P5
+  }
+
+  package "Subscribed Subjects" {
+    note right: Auth Service Subscribes
+    component "admin.registration.approved" as S1
+    component "admin.registration.rejected" as S2
+    component "admin.password.reset.approve" as S3
+  }
+}
+
+' Relationships
+GW --> AUTH : HTTP /auth/* (REST API calls)
+AUTH --> PG : Read/Write users & requests
+AUTH --> RDS : Store/Revoke refresh tokens
+
+AUTH --> NATS : Publish events
+NATS --> AUTH : Subscribe events
+
+' Publishing connections
+AUTH --> P1 : Publish
+AUTH --> P2 : Publish
+AUTH --> P3 : Publish
+AUTH --> P4 : Publish
+AUTH --> P5 : Publish
+
+' Subscribing connections
+S1 --> AUTH : Subscribe
+S2 --> AUTH : Subscribe
+S3 --> AUTH : Subscribe
+
+' External publishing (from Admin)
+ADMIN --> NATS : Publish admin.* events
+NATS --> S1 : Route to subscribed subjects
+NATS --> S2 : Route to subscribed subjects
+NATS --> S3 : Route to subscribed subjects
+
+' Optional audit mirroring
+P1 --> [AUDIT_LOG Stream] : Mirror critical events (optional)
+
+@enduml
