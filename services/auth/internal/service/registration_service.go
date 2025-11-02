@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"time"
 
 	"auth/internal/domain"
 
@@ -55,7 +54,7 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 	}
 
 	// Check if user already exists
-	exists, err := s.userRepo.ExistsUserByEmail(ctx, req.Email)
+	exists, err := s.userRepo.ExistsByEmail(ctx, req.Email)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to check user existence: %w", err)
 	}
@@ -63,7 +62,7 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 		return uuid.Nil, domain.ErrEmailAlreadyExists
 	}
 
-	exists, err = s.userRepo.ExistsUserByUsername(ctx, req.Username)
+	exists, err = s.userRepo.ExistsByUsername(ctx, req.Username)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to check user existence: %w", err)
 	}
@@ -129,7 +128,7 @@ func (s *RegistrationService) ApproveRegistration(ctx context.Context, requestID
 		PasswordHash: regReq.Password, // Already hashed
 	}
 
-	if err := s.userRepo.CreateUser(ctx, user); err != nil {
+	if err := s.userRepo.Create(ctx, user); err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
