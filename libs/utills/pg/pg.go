@@ -9,13 +9,13 @@ import (
 
 func UUIDFromGoogle(uuid uuid.UUID) pgtype.UUID {
 	var pgUUID pgtype.UUID
-	_ = pgUUID.Scan(uuid)
+	_ = pgUUID.Scan(uuid.String())
 	return pgUUID
 }
 
 func GoogleUUIDFromPG(pgUUID pgtype.UUID) (uuid.UUID, error) {
 	var id uuid.UUID
-	err := id.Scan(pgUUID)
+	err := id.Scan(pgUUID.String())
 	return id, err
 }
 

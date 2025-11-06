@@ -8,7 +8,7 @@ import (
 )
 
 type IRegistrationStorage interface {
-	CreateRegistrationRequest(ctx context.Context, req *domain.RegistrationRequest) error
+	CreateRegistrationRequest(ctx context.Context, req *domain.RegistrationRequest) (uuid.UUID, error)
 	GetRegistrationRequestByID(ctx context.Context, id uuid.UUID) (*domain.RegistrationRequest, error)
 	UpdateRegistrationRequestStatus(ctx context.Context, id uuid.UUID, status domain.RegistrationStatus, approvedBy *uuid.UUID) error
 	ExistsPendingRegistrationByEmail(ctx context.Context, email string) (bool, error)
@@ -26,7 +26,7 @@ func NewRegistrationRepository(storage IRegistrationStorage) *RegistrationReposi
 }
 
 // Create creates a new registration request
-func (r *RegistrationRepository) Create(ctx context.Context, req *domain.RegistrationRequest) error {
+func (r *RegistrationRepository) Create(ctx context.Context, req *domain.RegistrationRequest) (uuid.UUID, error) {
 	return r.storage.CreateRegistrationRequest(ctx, req)
 }
 

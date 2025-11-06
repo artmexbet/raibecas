@@ -8,22 +8,26 @@ import (
 	"time"
 
 	"auth/internal/domain"
-	"auth/internal/service"
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 )
 
+type IRegistrationService interface {
+	ApproveRegistration(context.Context, uuid.UUID, uuid.UUID) (*domain.User, error)
+	RejectRegistration(context.Context, uuid.UUID, uuid.UUID) error
+}
+
 // Subscriber handles subscribing to NATS events
 type Subscriber struct {
 	conn        *nats.Conn
-	regService  *service.RegistrationService
+	regService  IRegistrationService
 	publisher   IEventPublisher
 	subscribers []*nats.Subscription
 }
 
 // NewSubscriber creates a new NATS subscriber
-func NewSubscriber(conn *nats.Conn, regService *service.RegistrationService, publisher IEventPublisher) *Subscriber {
+func NewSubscriber(conn *nats.Conn, regService IRegistrationService, publisher IEventPublisher) *Subscriber {
 	return &Subscriber{
 		conn:       conn,
 		regService: regService,

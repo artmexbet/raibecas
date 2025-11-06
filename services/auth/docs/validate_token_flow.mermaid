@@ -1,0 +1,19 @@
+C4Component
+    title Валидация access токена (Validate)
+
+    Container_Ext(client, "Client/Other Service", "Microservice", "Проверяет валидность токена")
+    ContainerDb(validateTopic, "auth.validate", "NATS", "Request/Reply")
+
+    Container_Boundary(authService, "Auth Service") {
+        Component(authHandler, "Auth Handler", "Go, NATS Handler", "Обрабатывает запрос на валидацию")
+        Component(authService_comp, "Auth Service", "Business Logic", "Проверяет подпись токена")
+        Component(jwtMgr, "JWT Manager", "Token Validation", "Валидирует JWT и извлекает claims")
+    }
+
+    Rel(client, validateTopic, "POST: {token}", "Request/Reply")
+    Rel(validateTopic, authHandler, "Subscribe", "Handle request")
+    Rel(authHandler, authService_comp, "ValidateAccessToken()", "Call")
+    Rel(authService_comp, jwtMgr, "Validate(token)", "Parse & Verify")
+    Rel(jwtMgr, authService_comp, "Return claims", "Response")
+    Rel(authHandler, validateTopic, "RESPONSE: {valid, user_id, role} OR {valid: false}", "Reply")
+

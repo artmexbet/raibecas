@@ -1,7 +1,6 @@
 package server
 
 import (
-	"auth/internal/postgres"
 	"context"
 	"fmt"
 	"log/slog"
@@ -13,6 +12,7 @@ import (
 	"auth/internal/config"
 	"auth/internal/handler"
 	"auth/internal/nats"
+	"auth/internal/postgres"
 	"auth/internal/repository"
 	"auth/internal/service"
 	"auth/internal/storeredis"

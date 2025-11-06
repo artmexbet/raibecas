@@ -1,0 +1,40 @@
+sequenceDiagram
+    actor ExternalService as External Service
+    participant NATS as NATS Broker
+    participant AuthHandler as Auth Handler
+    participant AuthService as Auth Service
+    participant JWT as JWT Manager
+
+    ExternalService->>NATS: Публикует auth.validate запрос с токеном
+    NATS->>AuthHandler: Получает auth.validate
+
+    AuthHandler->>AuthService: ValidateAccessToken(token)
+    AuthService->>JWT: Validate(token)
+
+    alt Токен невалиден (неверная подпись)
+        JWT-->>AuthService: Возвращает ошибку validation
+        AuthService-->>AuthHandler: Возвращает ошибку
+        AuthHandler->>NATS: Отправляет {valid: false}
+        NATS-->>ExternalService: Возвращает {valid: false}
+        ExternalService-->>ExternalService: Отклоняет запрос
+
+    else Токен истёк (exp < now)
+        JWT-->>AuthService: Возвращает ошибку "token expired"
+        AuthService-->>AuthHandler: Возвращает ошибку
+        AuthHandler->>NATS: Отправляет {valid: false}
+        NATS-->>ExternalService: Возвращает {valid: false}
+        ExternalService-->>ExternalService: Просит обновить токен (refresh)
+
+    else Токен валиден
+        JWT->>JWT: Парсит JWT и проверяет подпись (HMAC-SHA256)
+        JWT->>JWT: Проверяет срок действия (exp claim)
+        JWT->>JWT: Извлекает claims (user_id, role, username, email)
+        JWT-->>AuthService: Возвращает claims
+
+        AuthService-->>AuthHandler: Возвращает {valid: true, user_id, role, username, email}
+
+        AuthHandler->>NATS: Отправляет успешный ответ
+        NATS-->>ExternalService: Возвращает {valid: true, user_id, role, username, email}
+        ExternalService-->>ExternalService: Разрешает запрос
+    end
+

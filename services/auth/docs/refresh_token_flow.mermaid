@@ -1,0 +1,28 @@
+C4Component
+    title Обновление токенов (Refresh)
+
+    Container_Ext(client, "Client/Gateway", "Go, Fiber", "Запрашивает новый access токен")
+    ContainerDb(refreshTopic, "auth.refresh", "NATS", "Request/Reply")
+
+    Container_Boundary(authService, "Auth Service") {
+        Component(authHandler, "Auth Handler", "Go, NATS Handler", "Обрабатывает запрос на обновление")
+        Component(authService_comp, "Auth Service", "Business Logic", "Проверяет refresh токен и генерирует новые")
+        Component(jwtMgr, "JWT Manager", "Token Generation", "Создаёт новые access и refresh токены")
+        ContainerDb(userDB, "PostgreSQL users", "Database", "Проверяет статус пользователя")
+    }
+
+    ContainerDb(redis, "Redis", "Session Storage", "Получает и обновляет refresh токены")
+
+    Rel(client, refreshTopic, "POST: {user_id, refresh_token, device_id}", "Request/Reply")
+    Rel(refreshTopic, authHandler, "Subscribe", "Handle request")
+    Rel(authHandler, authService_comp, "RefreshTokens()", "Call")
+    Rel(authService_comp, redis, "GET refresh_token:value:{token}", "Lookup")
+    Rel(redis, authService_comp, "Return user_id or nil", "Response")
+    Rel(authService_comp, userDB, "SELECT user by id", "Verify user active")
+    Rel(userDB, authService_comp, "Return user", "Response")
+    Rel(authService_comp, jwtMgr, "GenerateAccessToken()", "Create")
+    Rel(authService_comp, jwtMgr, "GenerateRefreshToken()", "Create")
+    Rel(authService_comp, redis, "DELETE old token", "Cleanup")
+    Rel(authService_comp, redis, "SAVE new refresh_token", "Store")
+    Rel(authHandler, refreshTopic, "RESPONSE: {access_token, refresh_token, expires_in}", "Reply")
+

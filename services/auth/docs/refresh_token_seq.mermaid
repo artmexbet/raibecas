@@ -1,0 +1,58 @@
+sequenceDiagram
+    actor User
+    participant Gateway as Client/Gateway
+    participant NATS as NATS Broker
+    participant AuthHandler as Auth Handler
+    participant AuthService as Auth Service
+    participant JWT as JWT Manager
+    participant Cache as Redis
+    participant DB as PostgreSQL
+
+    User->>Gateway: Отправляет refresh_token
+    Gateway->>NATS: Публикует auth.refresh запрос
+    NATS->>AuthHandler: Получает auth.refresh
+
+    AuthHandler->>AuthService: RefreshTokens(user_id, refresh_token, device_id)
+
+    AuthService->>Cache: GET refresh_token:value:{token}
+    Cache-->>AuthService: Возвращает user_id или nil
+
+    alt Токена нет в Redis (истёк или был удалён)
+        AuthService-->>AuthHandler: Возвращает ошибку "Invalid or expired token"
+        AuthHandler->>NATS: Отправляет ошибку
+        NATS-->>Gateway: Возвращает ошибку
+        Gateway-->>User: Ошибка (нужна повторная регистрация)
+
+    else Токен найден
+        AuthService->>DB: SELECT user WHERE id = user_id
+        DB-->>AuthService: Возвращает пользователя
+
+        alt Пользователь неактиван
+            AuthService-->>AuthHandler: Возвращает ошибку "User is inactive"
+            AuthHandler->>NATS: Отправляет ошибку
+            NATS-->>Gateway: Возвращает ошибку
+            Gateway-->>User: Ошибка (пользователь заблокирован)
+
+        else Пользователь активен
+            AuthService->>JWT: GenerateAccessToken(user_id, role)
+            JWT-->>AuthService: Возвращает новый access_token
+
+            AuthService->>JWT: GenerateRefreshToken(user_id)
+            JWT-->>AuthService: Возвращает новый refresh_token
+
+            AuthService->>Cache: DELETE refresh_token:value:{old_token}
+            AuthService->>Cache: DELETE refresh_token:user:{user_id}:{device_id}
+            Cache-->>AuthService: ОК (удалены старые токены)
+
+            AuthService->>Cache: SAVE refresh_token:user:{user_id}:{device_id}
+            AuthService->>Cache: SAVE refresh_token:value:{new_token} → user_id
+            Cache-->>AuthService: ОК (сохранены новые токены)
+
+            AuthService-->>AuthHandler: Возвращает {new_access_token, new_refresh_token}
+
+            AuthHandler->>NATS: Отправляет успешный ответ
+            NATS-->>Gateway: Возвращает {access_token, refresh_token, expires_in}
+            Gateway-->>User: Выдаёт новые токены
+        end
+    end
+

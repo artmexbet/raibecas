@@ -12,12 +12,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-func (p *Postgres) CreateRegistrationRequest(ctx context.Context, req *domain.RegistrationRequest) error {
+func (p *Postgres) CreateRegistrationRequest(ctx context.Context, req *domain.RegistrationRequest) (uuid.UUID, error) {
 	metadata, err := json.Marshal(req.Metadata)
 	if err != nil {
-		return fmt.Errorf("could not marshal metadata: %v", err)
+		return uuid.Nil, fmt.Errorf("could not marshal metadata: %v", err)
 	}
-	_, err = p.q.CreateRegistrationRequest(ctx,
+	resp, err := p.q.CreateRegistrationRequest(ctx,
 		queries.CreateRegistrationRequestParams{
 			Username: req.Username,
 			Email:    req.Email,
@@ -26,9 +26,13 @@ func (p *Postgres) CreateRegistrationRequest(ctx context.Context, req *domain.Re
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("could not create registration request: %v", err)
+		return uuid.Nil, fmt.Errorf("could not create registration request: %v", err)
 	}
-	return nil
+	id, err := pg.GoogleUUIDFromPG(resp.ID)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("could not convert registration request ID to UUID: %v", err)
+	}
+	return id, nil
 }
 
 func (p *Postgres) GetRegistrationRequestByID(ctx context.Context, id uuid.UUID) (*domain.RegistrationRequest, error) {

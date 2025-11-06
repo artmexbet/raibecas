@@ -1,0 +1,28 @@
+C4Component
+    title Выход с текущего устройства (Logout)
+
+    Container_Ext(client, "Client/Gateway", "Go, Fiber", "Запрашивает выход")
+    ContainerDb(logoutTopic, "auth.logout", "NATS", "Request/Reply")
+
+    Container_Boundary(authService, "Auth Service") {
+        Component(authHandler, "Auth Handler", "Go, NATS Handler", "Обрабатывает запрос на выход")
+        Component(authService_comp, "Auth Service", "Business Logic", "Инвалидирует сессию")
+        Component(jwtMgr, "JWT Manager", "Token Validation", "Валидирует access токен")
+    }
+
+    ContainerDb(redis, "Redis", "Session Storage", "Удаляет refresh токен")
+    ContainerDb(userLogoutTopic, "auth.user.logout", "NATS", "Event")
+    Container_Ext(otherServices, "Other Services", "Microservices", "Получают события выхода")
+
+    Rel(client, logoutTopic, "POST: {user_id, token}", "Request/Reply")
+    Rel(logoutTopic, authHandler, "Subscribe", "Handle request")
+    Rel(authHandler, authService_comp, "ValidateAccessToken()", "Verify token")
+    Rel(authService_comp, jwtMgr, "Validate(token)", "Parse & Verify")
+    Rel(jwtMgr, authService_comp, "Return claims", "Response")
+    Rel(authHandler, authService_comp, "Logout(user_id, token)", "Call")
+    Rel(authService_comp, redis, "DELETE refresh_token:value:{token}", "Invalidate session")
+    Rel(authService_comp, redis, "DELETE refresh_token:user:{user_id}:{device_id}", "Cleanup")
+    Rel(authHandler, userLogoutTopic, "Publish event", "Event: {user_id, timestamp}")
+    Rel(userLogoutTopic, otherServices, "Subscribe", "Handle logout event")
+    Rel(authHandler, logoutTopic, "RESPONSE: {success: true, message}", "Reply")
+

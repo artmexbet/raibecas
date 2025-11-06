@@ -15,7 +15,7 @@ var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-
 
 // RegistrationRepository defines the interface for registration request data access
 type RegistrationRepository interface {
-	Create(ctx context.Context, req *domain.RegistrationRequest) error
+	Create(ctx context.Context, req *domain.RegistrationRequest) (uuid.UUID, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.RegistrationRequest, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.RegistrationStatus, approvedBy *uuid.UUID) error
 	ExistsByEmail(ctx context.Context, email string) (bool, error)
@@ -101,11 +101,12 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 		Metadata: req.Metadata,
 	}
 
-	if err := s.regRepo.Create(ctx, regReq); err != nil {
+	id, err := s.regRepo.Create(ctx, regReq)
+	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to create registration request: %w", err)
 	}
 
-	return regReq.ID, nil
+	return id, nil
 }
 
 // ApproveRegistration approves a registration request and creates a user

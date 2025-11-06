@@ -1,0 +1,50 @@
+sequenceDiagram
+    actor User
+    participant Gateway as Client/Gateway
+    participant NATS as NATS Broker
+    participant AuthHandler as Auth Handler
+    participant AuthService as Auth Service
+    participant JWT as JWT Manager
+    participant DB as PostgreSQL
+    participant Cache as Redis
+    participant Events as Event Publisher
+    participant OtherServices as Other Services
+
+    User->>Gateway: Отправляет email и пароль
+    Gateway->>NATS: Публикует auth.login запрос
+    NATS->>AuthHandler: Получает auth.login
+
+    AuthHandler->>AuthService: Login(email, password, device_id)
+    AuthService->>DB: SELECT user WHERE email = ?
+    DB-->>AuthService: Возвращает пользователя
+
+    AuthService->>AuthService: Проверяет пароль (bcrypt verify)
+
+    alt Пароль неверный
+        AuthService-->>AuthHandler: Возвращает ошибку "Invalid credentials"
+        AuthHandler->>NATS: Отправляет ошибку
+        NATS-->>Gateway: Возвращает ошибку
+        Gateway-->>User: Ошибка входа
+    else Пароль верный
+        AuthService->>JWT: GenerateAccessToken(user_id, role)
+        JWT-->>AuthService: Возвращает access_token (TTL 15m)
+
+        AuthService->>JWT: GenerateRefreshToken(user_id)
+        JWT-->>AuthService: Возвращает refresh_token (TTL 7d)
+
+        AuthService->>Cache: SAVE refresh_token:user:{id}:{device_id}
+        AuthService->>Cache: SAVE refresh_token:value:{token} → user_id
+        Cache-->>AuthService: ОК
+
+        AuthService-->>AuthHandler: Возвращает {access_token, refresh_token}
+
+        AuthHandler->>Events: PublishUserLogin(user_id, device_id, ...)
+        Events->>NATS: Публикует auth.user.login
+        NATS->>OtherServices: Рассылает событие
+        OtherServices-->>OtherServices: Обрабатывают событие входа
+
+        AuthHandler->>NATS: Отправляет успешный ответ
+        NATS-->>Gateway: Возвращает {access_token, refresh_token, expires_in}
+        Gateway-->>User: Выдаёт токены
+    end
+

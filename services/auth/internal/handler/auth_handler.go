@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
@@ -57,7 +58,7 @@ func (h *AuthHandler) HandleLogin(msg *natspkg.Msg) {
 
 	tokens, userID, err := h.authService.Login(ctx, loginReq)
 	if err != nil {
-		h.respondError(msg, "Invalid credentials")
+		h.respondError(msg, fmt.Sprintf("invalid credentials: %v", err))
 		return
 	}
 

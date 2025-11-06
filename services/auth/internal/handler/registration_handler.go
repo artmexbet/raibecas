@@ -7,19 +7,23 @@ import (
 	"time"
 
 	"auth/internal/domain"
-	"auth/internal/service"
 
+	"github.com/google/uuid"
 	natspkg "github.com/nats-io/nats.go"
 )
 
+type IRegistrationService interface {
+	CreateRegistrationRequest(context.Context, domain.RegisterRequest) (uuid.UUID, error)
+}
+
 // RegistrationHandler handles registration NATS requests
 type RegistrationHandler struct {
-	regService *service.RegistrationService
+	regService IRegistrationService
 	publisher  IEventPublisher
 }
 
 // NewRegistrationHandler creates a new NATS registration handler
-func NewRegistrationHandler(regService *service.RegistrationService, publisher IEventPublisher) *RegistrationHandler {
+func NewRegistrationHandler(regService IRegistrationService, publisher IEventPublisher) *RegistrationHandler {
 	return &RegistrationHandler{
 		regService: regService,
 		publisher:  publisher,

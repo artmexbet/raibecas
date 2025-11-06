@@ -1,0 +1,25 @@
+C4Component
+    title Создание заявки на регистрацию
+
+    Container_Ext(client, "Client/Gateway", "Go, Fiber", "Отправляет заявку на регистрацию")
+    ContainerDb(registerTopic, "auth.register", "NATS", "Request/Reply")
+
+    Container_Boundary(authService, "Auth Service") {
+        Component(regHandler, "Registration Handler", "Go, NATS Handler", "Обрабатывает запрос на регистрацию")
+        Component(regService, "Registration Service", "Business Logic", "Сохраняет заявку в БД")
+        ContainerDb(userDB, "PostgreSQL registration_requests", "Database", "Хранит заявки")
+    }
+
+    ContainerDb(registrationRequestedTopic, "auth.registration.requested", "NATS", "Event")
+    ContainerDb(adminTopic, "admin.registration.approved/rejected", "NATS", "Event")
+    Container_Ext(adminService, "Admin Service", "Go", "Одобряет/отклоняет заявки")
+
+    Rel(client, registerTopic, "POST: {username, email, password, metadata}", "Request/Reply")
+    Rel(registerTopic, regHandler, "Subscribe", "Handle request")
+    Rel(regHandler, regService, "CreateRegistrationRequest()", "Call")
+    Rel(regService, userDB, "INSERT registration_request", "Save")
+    Rel(regHandler, registrationRequestedTopic, "Publish event", "Event: {request_id, username, email, timestamp}")
+    Rel(registrationRequestedTopic, adminService, "Subscribe", "Process request")
+    Rel(adminService, adminTopic, "Publish decision", "approved/rejected event")
+    Rel(adminTopic, regHandler, "Subscribe", "Handle decision")
+    Rel(regHandler, registerTopic, "RESPONSE: {request_id, status, message}", "Reply")

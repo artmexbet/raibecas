@@ -1,0 +1,27 @@
+C4Component
+    title Выход со всех устройств (LogoutAll)
+
+    Container_Ext(client, "Client/Gateway", "Go, Fiber", "Запрашивает выход со всех устройств")
+    ContainerDb(logoutAllTopic, "auth.logout_all", "NATS", "Request/Reply")
+
+    Container_Boundary(authService, "Auth Service") {
+        Component(authHandler, "Auth Handler", "Go, NATS Handler", "Обрабатывает запрос на выход")
+        Component(authService_comp, "Auth Service", "Business Logic", "Инвалидирует все сессии пользователя")
+        Component(jwtMgr, "JWT Manager", "Token Validation", "Валидирует access токен")
+    }
+
+    ContainerDb(redis, "Redis", "Session Storage", "Удаляет все refresh токены пользователя")
+    ContainerDb(userLogoutTopic, "auth.user.logout", "NATS", "Event")
+    Container_Ext(otherServices, "Other Services", "Microservices", "Получают события выхода со всех устройств")
+
+    Rel(client, logoutAllTopic, "POST: {user_id, token}", "Request/Reply")
+    Rel(logoutAllTopic, authHandler, "Subscribe", "Handle request")
+    Rel(authHandler, authService_comp, "ValidateAccessToken()", "Verify token")
+    Rel(authService_comp, jwtMgr, "Validate(token)", "Parse & Verify")
+    Rel(jwtMgr, authService_comp, "Return claims", "Response")
+    Rel(authHandler, authService_comp, "LogoutAll(user_id)", "Call")
+    Rel(authService_comp, redis, "DELETE refresh_token:user:{user_id}:*", "Invalidate all sessions")
+    Rel(authHandler, userLogoutTopic, "Publish event", "Event: {user_id, timestamp, all_devices: true}")
+    Rel(userLogoutTopic, otherServices, "Subscribe", "Handle logout from all devices")
+    Rel(authHandler, logoutAllTopic, "RESPONSE: {success: true, message}", "Reply")
+
