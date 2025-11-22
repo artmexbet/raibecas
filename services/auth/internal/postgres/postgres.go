@@ -1,7 +1,7 @@
 package postgres
 
 import (
-	"auth/internal/postgres/queries"
+	"github.com/artmexbet/raibecas/services/auth/internal/postgres/queries"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

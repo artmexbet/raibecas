@@ -8,7 +8,7 @@ package queries
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -19,11 +19,17 @@ INSERT INTO users (username, email, password_hash
 `
 
 type CreateUserParams struct {
-	Username     string `json:"username"`
-	Email        string `json:"email"`
-	PasswordHash string `json:"password_hash"`
+	Username     string
+	Email        string
+	PasswordHash string
 }
 
+// CreateUser
+//
+//	INSERT INTO users (username, email, password_hash
+//	) VALUES (
+//	    $1, $2, $3
+//	) RETURNING id, username, email, password_hash, role, is_active, created_at, updated_at
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, createUser, arg.Username, arg.Email, arg.PasswordHash)
 	var i User
@@ -44,6 +50,9 @@ const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, username, email, password_hash, role, is_active, created_at, updated_at FROM users WHERE email = $1 LIMIT 1
 `
 
+// GetUserByEmail
+//
+//	SELECT id, username, email, password_hash, role, is_active, created_at, updated_at FROM users WHERE email = $1 LIMIT 1
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByEmail, email)
 	var i User
@@ -64,7 +73,10 @@ const getUserByID = `-- name: GetUserByID :one
 SELECT id, username, email, password_hash, role, is_active, created_at, updated_at FROM users WHERE id = $1 LIMIT 1
 `
 
-func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
+// GetUserByID
+//
+//	SELECT id, username, email, password_hash, role, is_active, created_at, updated_at FROM users WHERE id = $1 LIMIT 1
+func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByID, id)
 	var i User
 	err := row.Scan(
@@ -84,6 +96,9 @@ const getUserByUsername = `-- name: GetUserByUsername :one
 SELECT id, username, email, password_hash, role, is_active, created_at, updated_at FROM users WHERE username = $1 LIMIT 1
 `
 
+// GetUserByUsername
+//
+//	SELECT id, username, email, password_hash, role, is_active, created_at, updated_at FROM users WHERE username = $1 LIMIT 1
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByUsername, username)
 	var i User
@@ -105,10 +120,13 @@ SELECT id, username, email, password_hash, role, is_active, created_at, updated_
 `
 
 type ListUsersParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	Limit  int32
+	Offset int32
 }
 
+// ListUsers
+//
+//	SELECT id, username, email, password_hash, role, is_active, created_at, updated_at FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2
 func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
 	rows, err := q.db.Query(ctx, listUsers, arg.Limit, arg.Offset)
 	if err != nil {
@@ -143,10 +161,13 @@ UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2
 `
 
 type UpdateUserIsActiveParams struct {
-	IsActive bool        `json:"is_active"`
-	ID       pgtype.UUID `json:"id"`
+	IsActive bool
+	ID       uuid.UUID
 }
 
+// UpdateUserIsActive
+//
+//	UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2
 func (q *Queries) UpdateUserIsActive(ctx context.Context, arg UpdateUserIsActiveParams) error {
 	_, err := q.db.Exec(ctx, updateUserIsActive, arg.IsActive, arg.ID)
 	return err
@@ -157,10 +178,13 @@ UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2
 `
 
 type UpdateUserPasswordParams struct {
-	PasswordHash string      `json:"password_hash"`
-	ID           pgtype.UUID `json:"id"`
+	PasswordHash string
+	ID           uuid.UUID
 }
 
+// UpdateUserPassword
+//
+//	UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2
 func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
 	_, err := q.db.Exec(ctx, updateUserPassword, arg.PasswordHash, arg.ID)
 	return err
@@ -170,6 +194,9 @@ const userExistsByEmail = `-- name: UserExistsByEmail :one
 SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)
 `
 
+// UserExistsByEmail
+//
+//	SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)
 func (q *Queries) UserExistsByEmail(ctx context.Context, email string) (bool, error) {
 	row := q.db.QueryRow(ctx, userExistsByEmail, email)
 	var exists bool
@@ -181,6 +208,9 @@ const userExistsByUsername = `-- name: UserExistsByUsername :one
 SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)
 `
 
+// UserExistsByUsername
+//
+//	SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)
 func (q *Queries) UserExistsByUsername(ctx context.Context, username string) (bool, error) {
 	row := q.db.QueryRow(ctx, userExistsByUsername, username)
 	var exists bool

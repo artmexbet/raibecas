@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"

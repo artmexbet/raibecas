@@ -3,10 +3,9 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"utills/pg"
 
-	"auth/internal/domain"
-	"auth/internal/postgres/queries"
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/internal/postgres/queries"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -33,7 +32,7 @@ func (p *Postgres) CreateUser(ctx context.Context, user *domain.User) error {
 }
 
 func (p *Postgres) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
-	u, err := p.q.GetUserByID(ctx, pg.UUIDFromGoogle(id))
+	u, err := p.q.GetUserByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("error getting user by id: %v", err)
 	}
@@ -94,7 +93,7 @@ func (p *Postgres) UpdatePassword(ctx context.Context, userID uuid.UUID, passwor
 	q := p.q.WithTx(tx)
 
 	err = q.UpdateUserPassword(ctx, queries.UpdateUserPasswordParams{
-		ID:           pg.UUIDFromGoogle(userID),
+		ID:           userID,
 		PasswordHash: passwordHash,
 	})
 	if err != nil {

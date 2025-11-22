@@ -1,6 +1,6 @@
 package nats
 
-import "auth/internal/domain"
+import "github.com/artmexbet/raibecas/services/auth/internal/domain"
 
 // IEventPublisher defines the interface for publishing events
 type IEventPublisher interface {

@@ -1,8 +1,9 @@
 package repository
 
 import (
-	"auth/internal/domain"
 	"context"
+
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 
 	"github.com/google/uuid"
 )

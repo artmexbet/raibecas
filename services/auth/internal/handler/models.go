@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 
 	"github.com/google/uuid"
 )

@@ -4,8 +4,8 @@ import (
 	"log"
 	"log/slog"
 
-	"auth/internal/config"
-	"auth/internal/server"
+	"github.com/artmexbet/raibecas/services/auth/internal/config"
+	"github.com/artmexbet/raibecas/services/auth/internal/server"
 )
 
 func main() {
