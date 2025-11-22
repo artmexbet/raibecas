@@ -8,7 +8,7 @@ package queries
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 const createRegistrationRequest = `-- name: CreateRegistrationRequest :one
@@ -18,12 +18,17 @@ RETURNING id, username, email, password, status, metadata, created_at, updated_a
 `
 
 type CreateRegistrationRequestParams struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Metadata []byte `json:"metadata"`
+	Username string
+	Email    string
+	Password string
+	Metadata []byte
 }
 
+// CreateRegistrationRequest
+//
+//	INSERT INTO registration_requests (username, email, password, metadata)
+//	VALUES ($1, $2, $3, $4)
+//	RETURNING id, username, email, password, status, metadata, created_at, updated_at, approved_by, approved_at
 func (q *Queries) CreateRegistrationRequest(ctx context.Context, arg CreateRegistrationRequestParams) (RegistrationRequest, error) {
 	row := q.db.QueryRow(ctx, createRegistrationRequest,
 		arg.Username,
@@ -54,7 +59,13 @@ WHERE id = $1
 LIMIT 1
 `
 
-func (q *Queries) GetRegistrationRequestByID(ctx context.Context, id pgtype.UUID) (RegistrationRequest, error) {
+// GetRegistrationRequestByID
+//
+//	SELECT id, username, email, password, status, metadata, created_at, updated_at, approved_by, approved_at
+//	FROM registration_requests
+//	WHERE id = $1
+//	LIMIT 1
+func (q *Queries) GetRegistrationRequestByID(ctx context.Context, id uuid.UUID) (RegistrationRequest, error) {
 	row := q.db.QueryRow(ctx, getRegistrationRequestByID, id)
 	var i RegistrationRequest
 	err := row.Scan(
@@ -81,10 +92,17 @@ LIMIT $1 OFFSET $2
 `
 
 type ListPendingRegistrationsParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	Limit  int32
+	Offset int32
 }
 
+// ListPendingRegistrations
+//
+//	SELECT id, username, email, password, status, metadata, created_at, updated_at, approved_by, approved_at
+//	FROM registration_requests
+//	WHERE status = 'pending'
+//	ORDER BY created_at DESC
+//	LIMIT $1 OFFSET $2
 func (q *Queries) ListPendingRegistrations(ctx context.Context, arg ListPendingRegistrationsParams) ([]RegistrationRequest, error) {
 	rows, err := q.db.Query(ctx, listPendingRegistrations, arg.Limit, arg.Offset)
 	if err != nil {
@@ -120,6 +138,9 @@ const registrationExistsByEmail = `-- name: RegistrationExistsByEmail :one
 SELECT EXISTS(SELECT 1 FROM registration_requests WHERE email = $1 AND status = 'pending')
 `
 
+// RegistrationExistsByEmail
+//
+//	SELECT EXISTS(SELECT 1 FROM registration_requests WHERE email = $1 AND status = 'pending')
 func (q *Queries) RegistrationExistsByEmail(ctx context.Context, email string) (bool, error) {
 	row := q.db.QueryRow(ctx, registrationExistsByEmail, email)
 	var exists bool
@@ -131,6 +152,9 @@ const registrationExistsByUsername = `-- name: RegistrationExistsByUsername :one
 SELECT EXISTS(SELECT 1 FROM registration_requests WHERE username = $1 AND status = 'pending')
 `
 
+// RegistrationExistsByUsername
+//
+//	SELECT EXISTS(SELECT 1 FROM registration_requests WHERE username = $1 AND status = 'pending')
 func (q *Queries) RegistrationExistsByUsername(ctx context.Context, username string) (bool, error) {
 	row := q.db.QueryRow(ctx, registrationExistsByUsername, username)
 	var exists bool
@@ -148,11 +172,19 @@ WHERE id = $3
 `
 
 type UpdateRegistrationStatusParams struct {
-	Status     string      `json:"status"`
-	ApprovedBy pgtype.UUID `json:"approved_by"`
-	ID         pgtype.UUID `json:"id"`
+	Status     string
+	ApprovedBy *uuid.UUID
+	ID         uuid.UUID
 }
 
+// UpdateRegistrationStatus
+//
+//	UPDATE registration_requests
+//	SET status      = $1,
+//	    approved_by = $2,
+//	    approved_at = CASE WHEN $1 = 'approved' THEN NOW() END,
+//	    updated_at  = NOW()
+//	WHERE id = $3
 func (q *Queries) UpdateRegistrationStatus(ctx context.Context, arg UpdateRegistrationStatusParams) error {
 	_, err := q.db.Exec(ctx, updateRegistrationStatus, arg.Status, arg.ApprovedBy, arg.ID)
 	return err

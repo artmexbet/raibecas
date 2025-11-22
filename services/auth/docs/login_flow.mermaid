@@ -1,0 +1,29 @@
+C4Component
+    title Аутентификация и вход (Login)
+
+    Container_Ext(client, "Client/Gateway", "Go, Fiber", "Отправляет учётные данные для входа")
+    ContainerDb(loginTopic, "auth.login", "NATS", "Request/Reply")
+
+    Container_Boundary(authService, "Auth Service") {
+        Component(authHandler, "Auth Handler", "Go, NATS Handler", "Обрабатывает запрос на вход")
+        Component(authService_comp, "Auth Service", "Business Logic", "Валидирует пароль и генерирует токены")
+        Component(jwtMgr, "JWT Manager", "Token Generation", "Создаёт access и refresh токены")
+        ContainerDb(userDB, "PostgreSQL users", "Database", "Проверяет учётные данные")
+    }
+
+    ContainerDb(redis, "Redis", "Session Storage", "Хранит refresh токены")
+    ContainerDb(userLoginTopic, "auth.user.login", "NATS", "Event")
+    Container_Ext(otherServices, "Other Services", "Microservices", "Получают события входа")
+
+    Rel(client, loginTopic, "POST: {email, password, device_id, user_agent, ip_address}", "Request/Reply")
+    Rel(loginTopic, authHandler, "Subscribe", "Handle request")
+    Rel(authHandler, authService_comp, "Login()", "Call")
+    Rel(authService_comp, userDB, "SELECT user by email", "Query")
+    Rel(userDB, authService_comp, "Return user", "Response")
+    Rel(authService_comp, jwtMgr, "GenerateAccessToken()", "Create")
+    Rel(authService_comp, jwtMgr, "GenerateRefreshToken()", "Create")
+    Rel(authService_comp, redis, "SAVE refresh_token:user:{id}", "Store")
+    Rel(authHandler, userLoginTopic, "Publish event", "Event: {user_id, device_id, user_agent, ip_address, timestamp}")
+    Rel(userLoginTopic, otherServices, "Subscribe", "Handle login event")
+    Rel(authHandler, loginTopic, "RESPONSE: {access_token, refresh_token, expires_in}", "Reply")
+

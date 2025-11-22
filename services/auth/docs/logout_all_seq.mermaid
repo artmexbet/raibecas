@@ -1,0 +1,59 @@
+sequenceDiagram
+    actor User
+    participant Gateway as Client/Gateway
+    participant NATS as NATS Broker
+    participant AuthHandler as Auth Handler
+    participant AuthService as Auth Service
+    participant JWT as JWT Manager
+    participant Cache as Redis
+    participant Events as Event Publisher
+    participant OtherServices as Other Services
+
+    User->>Gateway: Нажимает "Выход со всех устройств"
+    Gateway->>NATS: Публикует auth.logout_all запрос
+    NATS->>AuthHandler: Получает auth.logout_all
+
+    AuthHandler->>AuthService: ValidateAccessToken(token)
+    AuthService->>JWT: Validate(token)
+    JWT-->>AuthService: Возвращает claims с user_id
+    AuthService-->>AuthHandler: Возвращает claims
+
+    alt Токен невалиден
+        AuthHandler-->>NATS: Отправляет ошибку "Unauthorized"
+        NATS-->>Gateway: Возвращает ошибку
+        Gateway-->>User: Ошибка (токен истёк)
+
+    else Токен валиден, но user_id не совпадает
+        AuthHandler-->>NATS: Отправляет ошибку "Unauthorized"
+        NATS-->>Gateway: Возвращает ошибку
+        Gateway-->>User: Ошибка (несоответствие)
+
+    else Токен валиден и user_id совпадает
+        AuthHandler->>AuthService: LogoutAll(user_id)
+
+        AuthService->>Cache: SCAN refresh_token:user:{user_id}:*
+        Cache-->>AuthService: Возвращает список всех device_id
+
+        loop Для каждого device_id пользователя
+            AuthService->>Cache: GET refresh_token:user:{user_id}:{device_id}
+            Cache-->>AuthService: Возвращает token_value
+
+            AuthService->>Cache: DELETE refresh_token:user:{user_id}:{device_id}
+            Cache-->>AuthService: ОК
+
+            AuthService->>Cache: DELETE refresh_token:value:{token_value}
+            Cache-->>AuthService: ОК
+        end
+
+        AuthService-->>AuthHandler: Возвращает успех
+
+        AuthHandler->>Events: PublishUserLogout(user_id, all_devices=true, timestamp)
+        Events->>NATS: Публикует auth.user.logout
+        NATS->>OtherServices: Рассылает событие logout со всех устройств
+        OtherServices-->>OtherServices: Обрабатывают событие (разлогинивают везде)
+
+        AuthHandler->>NATS: Отправляет успешный ответ
+        NATS-->>Gateway: Возвращает {success: true, message: "Logged out from all devices"}
+        Gateway-->>User: Успешно вышли со всех устройств
+    end
+

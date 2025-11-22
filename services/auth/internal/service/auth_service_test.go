@@ -6,111 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"auth/internal/domain"
-	"auth/pkg/jwt"
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/mock"
 	"golang.org/x/crypto/bcrypt"
 )
-
-// Mock repositories for testing
-type mockUserRepository struct {
-	users map[uuid.UUID]*domain.User
-}
-
-func (m *mockUserRepository) Create(ctx context.Context, user *domain.User) error {
-	m.users[user.ID] = user
-	return nil
-}
-
-func (m *mockUserRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	for _, user := range m.users {
-		if user.Email == email {
-			return user, nil
-		}
-	}
-	return nil, domain.ErrUserNotFound
-}
-
-func (m *mockUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
-	user, ok := m.users[id]
-	if !ok {
-		return nil, domain.ErrUserNotFound
-	}
-	return user, nil
-}
-
-func (m *mockUserRepository) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
-	for _, user := range m.users {
-		if user.Username == username {
-			return user, nil
-		}
-	}
-	return nil, domain.ErrUserNotFound
-}
-
-func (m *mockUserRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
-	for _, user := range m.users {
-		if user.Email == email {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (m *mockUserRepository) ExistsByUsername(ctx context.Context, username string) (bool, error) {
-	for _, user := range m.users {
-		if user.Username == username {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (m *mockUserRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error {
-	user, ok := m.users[userID]
-	if !ok {
-		return domain.ErrUserNotFound
-	}
-	user.PasswordHash = passwordHash
-	return nil
-}
-
-type mockTokenStore struct {
-	tokens map[uuid.UUID]*domain.RefreshToken
-}
-
-func (m *mockTokenStore) StoreRefreshToken(ctx context.Context, token *domain.RefreshToken, ttl time.Duration) error {
-	m.tokens[token.UserID] = token
-	return nil
-}
-
-func (m *mockTokenStore) GetRefreshToken(ctx context.Context, userID uuid.UUID) (*domain.RefreshToken, error) {
-	token, ok := m.tokens[userID]
-	if !ok {
-		return nil, domain.ErrTokenNotFound
-	}
-	return token, nil
-}
-
-func (m *mockTokenStore) GetRefreshTokenByValue(ctx context.Context, tokenValue string) (*domain.RefreshToken, error) {
-	for _, token := range m.tokens {
-		if token.Token == tokenValue {
-			return token, nil
-		}
-	}
-	return nil, domain.ErrTokenNotFound
-}
-
-func (m *mockTokenStore) DeleteRefreshToken(ctx context.Context, userID uuid.UUID) error {
-	delete(m.tokens, userID)
-	return nil
-}
-
-func (m *mockTokenStore) DeleteAllRefreshTokens(ctx context.Context, userID uuid.UUID) error {
-	delete(m.tokens, userID)
-	return nil
-}
 
 func TestAuthService_Login_Success(t *testing.T) {
 	// Setup
@@ -119,21 +21,20 @@ func TestAuthService_Login_Success(t *testing.T) {
 	password := "password123"
 	passwordHash, _ := bcrypt.GenerateFromPassword([]byte(password), 12)
 
-	mockUsers := &mockUserRepository{
-		users: map[uuid.UUID]*domain.User{
-			userID: {
-				ID:           userID,
-				Email:        email,
-				PasswordHash: string(passwordHash),
-				Role:         domain.RoleUser,
-				IsActive:     true,
-			},
-		},
-	}
+	// Use generated mocks
+	mockUsers := NewMockIUserRepository(t)
+	mockTokens := NewMockITokenStore(t)
 
-	mockTokens := &mockTokenStore{
-		tokens: make(map[uuid.UUID]*domain.RefreshToken),
+	// Expectations
+	expectedUser := &domain.User{
+		ID:           userID,
+		Email:        email,
+		PasswordHash: string(passwordHash),
+		Role:         domain.RoleUser,
+		IsActive:     true,
 	}
+	mockUsers.EXPECT().GetByEmail(mock.Anything, email).Return(expectedUser, nil)
+	mockTokens.EXPECT().StoreRefreshToken(mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour)
 	authService := NewAuthService(mockUsers, mockTokens, jwtManager)
@@ -170,10 +71,7 @@ func TestAuthService_Login_Success(t *testing.T) {
 		t.Errorf("Expected user ID %s, got %s", userID, returnedUserID)
 	}
 
-	// Verify refresh token was stored
-	if _, ok := mockTokens.tokens[userID]; !ok {
-		t.Error("Refresh token was not stored")
-	}
+	// Expectations asserted by mock cleanup
 }
 
 func TestAuthService_Login_InvalidPassword(t *testing.T) {
@@ -183,21 +81,16 @@ func TestAuthService_Login_InvalidPassword(t *testing.T) {
 	password := "password123"
 	passwordHash, _ := bcrypt.GenerateFromPassword([]byte(password), 12)
 
-	mockUsers := &mockUserRepository{
-		users: map[uuid.UUID]*domain.User{
-			userID: {
-				ID:           userID,
-				Email:        email,
-				PasswordHash: string(passwordHash),
-				Role:         domain.RoleUser,
-				IsActive:     true,
-			},
-		},
-	}
+	mockUsers := NewMockIUserRepository(t)
+	mockTokens := NewMockITokenStore(t)
 
-	mockTokens := &mockTokenStore{
-		tokens: make(map[uuid.UUID]*domain.RefreshToken),
-	}
+	mockUsers.EXPECT().GetByEmail(mock.Anything, email).Return(&domain.User{
+		ID:           userID,
+		Email:        email,
+		PasswordHash: string(passwordHash),
+		Role:         domain.RoleUser,
+		IsActive:     true,
+	}, nil)
 
 	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour)
 	authService := NewAuthService(mockUsers, mockTokens, jwtManager)
@@ -223,21 +116,16 @@ func TestAuthService_Login_UserNotActive(t *testing.T) {
 	password := "password123"
 	passwordHash, _ := bcrypt.GenerateFromPassword([]byte(password), 12)
 
-	mockUsers := &mockUserRepository{
-		users: map[uuid.UUID]*domain.User{
-			userID: {
-				ID:           userID,
-				Email:        email,
-				PasswordHash: string(passwordHash),
-				Role:         domain.RoleUser,
-				IsActive:     false, // User is not active
-			},
-		},
-	}
+	mockUsers := NewMockIUserRepository(t)
+	mockTokens := NewMockITokenStore(t)
 
-	mockTokens := &mockTokenStore{
-		tokens: make(map[uuid.UUID]*domain.RefreshToken),
-	}
+	mockUsers.EXPECT().GetByEmail(mock.Anything, email).Return(&domain.User{
+		ID:           userID,
+		Email:        email,
+		PasswordHash: string(passwordHash),
+		Role:         domain.RoleUser,
+		IsActive:     false, // User is not active
+	}, nil)
 
 	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour)
 	authService := NewAuthService(mockUsers, mockTokens, jwtManager)
@@ -259,32 +147,22 @@ func TestAuthService_Login_UserNotActive(t *testing.T) {
 func TestAuthService_Logout(t *testing.T) {
 	// Setup
 	userID := uuid.New()
-	mockUsers := &mockUserRepository{
-		users: make(map[uuid.UUID]*domain.User),
-	}
+	mockUsers := NewMockIUserRepository(t)
+	mockTokens := NewMockITokenStore(t)
 
-	mockTokens := &mockTokenStore{
-		tokens: map[uuid.UUID]*domain.RefreshToken{
-			userID: {
-				UserID: userID,
-				Token:  "test-token",
-			},
-		},
-	}
+	// Expect DeleteRefreshToken to be called with provided token
+	mockTokens.EXPECT().DeleteRefreshToken(mock.Anything, userID, "test-token").Return(nil)
 
 	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour)
 	authService := NewAuthService(mockUsers, mockTokens, jwtManager)
 
 	// Test
-	err := authService.Logout(context.Background(), userID)
+	err := authService.Logout(context.Background(), userID, "test-token")
 
 	// Assert
 	if err != nil {
 		t.Fatalf("Expected successful logout, got error: %v", err)
 	}
 
-	// Verify token was removed
-	if _, ok := mockTokens.tokens[userID]; ok {
-		t.Error("Refresh token was not removed")
-	}
+	// Expectations asserted by mock cleanup
 }

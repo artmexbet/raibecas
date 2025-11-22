@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 
 	"github.com/nats-io/nats.go"
 )

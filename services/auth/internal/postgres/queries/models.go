@@ -5,29 +5,31 @@
 package queries
 
 import (
-	"github.com/jackc/pgx/v5/pgtype"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 type RegistrationRequest struct {
-	ID         pgtype.UUID      `json:"id"`
-	Username   string           `json:"username"`
-	Email      string           `json:"email"`
-	Password   string           `json:"password"`
-	Status     string           `json:"status"`
-	Metadata   []byte           `json:"metadata"`
-	CreatedAt  pgtype.Timestamp `json:"created_at"`
-	UpdatedAt  pgtype.Timestamp `json:"updated_at"`
-	ApprovedBy pgtype.UUID      `json:"approved_by"`
-	ApprovedAt pgtype.Timestamp `json:"approved_at"`
+	ID         uuid.UUID
+	Username   string
+	Email      string
+	Password   string
+	Status     string
+	Metadata   []byte
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	ApprovedBy *uuid.UUID
+	ApprovedAt *time.Time
 }
 
 type User struct {
-	ID           pgtype.UUID      `json:"id"`
-	Username     string           `json:"username"`
-	Email        string           `json:"email"`
-	PasswordHash string           `json:"password_hash"`
-	Role         string           `json:"role"`
-	IsActive     bool             `json:"is_active"`
-	CreatedAt    pgtype.Timestamp `json:"created_at"`
-	UpdatedAt    pgtype.Timestamp `json:"updated_at"`
+	ID           uuid.UUID
+	Username     string
+	Email        string
+	PasswordHash string
+	Role         string
+	IsActive     bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }

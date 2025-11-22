@@ -1,0 +1,54 @@
+C4Container
+    title Auth Service - Обзор архитектуры и потоков
+
+    System_Ext(clients, "Clients / Gateway", "Web/Mobile Frontend")
+
+    System_Boundary(authSystem, "Auth Service") {
+        Container(natsInbox, "NATS Request/Reply", "Message Queue", "Синхронные запросы от клиентов")
+        Container(natsEvents, "NATS Pub/Sub", "Event Bus", "Асинхронные события")
+
+        Container_Boundary(handlers, "NATS Handlers") {
+            Container(regHandler, "Registration Handler", "Go", "auth.register")
+            Container(authHandler, "Auth Handler", "Go", "auth.login, auth.logout, auth.logout_all, auth.refresh, auth.validate, auth.change_password")
+        }
+
+        Container_Boundary(services, "Services") {
+            Container(regService, "Registration Service", "Go", "Управление заявками на регистрацию")
+            Container(authService, "Auth Service", "Go", "JWT, валидация, токены")
+        }
+
+        Container_Boundary(domain, "Domain") {
+            Container(jwtMgr, "JWT Manager", "Go", "Генерация и валидация токенов")
+            Container(passwordMgr, "Password Manager", "Go", "Хеширование и проверка паролей (bcrypt)")
+        }
+
+        Container_Boundary(persistence, "Persistence") {
+            ContainerDb(postgres, "PostgreSQL", "Database", "users, registration_requests таблицы")
+            ContainerDb(redis, "Redis", "Cache", "refresh_token:user:{id}, refresh_token:value:{token}")
+        }
+    }
+
+    System_Ext(adminService, "Admin Service", "Управление заявками на регистрацию")
+    System_Ext(otherServices, "Other Services", "Использование событий Auth")
+
+    Rel(clients, natsInbox, "Запросы на действия", "POST")
+    Rel(natsInbox, regHandler, "auth.register", "Subscribe")
+    Rel(natsInbox, authHandler, "auth.login, auth.logout...", "Subscribe")
+
+    Rel(regHandler, regService, "CreateRegistrationRequest()", "Call")
+    Rel(regHandler, natsEvents, "auth.registration.requested", "Publish")
+    Rel(natsEvents, adminService, "Событие заявки", "Subscribe")
+    Rel(adminService, natsEvents, "admin.registration.approved/rejected", "Publish")
+
+    Rel(authHandler, authService, "Login(), Logout(), Refresh()...", "Call")
+    Rel(authService, jwtMgr, "GenerateToken(), ValidateToken()", "Call")
+    Rel(authService, passwordMgr, "HashPassword(), VerifyPassword()", "Call")
+
+    Rel(regService, postgres, "INSERT/UPDATE registration_requests", "SQL")
+    Rel(authService, postgres, "SELECT/UPDATE users", "SQL")
+    Rel(authService, redis, "GET/SET/DELETE tokens", "Redis")
+
+    Rel(regHandler, natsEvents, "auth.user.registered", "Publish")
+    Rel(authHandler, natsEvents, "auth.user.login, auth.user.logout, auth.password.reset", "Publish")
+    Rel(natsEvents, otherServices, "События для других сервисов", "Subscribe")
+

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"auth/internal/domain"
-	"auth/pkg/jwt"
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"

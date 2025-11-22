@@ -1,23 +1,22 @@
 package postgres
 
 import (
-	"auth/internal/domain"
-	"auth/internal/postgres/queries"
 	"context"
 	"encoding/json"
 	"fmt"
-	"utills/pg"
+
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/internal/postgres/queries"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
-func (p *Postgres) CreateRegistrationRequest(ctx context.Context, req *domain.RegistrationRequest) error {
+func (p *Postgres) CreateRegistrationRequest(ctx context.Context, req *domain.RegistrationRequest) (uuid.UUID, error) {
 	metadata, err := json.Marshal(req.Metadata)
 	if err != nil {
-		return fmt.Errorf("could not marshal metadata: %v", err)
+		return uuid.Nil, fmt.Errorf("could not marshal metadata: %v", err)
 	}
-	_, err = p.q.CreateRegistrationRequest(ctx,
+	resp, err := p.q.CreateRegistrationRequest(ctx,
 		queries.CreateRegistrationRequestParams{
 			Username: req.Username,
 			Email:    req.Email,
@@ -26,13 +25,13 @@ func (p *Postgres) CreateRegistrationRequest(ctx context.Context, req *domain.Re
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("could not create registration request: %v", err)
+		return uuid.Nil, fmt.Errorf("could not create registration request: %v", err)
 	}
-	return nil
+	return resp.ID, nil
 }
 
 func (p *Postgres) GetRegistrationRequestByID(ctx context.Context, id uuid.UUID) (*domain.RegistrationRequest, error) {
-	r, err := p.q.GetRegistrationRequestByID(ctx, pg.UUIDFromGoogle(id))
+	r, err := p.q.GetRegistrationRequestByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("could not get registration request by id: %v", err)
 	}
@@ -44,14 +43,10 @@ func (p *Postgres) GetRegistrationRequestByID(ctx context.Context, id uuid.UUID)
 }
 
 func (p *Postgres) UpdateRegistrationRequestStatus(ctx context.Context, id uuid.UUID, status domain.RegistrationStatus, approvedBy *uuid.UUID) error {
-	var pgApprovedBy pgtype.UUID
-	if approvedBy != nil {
-		pgApprovedBy = pg.UUIDFromGoogle(*approvedBy)
-	}
 	err := p.q.UpdateRegistrationStatus(ctx, queries.UpdateRegistrationStatusParams{
-		ID:         pg.UUIDFromGoogle(id),
+		ID:         id,
 		Status:     status.String(),
-		ApprovedBy: pgApprovedBy,
+		ApprovedBy: approvedBy,
 	})
 	if err != nil {
 		return fmt.Errorf("could not update registration request status: %v", err)

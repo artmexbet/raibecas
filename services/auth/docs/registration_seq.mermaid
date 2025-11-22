@@ -1,0 +1,59 @@
+sequenceDiagram
+    actor User
+    participant Gateway as Client/Gateway
+    participant NATS as NATS Broker
+    participant RegHandler as Reg. Handler
+    participant RegService as Reg. Service
+    participant DB as PostgreSQL
+    participant Events as Event Publisher
+    participant AdminService as Admin Service
+    participant AuthHandler as Auth Handler
+
+    User->>Gateway: Заполняет форму регистрации
+    Gateway->>NATS: Публикует auth.register запрос
+    NATS->>RegHandler: Получает auth.register
+
+    RegHandler->>RegService: CreateRegistrationRequest(username, email, password, metadata)
+
+    alt Email уже существует
+        RegService-->>RegHandler: Возвращает ошибку "Email already exists"
+        RegHandler->>NATS: Отправляет ошибку
+        NATS-->>Gateway: Возвращает ошибку
+        Gateway-->>User: Ошибка регистрации
+    else Email свободен
+        RegService->>RegService: Хеширует пароль (bcrypt)
+        RegService->>DB: INSERT INTO registration_requests
+        DB-->>RegService: Возвращает request_id
+
+        RegService-->>RegHandler: Возвращает request_id и статус "pending"
+
+        RegHandler->>Events: PublishRegistrationRequested(request_id, username, email, timestamp)
+        Events->>NATS: Публикует auth.registration.requested
+        NATS->>AdminService: Рассылает событие заявки
+        AdminService-->>AdminService: Получает уведомление о новой заявке
+
+        RegHandler->>NATS: Отправляет успешный ответ
+        NATS-->>Gateway: Возвращает {request_id, status: "pending"}
+        Gateway-->>User: Заявка отправлена, ждите одобрения
+
+        par Администратор рассматривает заявку
+            AdminService->>AdminService: Проверяет заявку
+            AdminService->>NATS: Публикует admin.registration.approved/rejected
+            NATS->>RegHandler: Получает решение администратора
+
+            alt Заявка одобрена
+                RegHandler->>DB: UPDATE registration_requests SET status = 'approved'
+                RegHandler->>DB: INSERT INTO users (username, email, password_hash, role, status='active')
+                DB-->>RegHandler: ОК
+
+                RegHandler->>Events: PublishUserRegistered(user_id, username, email, timestamp)
+                Events->>NATS: Публикует auth.user.registered
+                NATS-->>NATS: Рассылает событие регистрации другим сервисам
+
+            else Заявка отклонена
+                RegHandler->>DB: UPDATE registration_requests SET status = 'rejected'
+                DB-->>RegHandler: ОК
+            end
+        end
+    end
+

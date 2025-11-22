@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 
 	"github.com/google/uuid"
 )

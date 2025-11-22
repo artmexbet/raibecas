@@ -10,7 +10,7 @@ import (
 // Config holds all configuration for the auth service
 type Config struct {
 	Server   ServerConfig   `yaml:"server" env-prefix:"SERVER_"`
-	Database DatabaseConfig `yaml:"database" env-prefix:"DATABASE_"`
+	Database DatabaseConfig `yaml:"database" env-prefix:"DB_"`
 	Redis    RedisConfig    `yaml:"redis" env-prefix:"REDIS_"`
 	NATS     NATSConfig     `yaml:"nats" env-prefix:"NATS_"`
 	JWT      JWTConfig      `yaml:"jwt" env-prefix:"JWT_"`
@@ -40,7 +40,7 @@ type DatabaseConfig struct {
 type RedisConfig struct {
 	Host     string `env:"HOST" env-default:"localhost"`
 	Port     string `env:"PORT" env-default:"6379"`
-	Password string `env:"PASSWORD"`
+	Password string `env:"PASSWORD" env-default:""`
 	DB       int    `env:"DB" env-default:"0"`
 }
 

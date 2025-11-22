@@ -3,11 +3,12 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
-	"auth/internal/domain"
-	"auth/pkg/jwt"
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
 
 	"github.com/google/uuid"
 	natspkg "github.com/nats-io/nats.go"
@@ -57,7 +58,7 @@ func (h *AuthHandler) HandleLogin(msg *natspkg.Msg) {
 
 	tokens, userID, err := h.authService.Login(ctx, loginReq)
 	if err != nil {
-		h.respondError(msg, "Invalid credentials")
+		h.respondError(msg, fmt.Sprintf("invalid credentials: %v", err))
 		return
 	}
 

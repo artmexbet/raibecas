@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"time"
 
-	"auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"

@@ -1,0 +1,57 @@
+C4Component
+    title NATS топики - Карта всех сообщений Auth Service
+
+    Container_Ext(clients, "Clients / Services", "External", "Отправители запросов")
+    Container_Ext(otherServices, "Other Services", "Microservices", "Получатели событий")
+    Container_Ext(adminService, "Admin Service", "Microservice", "Управление регистрацией")
+
+    ContainerDb(requestReplyTopics, "Request/Reply Topics", "NATS", "Синхронные запросы")
+    ContainerDb(pubSubTopics, "Pub/Sub Topics", "NATS", "Асинхронные события")
+
+    Container_Boundary(requestTopics, "Входящие Request/Reply") {
+        ContainerDb(registerReq, "auth.register", "Request/Reply", "Создать заявку на регистрацию")
+        ContainerDb(loginReq, "auth.login", "Request/Reply", "Аутентифицировать пользователя")
+        ContainerDb(validateReq, "auth.validate", "Request/Reply", "Валидировать access token")
+        ContainerDb(refreshReq, "auth.refresh", "Request/Reply", "Обновить access token")
+        ContainerDb(logoutReq, "auth.logout", "Request/Reply", "Выход с текущего устройства")
+        ContainerDb(logoutAllReq, "auth.logout_all", "Request/Reply", "Выход со всех устройств")
+        ContainerDb(changePassReq, "auth.change_password", "Request/Reply", "Изменить пароль")
+    }
+
+    Container_Boundary(pubsubTopics, "Публикуемые события (Pub/Sub)") {
+        ContainerDb(regReqEvent, "auth.registration.requested", "Event", "Заявка на регистрацию создана")
+        ContainerDb(userRegEvent, "auth.user.registered", "Event", "Пользователь зарегистрирован")
+        ContainerDb(userLoginEvent, "auth.user.login", "Event", "Пользователь вошёл")
+        ContainerDb(userLogoutEvent, "auth.user.logout", "Event", "Пользователь вышел")
+        ContainerDb(passwordResetEvent, "auth.password.reset", "Event", "Пароль изменён")
+    }
+
+    Container_Boundary(subscribeTopics, "Подписанные события") {
+        ContainerDb(regApprovedEvent, "admin.registration.approved", "Event", "Заявка одобрена")
+        ContainerDb(regRejectedEvent, "admin.registration.rejected", "Event", "Заявка отклонена")
+    }
+
+    Rel(clients, registerReq, "Заявка на регистрацию", "Request")
+    Rel(clients, loginReq, "Учётные данные", "Request")
+    Rel(clients, validateReq, "Токен для проверки", "Request")
+    Rel(clients, refreshReq, "Refresh token", "Request")
+    Rel(clients, logoutReq, "Запрос на выход", "Request")
+    Rel(clients, logoutAllReq, "Выход со всех устройств", "Request")
+    Rel(clients, changePassReq, "Старый и новый пароль", "Request")
+
+    Rel(registerReq, regReqEvent, "Автоматически публикуется", "Internal")
+    Rel(regReqEvent, adminService, "Заявка на рассмотрение", "Event")
+    Rel(adminService, regApprovedEvent, "Одобрение", "Event")
+    Rel(adminService, regRejectedEvent, "Отклонение", "Event")
+    Rel(regApprovedEvent, userRegEvent, "Пользователь создан", "Internal")
+
+    Rel(loginReq, userLoginEvent, "Автоматически публикуется", "Internal")
+    Rel(logoutReq, userLogoutEvent, "Автоматически публикуется", "Internal")
+    Rel(logoutAllReq, userLogoutEvent, "Автоматически публикуется (all_devices)", "Internal")
+    Rel(changePassReq, passwordResetEvent, "Автоматически публикуется", "Internal")
+
+    Rel(userRegEvent, otherServices, "Событие регистрации", "Subscribe")
+    Rel(userLoginEvent, otherServices, "Событие входа", "Subscribe")
+    Rel(userLogoutEvent, otherServices, "Событие выхода", "Subscribe")
+    Rel(passwordResetEvent, otherServices, "Событие смены пароля", "Subscribe")
+

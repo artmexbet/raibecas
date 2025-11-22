@@ -2,24 +2,23 @@ package main
 
 import (
 	"log"
+	"log/slog"
 
-	"auth/internal/config"
-	"auth/internal/server"
+	"github.com/artmexbet/raibecas/services/auth/internal/config"
+	"github.com/artmexbet/raibecas/services/auth/internal/server"
 )
 
 func main() {
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		slog.Error("Failed to load config", "err", err)
 	}
-
-	log.Println("Starting Auth service with NATS...")
 
 	// CreateUser NATS-based server
 	srv, err := server.NewNATS(cfg)
 	if err != nil {
-		log.Fatalf("Failed to create server: %v", err)
+		slog.Error("Failed to create server", "err", err)
 	}
 
 	// Start server (blocks until shutdown signal)

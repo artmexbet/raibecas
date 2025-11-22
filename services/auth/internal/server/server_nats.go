@@ -1,7 +1,6 @@
 package server
 
 import (
-	"auth/internal/postgres"
 	"context"
 	"fmt"
 	"log/slog"
@@ -10,13 +9,14 @@ import (
 	"syscall"
 	"time"
 
-	"auth/internal/config"
-	"auth/internal/handler"
-	"auth/internal/nats"
-	"auth/internal/repository"
-	"auth/internal/service"
-	"auth/internal/storeredis"
-	"auth/pkg/jwt"
+	"github.com/artmexbet/raibecas/services/auth/internal/config"
+	"github.com/artmexbet/raibecas/services/auth/internal/handler"
+	"github.com/artmexbet/raibecas/services/auth/internal/nats"
+	"github.com/artmexbet/raibecas/services/auth/internal/postgres"
+	"github.com/artmexbet/raibecas/services/auth/internal/repository"
+	"github.com/artmexbet/raibecas/services/auth/internal/service"
+	"github.com/artmexbet/raibecas/services/auth/internal/storeredis"
+	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	natsgo "github.com/nats-io/nats.go"
