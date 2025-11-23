@@ -1,6 +1,9 @@
 go 1.25.1
 
 use (
+	./libs/utils
+
 	./services/auth
 	./services/gateway
+	./services/chat
 )
