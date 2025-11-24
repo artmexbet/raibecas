@@ -3,6 +3,7 @@ package neuro
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 
@@ -52,10 +53,12 @@ func (e *Connector) GenerateEmbeddings(ctx context.Context, input string) ([]flo
 // - fn is a callback function that processes each chunk of the streaming response.
 func (e *Connector) Chat(
 	ctx context.Context,
-	chatHistory []domain.Message,
+	workingContext domain.WorkingContext,
 	newPrompt string,
 	fn func(domain.ChatResponse) error,
 ) error {
+	// Prepare chat messages history
+	chatHistory := workingContext.Messages
 	msgs := make([]ollamaApi.Message, len(chatHistory)+1)
 	for i, m := range chatHistory {
 		msgs[i] = ollamaApi.Message{
@@ -63,17 +66,23 @@ func (e *Connector) Chat(
 			Content: m.Content,
 		}
 	}
+
+	preparedContext := workingContext.PrepareContext(newPrompt)
+	slog.DebugContext(ctx, "Prepared context", "context", preparedContext)
+
+	// Add the new user prompt with prepared context (e.g., including relevant documents)
 	msgs[len(chatHistory)] = ollamaApi.Message{
 		Role:    "user",
-		Content: newPrompt,
+		Content: preparedContext,
 	}
 
 	reqData := &ollamaApi.ChatRequest{
-		Model:    e.cfg.EmbeddingModel,
+		Model:    e.cfg.GenerationModel,
 		Messages: msgs,
-		Stream:   pointer.To(true),
+		Stream:   pointer.To(false), //todo: make streaming configurable
 	}
 	err := e.client.Chat(ctx, reqData, func(resp ollamaApi.ChatResponse) error {
+		// Map ollamaApi.ChatResponse to domain.ChatResponse for every chunk
 		return fn(domain.ChatResponse{
 			Done:      resp.Done,
 			CreatedAt: resp.CreatedAt,

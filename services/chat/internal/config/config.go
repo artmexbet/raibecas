@@ -35,12 +35,29 @@ func (o *Ollama) GetAddress() string {
 type Redis struct {
 	Host string `yaml:"host" env:"HOST" env-default:"localhost"`
 	Port string `yaml:"port" env:"PORT" env-default:"6379"`
+	DB   int    `yaml:"db" env:"DB" env-default:"0"`
+}
+
+func (r *Redis) GetAddress() string {
+	return fmt.Sprintf("%s:%s", r.Host, r.Port)
+}
+
+type HTTP struct {
+	Host string `yaml:"host" env:"HOST" env-default:"localhost"`
+	Port string `yaml:"port" env:"PORT" env-default:"8080"`
+}
+
+func (h *HTTP) GetAddress() string {
+	return fmt.Sprintf("%s:%s", h.Host, h.Port)
 }
 
 type Config struct {
-	Qdrant *Qdrant `yaml:"qdrant" env-prefix:"QDRANT_"`
-	Ollama *Ollama `yaml:"ollama" env-prefix:"OLLAMA_"`
-	Redis  *Redis  `yaml:"redis" env-prefix:"REDIS_"`
+	Qdrant Qdrant `yaml:"qdrant" env-prefix:"QDRANT_"`
+	Ollama Ollama `yaml:"ollama" env-prefix:"OLLAMA_"`
+	Redis  Redis  `yaml:"redis" env-prefix:"REDIS_"`
+
+	HTTP    HTTP `yaml:"http" env-prefix:"HTTP_"`
+	UseHTTP bool `yaml:"use_http" env:"USE_HTTP" env-default:"false"`
 }
 
 // Load loads configuration from environment variables using cleanenv
