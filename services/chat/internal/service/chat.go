@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/artmexbet/raibecas/services/chat/internal/domain"
 )
@@ -49,6 +50,7 @@ func (c *Chat) ProcessInput(ctx context.Context, input, userID string, fn func(r
 	if err != nil {
 		return fmt.Errorf("could not retrieve vectors: %w", err)
 	}
+	slog.DebugContext(ctx, "retrieved documents", "count", len(docs), "docs", docs)
 
 	//DONT RETRIEVE HISTORY FOR NOW //todo: implement saving and retrieving chat history
 	//history, err := c.historyStore.RetrieveChatHistory(ctx, userID)

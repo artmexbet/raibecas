@@ -71,7 +71,7 @@ func (q *QdrantWrapper) RetrieveVectors(ctx context.Context, vector []float64) (
 			Metadata: make(map[string]interface{}),
 		}
 		for key, value := range v.Payload {
-			response[i].Metadata[key] = value //todo: check the type of value. May be need to convert
+			response[i].Metadata[key] = value.GetStringValue()
 		}
 	}
 

@@ -1,6 +1,7 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"log/slog"
@@ -8,7 +9,6 @@ import (
 	"github.com/artmexbet/raibecas/services/chat/internal/config"
 	"github.com/artmexbet/raibecas/services/chat/internal/domain"
 	"github.com/artmexbet/raibecas/services/chat/internal/handler/models"
-
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
@@ -67,6 +67,7 @@ func (h *Handler) RegisterRoutes() {
 		c.Set("Cache-Control", "no-cache")
 
 		slog.Debug("Processing chat input", slog.String("request_id", c.Get(fiber.HeaderXRequestID)))
+		buf := bytes.NewBuffer(nil)
 		// Stream chunks as they arrive
 		err = h.svc.ProcessInput(c.UserContext(), req.Input, req.UserID, func(response domain.ChatResponse) error {
 			slog.DebugContext(c.UserContext(), "Sending chat response chunk",
@@ -77,21 +78,16 @@ func (h *Handler) RegisterRoutes() {
 			if err != nil {
 				return err
 			}
-
-			// Send the chunk followed by newline (NDJSON format)
-			if _, err := c.WriteString(string(data) + "\n"); err != nil {
-				return err
-			}
+			buf.WriteString(string(data) + "\n")
 
 			// Flush the response writer to send data immediately
-			return c.SendStream(nil)
+			return nil
 		})
 
 		if err != nil {
 			return err
 		}
-
-		return nil
+		return c.SendStream(buf)
 	})
 }
 
