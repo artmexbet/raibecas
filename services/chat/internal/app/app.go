@@ -20,13 +20,18 @@ import (
 	"github.com/artmexbet/raibecas/services/chat/internal/service"
 )
 
+// App represents the main entry point for the chat service application.
 type App struct {
 }
 
+// New creates and returns a new App instance.
 func New() *App {
 	return &App{}
 }
 
+// Run initializes the chat service application by loading configuration,
+// setting up Qdrant and Ollama clients, and preparing the service.
+// It returns an error if any initialization step fails.
 func (a *App) Run() error {
 	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{

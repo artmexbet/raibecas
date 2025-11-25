@@ -17,6 +17,8 @@ type QdrantWrapper struct {
 	cfg    *config.Qdrant
 }
 
+// New creates a new QdrantWrapper instance with the provided configuration and Qdrant client.
+// cfg is the Qdrant configuration, and client is the Qdrant client used for communication.
 func New(cfg *config.Qdrant, client *qdrant.Client) *QdrantWrapper {
 	return &QdrantWrapper{
 		client: client,
@@ -24,6 +26,9 @@ func New(cfg *config.Qdrant, client *qdrant.Client) *QdrantWrapper {
 	}
 }
 
+// RetrieveVectors queries the Qdrant vector database for similar vectors based on the input vector.
+// It takes a context for cancellation and a slice of float64 representing the query vector.
+// Returns an error if the retrieval fails.
 func (q *QdrantWrapper) CheckConnection(ctx context.Context) error {
 	exists, err := q.client.CollectionExists(ctx, q.cfg.CollectionName)
 	if err != nil {

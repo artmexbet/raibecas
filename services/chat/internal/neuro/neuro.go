@@ -20,6 +20,9 @@ type Connector struct {
 	baseRoute string
 }
 
+// NewConnector creates a new Connector for interacting with the Ollama API.
+// cfg is the Ollama configuration containing the API address and model settings.
+// Returns a Connector instance or an error if the address is invalid.
 func NewConnector(cfg *config.Ollama) (*Connector, error) {
 	httpClient := &http.Client{}
 	u, err := url.Parse(cfg.GetAddress())
@@ -35,7 +38,7 @@ func NewConnector(cfg *config.Ollama) (*Connector, error) {
 	}, nil
 }
 
-// GenerateEmbeddings send a request to Ollama to generate embeddings for the given input text.
+// GenerateEmbeddings sends a request to Ollama to generate embeddings for the given input text.
 func (e *Connector) GenerateEmbeddings(ctx context.Context, input string) ([]float64, error) {
 	reqData := &ollamaApi.EmbeddingRequest{
 		Model:  e.cfg.EmbeddingModel,
