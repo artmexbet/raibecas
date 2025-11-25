@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
 )
@@ -44,9 +45,11 @@ func (o *Ollama) GetAddress() string {
 }
 
 type Redis struct {
-	Host string `yaml:"host" env:"HOST" env-default:"localhost"`
-	Port string `yaml:"port" env:"PORT" env-default:"6379"`
-	DB   int    `yaml:"db" env:"DB" env-default:"0"`
+	Host       string        `yaml:"host" env:"HOST" env-default:"localhost"`
+	Port       string        `yaml:"port" env:"PORT" env-default:"6379"`
+	DB         int           `yaml:"db" env:"DB" env-default:"0"`
+	ChatTTL    time.Duration `yaml:"chat_ttl" env:"CHAT_TTL" env-default:"86400s"` // 24 hours in seconds
+	MessageTTL time.Duration `yaml:"message_ttl" env:"MESSAGE_TTL" env-default:"86400s"`
 }
 
 func (r *Redis) GetAddress() string {

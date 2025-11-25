@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/artmexbet/raibecas/services/chat/internal/domain"
 )
@@ -24,6 +25,9 @@ type iNeuroConnector interface {
 
 type iChatHistoryStore interface {
 	RetrieveChatHistory(ctx context.Context, userID string) ([]domain.Message, error)
+	SaveMessage(ctx context.Context, userID string, message domain.Message) error
+	ClearChatHistory(ctx context.Context, userID string) error
+	GetChatSize(ctx context.Context, userID string) (int, error)
 }
 
 type Chat struct {
@@ -52,16 +56,57 @@ func (c *Chat) ProcessInput(ctx context.Context, input, userID string, fn func(r
 	}
 	slog.DebugContext(ctx, "retrieved documents", "count", len(docs), "docs", docs)
 
-	//DONT RETRIEVE HISTORY FOR NOW //todo: implement saving and retrieving chat history
-	//history, err := c.historyStore.RetrieveChatHistory(ctx, userID)
-	//if err != nil {
-	//	return fmt.Errorf("could not retrieve chat history: %w", err)
-	//}
+	// Retrieve chat history from Redis
+	history, err := c.historyStore.RetrieveChatHistory(ctx, userID)
+	if err != nil {
+		slog.WarnContext(ctx, "could not retrieve chat history", "error", err)
+		history = []domain.Message{}
+	}
+
+	// Add user message to history
+	userMessage := domain.Message{
+		Role:    "user",
+		Content: input,
+	}
+	err = c.historyStore.SaveMessage(ctx, userID, userMessage)
+	if err != nil {
+		slog.WarnContext(ctx, "could not save user message", "error", err)
+	}
 
 	workingContext := domain.WorkingContext{
-		Messages: []domain.Message{}, //history,
+		Messages: history,
 		Docs:     docs,
 	}
-	//todo: save chat history. Maybe wrap fn to do it after each response chunk
-	return c.neuro.Chat(ctx, workingContext, input, fn)
+
+	// Process response with message chunking and saving
+	assistantContent := strings.Builder{}
+	err = c.neuro.Chat(ctx, workingContext, input, func(response domain.ChatResponse) error {
+		// Accumulate message chunks
+		if response.Message != nil && response.Message.Content != "" {
+			assistantContent.WriteString(response.Message.Content)
+		}
+
+		// If message is complete, save full message to history
+		if response.Done {
+			fullMessage := domain.Message{
+				Role:    "assistant",
+				Content: assistantContent.String(),
+			}
+			slog.DebugContext(ctx, "Sending chat response chunk")
+			err := c.historyStore.SaveMessage(ctx, userID, fullMessage)
+			if err != nil {
+				slog.WarnContext(ctx, "could not save assistant message", "error", err)
+			}
+		}
+
+		// Pass response to handler (streaming)
+		return fn(response)
+	})
+
+	return err
+}
+
+// ClearUserChat clears all chat history for a user
+func (c *Chat) ClearUserChat(ctx context.Context, userID string) error {
+	return c.historyStore.ClearChatHistory(ctx, userID)
 }
