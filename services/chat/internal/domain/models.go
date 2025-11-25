@@ -3,12 +3,13 @@ package domain
 import (
 	"strings"
 	"time"
+
+	"github.com/artmexbet/raibecas/services/chat/internal/config"
 )
 
 //go:generate easyjson -all models.go
 
 const (
-	MaxDocumentLength       = 768 // in characters todo: make configurable
 	AdditionalCountOfTokens = 512 // in tokens
 )
 
@@ -34,18 +35,27 @@ type WorkingContext struct {
 	Docs     []Document `json:"documents"` // Retrieved documents. May be empty.
 }
 
-func (wc *WorkingContext) PrepareContext(query string) string {
+func (wc *WorkingContext) PrepareContext(query string, cfg config.ContextGeneration) string {
 	sBuilder := strings.Builder{}
-	sBuilder.Grow(len(wc.Docs)*MaxDocumentLength +
-		len(query) + AdditionalCountOfTokens)
-	sBuilder.WriteString("Context: ")
+	// Preallocate memory to reduce allocations
+	sBuilder.Grow(
+		len(cfg.BasePrompt) +
+			len(cfg.ContextPrompt) +
+			len(cfg.QueryPrompt) +
+			len(wc.Docs)*cfg.VectorDimension +
+			len(query) + AdditionalCountOfTokens,
+	)
+	// Build the context string
+	sBuilder.WriteString(cfg.BasePrompt)
+	sBuilder.WriteString("\n")
+	sBuilder.WriteString(cfg.ContextPrompt)
 	for _, doc := range wc.Docs {
 		if content, ok := doc.Metadata["content"].(string); ok {
 			sBuilder.WriteString(content)
 			sBuilder.WriteString("\n")
 		}
 	}
-	sBuilder.WriteString("Query: ")
+	sBuilder.WriteString(cfg.QueryPrompt)
 	sBuilder.WriteString(query)
 	return sBuilder.String()
 }

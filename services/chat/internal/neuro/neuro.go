@@ -67,7 +67,7 @@ func (e *Connector) Chat(
 		}
 	}
 
-	preparedContext := workingContext.PrepareContext(newPrompt)
+	preparedContext := workingContext.PrepareContext(newPrompt, e.cfg.Context)
 	slog.DebugContext(ctx, "Prepared context", "context", preparedContext)
 
 	// Add the new user prompt with prepared context (e.g., including relevant documents)
@@ -79,7 +79,7 @@ func (e *Connector) Chat(
 	reqData := &ollamaApi.ChatRequest{
 		Model:    e.cfg.GenerationModel,
 		Messages: msgs,
-		Stream:   pointer.To(false), //todo: make streaming configurable
+		Stream:   pointer.To(e.cfg.StreamAnswers),
 	}
 	err := e.client.Chat(ctx, reqData, func(resp ollamaApi.ChatResponse) error {
 		// Map ollamaApi.ChatResponse to domain.ChatResponse for every chunk

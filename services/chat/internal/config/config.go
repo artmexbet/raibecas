@@ -13,10 +13,18 @@ type Qdrant struct {
 	CollectionName  string `yaml:"collection_name" env:"COLLECTION_NAME" env-default:"documents"`
 	RetrievePayload bool   `yaml:"retrieve_payload" env:"RETRIEVE_PAYLOAD" env-default:"true"`
 	CountOfResults  uint64 `yaml:"count_of_results" env:"COUNT_OF_RESULTS" env-default:"5"`
+	VectorDimension uint64 `yaml:"vector_dimension" env:"VECTOR_DIMENSION" env-default:"768"`
 }
 
 func (q *Qdrant) GetAddress() string {
 	return fmt.Sprintf("%s:%d", q.Host, q.Port)
+}
+
+type ContextGeneration struct {
+	VectorDimension int    `yaml:"vector_dimension" env:"VECTOR_DIMENSION"`
+	BasePrompt      string `yaml:"base_prompt" env:"BASE_PROMPT"` //todo: maybe use file?
+	ContextPrompt   string `yaml:"context_prompt" env:"CONTEXT_PROMPT"`
+	QueryPrompt     string `yaml:"query_prompt" env:"QUERY_PROMPT"`
 }
 
 type Ollama struct {
@@ -26,6 +34,9 @@ type Ollama struct {
 
 	EmbeddingModel  string `yaml:"embedding-model" env:"EMBEDDING_MODEL" env-default:"embeddinggemma"`
 	GenerationModel string `yaml:"generation-model" env:"GENERATION_MODEL" env-default:"gemma3:4b"`
+
+	StreamAnswers bool              `yaml:"stream_answers" env:"STREAM_ANSWERS" env-default:"false"`
+	Context       ContextGeneration `yaml:"context_generation" env-prefix:"CONTEXT_GENERATION_"`
 }
 
 func (o *Ollama) GetAddress() string {

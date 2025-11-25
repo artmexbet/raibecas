@@ -36,7 +36,7 @@ func (q *QdrantWrapper) CheckConnection(ctx context.Context) error {
 		return q.client.CreateCollection(ctx, &qdrant.CreateCollection{
 			CollectionName: q.cfg.CollectionName,
 			VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
-				Size:     768, //todo:make configurable
+				Size:     q.cfg.VectorDimension,
 				Distance: qdrant.Distance_Cosine,
 			}),
 		})

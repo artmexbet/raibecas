@@ -9,6 +9,8 @@ import (
 	"github.com/qdrant/go-client/qdrant"
 )
 
+const vectorDimension = 768
+
 func main() {
 	client, err := qdrant.NewClient(&qdrant.Config{
 		Host: "localhost",
@@ -27,7 +29,7 @@ func main() {
 		err = client.CreateCollection(ctx, &qdrant.CreateCollection{
 			CollectionName: "books",
 			VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
-				Size:     768, //todo:make configurable
+				Size:     vectorDimension,
 				Distance: qdrant.Distance_Cosine,
 			}),
 		})
@@ -46,6 +48,7 @@ func main() {
 		Port:            "11434",
 		EmbeddingModel:  "embeddinggemma",
 		GenerationModel: "gemma3:4b",
+		Context:         config.ContextGeneration{VectorDimension: vectorDimension},
 	})
 	if err != nil {
 		panic(err)
