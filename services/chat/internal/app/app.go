@@ -9,15 +9,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/qdrant/go-client/qdrant"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/artmexbet/raibecas/services/chat/internal/config"
 	"github.com/artmexbet/raibecas/services/chat/internal/handler/http"
 	"github.com/artmexbet/raibecas/services/chat/internal/neuro"
 	qdrantWrapper "github.com/artmexbet/raibecas/services/chat/internal/qdrant-wrapper"
 	_redis "github.com/artmexbet/raibecas/services/chat/internal/redis"
 	"github.com/artmexbet/raibecas/services/chat/internal/service"
-	"github.com/redis/go-redis/v9"
-
-	"github.com/qdrant/go-client/qdrant"
 )
 
 type App struct {
@@ -78,7 +78,7 @@ func (a *App) Run() error {
 
 	ch := make(chan os.Signal, 1)
 	defer close(ch)
-	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
+	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
 
 	var api *http.Handler
 	if cfg.UseHTTP {

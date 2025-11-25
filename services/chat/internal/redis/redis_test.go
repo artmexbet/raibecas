@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/artmexbet/raibecas/services/chat/internal/config"
 	"github.com/artmexbet/raibecas/services/chat/internal/domain"
-	"github.com/redis/go-redis/v9"
 )
 
 // TestRedisSetup creates a test Redis client

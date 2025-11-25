@@ -4,9 +4,10 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/qdrant/go-client/qdrant"
+
 	"github.com/artmexbet/raibecas/services/chat/internal/config"
 	"github.com/artmexbet/raibecas/services/chat/internal/neuro"
-	"github.com/qdrant/go-client/qdrant"
 )
 
 const vectorDimension = 768

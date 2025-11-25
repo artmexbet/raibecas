@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/qdrant/go-client/qdrant"
 	"utils/pointer"
 
 	"github.com/artmexbet/raibecas/services/chat/internal/config"
 	"github.com/artmexbet/raibecas/services/chat/internal/domain"
-
-	"github.com/qdrant/go-client/qdrant"
 )
 
 type QdrantWrapper struct {
@@ -49,7 +48,6 @@ func (q *QdrantWrapper) RetrieveVectors(ctx context.Context, vector []float64) (
 	for i, v := range vector {
 		convertedVector[i] = float32(v)
 	}
-	vector = nil // to avoid accidental usage
 
 	result, err := q.client.Query(
 		ctx,

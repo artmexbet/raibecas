@@ -3,15 +3,15 @@ package http
 import (
 	"context"
 
-	"github.com/artmexbet/raibecas/services/chat/internal/config"
-	"github.com/artmexbet/raibecas/services/chat/internal/domain"
-
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	recover2 "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
+
+	"github.com/artmexbet/raibecas/services/chat/internal/config"
+	"github.com/artmexbet/raibecas/services/chat/internal/domain"
 )
 
 type iService interface {

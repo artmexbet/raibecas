@@ -7,12 +7,11 @@ import (
 	"net/http"
 	"net/url"
 
+	ollamaApi "github.com/ollama/ollama/api"
 	"utils/pointer"
 
 	"github.com/artmexbet/raibecas/services/chat/internal/config"
 	"github.com/artmexbet/raibecas/services/chat/internal/domain"
-
-	ollamaApi "github.com/ollama/ollama/api"
 )
 
 type Connector struct {

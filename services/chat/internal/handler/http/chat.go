@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"log/slog"
 
+	"github.com/gofiber/fiber/v2"
+
 	"github.com/artmexbet/raibecas/services/chat/internal/domain"
 	"github.com/artmexbet/raibecas/services/chat/internal/handler/models"
-	"github.com/gofiber/fiber/v2"
 )
 
 func (h *Handler) chatHandler(c *fiber.Ctx) error {

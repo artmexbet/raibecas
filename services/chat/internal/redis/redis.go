@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/artmexbet/raibecas/services/chat/internal/config"
 	"github.com/artmexbet/raibecas/services/chat/internal/domain"
-
-	"github.com/redis/go-redis/v9"
 )
 
 type Redis struct {
