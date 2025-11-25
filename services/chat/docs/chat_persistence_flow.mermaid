@@ -1,0 +1,42 @@
+graph TB
+    A["👤 User Request"] -->|"POST /api/v1/chat"| B["🔗 HTTP Handler"]
+    B -->|"ProcessInput(userID, input)"| C["🤖 Chat Service"]
+
+    C -->|"1. Retrieve History"| D["💾 Redis Store"]
+    D -->|"chat:history:userID"| D
+
+    C -->|"2. Save User Message"| D
+    D -->|"Append to history"| D
+
+    C -->|"3. Generate Embeddings"| E["🧠 Neuro Connector\n(Ollama)"]
+    C -->|"4. Retrieve Documents"| F["📚 Vector Store\n(Qdrant)"]
+
+    E -->|"Chat with Context"| G["🔄 Stream Response\nChunks"]
+
+    G -->|"Chunk 1"| H["Chunk Handler"]
+    G -->|"Chunk 2..N"| H
+    G -->|"Chunk N (done=true)"| H
+
+    H -->|"Buffer"| I["💾 Redis Temp\nchat:temp_msg:userID"]
+    H -->|"Save Full Message\n(when done)"| D
+    H -->|"Stream to Client"| J["📡 Response Stream\nNDJSON"]
+
+    D -->|"✅ TTL: 24h"| K["Auto-Expiration"]
+    I -->|"✅ TTL: 24h"| K
+
+    L["🧹 Delete Chat\nDELETE /api/v1/chat/userID"] -->|"Clear Both"| D
+    L --> I
+
+    style A fill:#e1f5ff
+    style B fill:#fff3e0
+    style C fill:#f3e5f5
+    style D fill:#e8f5e9
+    style E fill:#fce4ec
+    style F fill:#f1f8e9
+    style G fill:#ede7f6
+    style H fill:#fff9c4
+    style I fill:#e0f2f1
+    style J fill:#e0f2f1
+    style K fill:#ffebee
+    style L fill:#ffccbc
+

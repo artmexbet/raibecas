@@ -1,0 +1,30 @@
+version: "2"
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - ineffassign
+    - revive
+    - gocyclo
+  settings:
+    revive:
+      rules:
+        - name: exported
+          severity: warning
+          disabled: true
+        - name: package-comments
+          severity: warning
+          disabled: true
+formatters:
+  enable:
+    - gofmt
+    - goimports
+    - gci
+  settings:
+    gci:
+      sections:
+        - Standard
+        - Default
+        - Prefix(github.com/artmexbet/raibecas)
