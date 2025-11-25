@@ -36,6 +36,8 @@ type Chat struct {
 	historyStore iChatHistoryStore
 }
 
+// New creates a new Chat service with the provided vector store and embedder.
+// vectorStore is used to retrieve vectors, and embedder is used to generate embeddings.
 func New(vectorStore iVectorStore, neuro iNeuroConnector, historyStore iChatHistoryStore) *Chat {
 	return &Chat{
 		vectorStore:  vectorStore,
@@ -44,6 +46,13 @@ func New(vectorStore iVectorStore, neuro iNeuroConnector, historyStore iChatHist
 	}
 }
 
+// ProcessInput generates embeddings for the input text using the embedder,
+// retrieves similar vectors from the vector store, and returns an error if any step fails.
+// Parameters:
+//   - ctx: context for cancellation and deadlines.
+//   - input: the input text to process.
+// Returns:
+//   - error: non-nil if embedding generation or vector retrieval fails.
 func (c *Chat) ProcessInput(ctx context.Context, input, userID string, fn func(response domain.ChatResponse) error) error {
 	embedding, err := c.neuro.GenerateEmbeddings(ctx, input)
 	if err != nil {

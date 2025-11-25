@@ -17,6 +17,8 @@ type Redis struct {
 	client *redis.Client
 }
 
+// New creates a new Redis instance with the provided configuration and Redis client.
+// cfg is the Redis configuration, and client is the Redis client to use for operations.
 func New(cfg *config.Redis, client *redis.Client) *Redis {
 	return &Redis{
 		cfg:    cfg,
