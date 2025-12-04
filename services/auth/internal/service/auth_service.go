@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/artmexbet/raibecas/services/auth/internal/domain"
-	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
-
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
 )
 
 // IUserRepository defines the interface for user data access

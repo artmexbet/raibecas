@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/artmexbet/raibecas/services/auth/internal/domain"
-
 	"github.com/nats-io/nats.go"
+
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 )
 
 // Publisher handles publishing events to NATS

@@ -1,9 +1,9 @@
 package postgres
 
 import (
-	"github.com/artmexbet/raibecas/services/auth/internal/postgres/queries"
-
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/artmexbet/raibecas/services/auth/internal/postgres/queries"
 )
 
 //go:generate sqlc generate

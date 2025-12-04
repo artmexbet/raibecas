@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
+
 	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 	"github.com/artmexbet/raibecas/services/auth/internal/postgres/queries"
-
-	"github.com/google/uuid"
 )
 
 func (p *Postgres) CreateRegistrationRequest(ctx context.Context, req *domain.RegistrationRequest) (uuid.UUID, error) {

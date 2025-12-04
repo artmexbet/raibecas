@@ -51,6 +51,7 @@ func New(vectorStore iVectorStore, neuro iNeuroConnector, historyStore iChatHist
 // Parameters:
 //   - ctx: context for cancellation and deadlines.
 //   - input: the input text to process.
+//
 // Returns:
 //   - error: non-nil if embedding generation or vector retrieval fails.
 func (c *Chat) ProcessInput(ctx context.Context, input, userID string, fn func(response domain.ChatResponse) error) error {

@@ -8,10 +8,10 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/artmexbet/raibecas/services/auth/internal/domain"
-
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 )
 
 // TokenStore handles refresh token storage in Redis

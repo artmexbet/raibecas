@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/artmexbet/raibecas/services/auth/internal/domain"
-	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
-
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
 )
 
 func TestAuthService_Login_Success(t *testing.T) {
