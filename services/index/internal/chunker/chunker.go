@@ -24,7 +24,7 @@ func SplitText(cfg Config, text string) []Chunk {
 	if cfg.ChunkSize <= 0 {
 		return nil
 	}
-	runes := []rune(strings.TrimSpace(text))
+	runes := []rune(strings.TrimSpace(text)) //todo: use buffered reader for large texts
 	if len(runes) == 0 {
 		return nil
 	}

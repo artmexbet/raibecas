@@ -57,22 +57,25 @@ type Pipeline struct {
 	MaxChunks    int `yaml:"max_chunks" env:"MAX_CHUNKS" env-default:"500"`
 }
 
+type Storage struct {
+	Type    string `yaml:"type" env:"TYPE" env-default:"filesystem"`
+	BaseDir string `yaml:"base_dir" env:"BASE_DIR" env-default:"./data/documents"`
+}
+
 type Config struct {
-	HTTP    HTTP `yaml:"http" env-prefix:"HTTP_"`
-	UseHTTP bool `yaml:"use_http" env:"USE_HTTP" env-default:"true"`
-
-	NATS    NATS `yaml:"nats" env-prefix:"NATS_"`
-	UseNATS bool `yaml:"use_nats" env:"USE_NATS" env-default:"false"`
-
+	HTTP     HTTP     `yaml:"http" env-prefix:"HTTP_"`
+	NATS     NATS     `yaml:"nats" env-prefix:"NATS_"`
 	Qdrant   Qdrant   `yaml:"qdrant" env-prefix:"QDRANT_"`
 	Ollama   Ollama   `yaml:"ollama" env-prefix:"OLLAMA_"`
 	Pipeline Pipeline `yaml:"pipeline" env-prefix:"PIPELINE_"`
+	Storage  Storage  `yaml:"storage" env-prefix:"STORAGE_"`
+	UseNATS  bool     `yaml:"use_nats" env:"USE_NATS" env-default:"false"`
 }
 
 func Load() (*Config, error) {
 	var cfg Config
 	if err := cleanenv.ReadEnv(&cfg); err != nil {
-		return nil, fmt.Errorf("load config: %w", err)
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 	return &cfg, nil
 }

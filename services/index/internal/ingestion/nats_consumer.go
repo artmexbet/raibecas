@@ -21,24 +21,21 @@ type Consumer struct {
 	cfg      *config.NATS
 	conn     *nats.Conn
 	js       nats.JetStreamContext
-	fetcher  Fetcher
 	pipeline Pipeline
 }
 
-type indexMessage struct {
-	DocumentID string            `json:"document_id"`
-	Title      string            `json:"title"`
-	SourceURI  string            `json:"source_uri"`
-	Metadata   map[string]string `json:"metadata"`
-	Content    string            `json:"content"`
-}
-
-func NewConsumer(cfg *config.NATS, conn *nats.Conn, fetcher Fetcher, pipeline Pipeline) (*Consumer, error) {
+func NewConsumer(cfg *config.NATS, conn *nats.Conn, pipeline Pipeline) (*Consumer, error) {
 	js, err := conn.JetStream()
 	if err != nil {
 		return nil, fmt.Errorf("jetstream: %w", err)
 	}
-	return &Consumer{cfg: cfg, conn: conn, js: js, fetcher: fetcher, pipeline: pipeline}, nil
+
+	return &Consumer{
+		cfg:      cfg,
+		conn:     conn,
+		js:       js,
+		pipeline: pipeline,
+	}, nil
 }
 
 func (c *Consumer) Start(ctx context.Context) error {
@@ -46,8 +43,9 @@ func (c *Consumer) Start(ctx context.Context) error {
 		return fmt.Errorf("subject is empty")
 	}
 
-	_, err := c.js.AddConsumer(c.cfg.Subject, &nats.ConsumerConfig{
+	_, err := c.js.AddConsumer(c.cfg.Stream, &nats.ConsumerConfig{
 		Durable:       c.cfg.Durable,
+		FilterSubject: c.cfg.Subject,
 		AckPolicy:     nats.AckExplicitPolicy,
 		AckWait:       c.cfg.AckWait,
 		MaxAckPending: c.cfg.MaxInFly,
@@ -57,44 +55,49 @@ func (c *Consumer) Start(ctx context.Context) error {
 	}
 
 	_, err = c.js.QueueSubscribe(c.cfg.Subject, c.cfg.Queue, func(msg *nats.Msg) {
-		defer msg.Ack() //nolint:errcheck // acknowledge by default
+		defer func() {
+			_ = msg.Ack()
+		}()
 		if err := c.handleMessage(ctx, msg.Data); err != nil {
 			slog.Error("handle message", "err", err)
-			msg.Nak() //nolint:errcheck // negative acknowledge on error
+			_ = msg.Nak()
 		}
 	}, nats.ManualAck(), nats.AckWait(c.cfg.AckWait), nats.MaxAckPending(c.cfg.MaxInFly))
 	if err != nil {
 		return fmt.Errorf("queue subscribe: %w", err)
 	}
 
-	<-ctx.Done()
 	return nil
 }
 
 func (c *Consumer) handleMessage(ctx context.Context, data []byte) error {
-	var msg indexMessage
-	if err := json.Unmarshal(data, &msg); err != nil {
-		return fmt.Errorf("decode message: %w", err)
+	var event domain.DocumentIndexEvent
+	if err := json.Unmarshal(data, &event); err != nil {
+		return fmt.Errorf("unmarshal: %w", err)
 	}
 
+	// Валидация
+	if event.DocumentID == "" {
+		return fmt.Errorf("document_id is required")
+	}
+	if event.FilePath == "" {
+		return fmt.Errorf("file_path is required")
+	}
+
+	// Создаем документ из события
 	doc := domain.Document{
-		ID:        msg.DocumentID,
-		Title:     msg.Title,
-		Content:   msg.Content,
-		SourceURI: msg.SourceURI,
-		Metadata:  msg.Metadata,
+		ID:        event.DocumentID,
+		Title:     event.Title,
+		FilePath:  event.FilePath,
+		SourceURI: event.SourceURI,
+		Metadata:  event.Metadata,
 	}
 
-	if doc.Content == "" && c.fetcher != nil {
-		fetched, err := c.fetcher.Fetch(doc.ID)
-		if err != nil {
-			return fmt.Errorf("fetch document %s: %w", doc.ID, err)
-		}
-		doc.Content = fetched.Content
-		if doc.Metadata == nil {
-			doc.Metadata = fetched.Metadata
-		}
-	}
-
+	// Индексируем документ
 	return c.pipeline.Index(ctx, doc)
+}
+
+func (c *Consumer) Stop() error {
+	c.conn.Close()
+	return nil
 }
