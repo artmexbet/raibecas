@@ -32,12 +32,25 @@ func (c *Client) EnsureCollection(ctx context.Context) error {
 	}
 	params := &qdrant.VectorParams{
 		Size:     c.cfg.VectorDimension,
-		Distance: qdrant.Distance_Cosine,
+		Distance: mapDistance(c.cfg.Distance),
 	}
 	return c.raw.CreateCollection(ctx, &qdrant.CreateCollection{
 		CollectionName: c.cfg.CollectionName,
 		VectorsConfig:  qdrant.NewVectorsConfig(params),
 	})
+}
+
+func mapDistance(distance string) qdrant.Distance {
+	switch distance {
+	case "Cosine":
+		return qdrant.Distance_Cosine
+	case "Euclid":
+		return qdrant.Distance_Euclid
+	case "Dot":
+		return qdrant.Distance_Dot
+	default:
+		return qdrant.Distance_Cosine
+	}
 }
 
 func (c *Client) UpsertChunks(ctx context.Context, entries []*qdrant.PointStruct) error {
