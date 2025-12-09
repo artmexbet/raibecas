@@ -66,7 +66,7 @@ func (p *Pipeline) Index(ctx context.Context, doc domain.Document) error {
 		}()
 
 		// Читаем содержимое файла
-		contentBytes, err := io.ReadAll(reader)
+		contentBytes, err := io.ReadAll(reader) //todo: dont read all into memory
 		if err != nil {
 			return fmt.Errorf("read document file: %w", err)
 		}

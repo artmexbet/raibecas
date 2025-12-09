@@ -43,7 +43,7 @@ type Ollama struct {
 	Protocol       string        `yaml:"protocol" env:"PROTOCOL" env-default:"http"`
 	Host           string        `yaml:"host" env:"HOST" env-default:"localhost"`
 	Port           string        `yaml:"port" env:"PORT" env-default:"11434"`
-	EmbeddingModel string        `yaml:"embedding_model" env:"EMBEDDING_MODEL" env-default:"mxbai-embed-large"`
+	EmbeddingModel string        `yaml:"embedding_model" env:"EMBEDDING_MODEL" env-default:"embeddinggemma"`
 	Timeout        time.Duration `yaml:"timeout" env:"TIMEOUT" env-default:"30s"`
 }
 
