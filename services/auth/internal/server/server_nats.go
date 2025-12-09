@@ -9,6 +9,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	natsgo "github.com/nats-io/nats.go"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/artmexbet/raibecas/services/auth/internal/config"
 	"github.com/artmexbet/raibecas/services/auth/internal/handler"
 	"github.com/artmexbet/raibecas/services/auth/internal/nats"
@@ -17,10 +21,6 @@ import (
 	"github.com/artmexbet/raibecas/services/auth/internal/service"
 	"github.com/artmexbet/raibecas/services/auth/internal/storeredis"
 	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
-
-	"github.com/jackc/pgx/v5/pgxpool"
-	natsgo "github.com/nats-io/nats.go"
-	"github.com/redis/go-redis/v9"
 )
 
 // NATS represents the NATS-based auth service server

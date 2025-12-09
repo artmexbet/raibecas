@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"github.com/artmexbet/raibecas/services/auth/internal/domain"
-
 	"github.com/google/uuid"
+
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 )
 
 // Response is a unified response wrapper for all NATS responses

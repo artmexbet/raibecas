@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/artmexbet/raibecas/services/auth/internal/domain"
-	"github.com/artmexbet/raibecas/services/auth/internal/postgres/queries"
-
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/internal/postgres/queries"
 )
 
 func (p *Postgres) CreateUser(ctx context.Context, user *domain.User) error {
@@ -16,7 +16,7 @@ func (p *Postgres) CreateUser(ctx context.Context, user *domain.User) error {
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %v", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // safe to ignore
 
 	q := p.q.WithTx(tx)
 	_, err = q.CreateUser(ctx, queries.CreateUserParams{
@@ -27,7 +27,7 @@ func (p *Postgres) CreateUser(ctx context.Context, user *domain.User) error {
 	if err != nil {
 		return err
 	}
-	tx.Commit(ctx)
+	tx.Commit(ctx) //nolint:errcheck // safe to ignore
 	return nil
 }
 
@@ -88,7 +88,7 @@ func (p *Postgres) UpdatePassword(ctx context.Context, userID uuid.UUID, passwor
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %v", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // safe to ignore
 
 	q := p.q.WithTx(tx)
 
@@ -99,6 +99,6 @@ func (p *Postgres) UpdatePassword(ctx context.Context, userID uuid.UUID, passwor
 	if err != nil {
 		return fmt.Errorf("error updating user password: %v", err)
 	}
-	tx.Commit(ctx)
+	tx.Commit(ctx) //nolint:errcheck // safe to ignore
 	return nil
 }

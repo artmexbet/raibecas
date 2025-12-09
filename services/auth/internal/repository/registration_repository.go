@@ -3,9 +3,9 @@ package repository
 import (
 	"context"
 
-	"github.com/artmexbet/raibecas/services/auth/internal/domain"
-
 	"github.com/google/uuid"
+
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 )
 
 type IRegistrationStorage interface {

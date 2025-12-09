@@ -9,7 +9,7 @@ import (
 
 type Qdrant struct {
 	Host string `yaml:"host" env:"HOST" env-default:"localhost"`
-	Port int    `yaml:"port" env:"PORT" env-default:"6333"`
+	Port int    `yaml:"port" env:"PORT" env-default:"6334"`
 
 	CollectionName  string `yaml:"collection_name" env:"COLLECTION_NAME" env-default:"documents"`
 	RetrievePayload bool   `yaml:"retrieve_payload" env:"RETRIEVE_PAYLOAD" env-default:"true"`
@@ -22,7 +22,7 @@ func (q *Qdrant) GetAddress() string {
 }
 
 type ContextGeneration struct {
-	VectorDimension int    `yaml:"vector_dimension" env:"VECTOR_DIMENSION"`
+	VectorDimension int    `yaml:"vector_dimension" env:"VECTOR_DIMENSION" env-default:"768"`
 	BasePrompt      string `yaml:"base_prompt" env:"BASE_PROMPT"` //todo: maybe use file?
 	ContextPrompt   string `yaml:"context_prompt" env:"CONTEXT_PROMPT"`
 	QueryPrompt     string `yaml:"query_prompt" env:"QUERY_PROMPT"`

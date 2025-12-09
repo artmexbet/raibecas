@@ -7,11 +7,11 @@ import (
 	"log"
 	"time"
 
-	"github.com/artmexbet/raibecas/services/auth/internal/domain"
-	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
-
 	"github.com/google/uuid"
 	natspkg "github.com/nats-io/nats.go"
+
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
 )
 
 type IAuthService interface {

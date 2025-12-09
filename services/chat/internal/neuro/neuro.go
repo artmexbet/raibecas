@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"net/url"
 
-	ollamaApi "github.com/ollama/ollama/api"
 	"utils/pointer"
+
+	ollamaApi "github.com/ollama/ollama/api"
 
 	"github.com/artmexbet/raibecas/services/chat/internal/config"
 	"github.com/artmexbet/raibecas/services/chat/internal/domain"

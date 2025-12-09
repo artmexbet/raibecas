@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/artmexbet/raibecas/services/auth/internal/domain"
-
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
+
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 )
 
 type IRegistrationService interface {
