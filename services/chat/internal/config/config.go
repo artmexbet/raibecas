@@ -38,6 +38,7 @@ type Ollama struct {
 
 	StreamAnswers bool              `yaml:"stream_answers" env:"STREAM_ANSWERS" env-default:"false"`
 	Context       ContextGeneration `yaml:"context_generation" env-prefix:"CONTEXT_GENERATION_"`
+	Temperature   float32           `yaml:"temperature" env:"TEMPERATURE" env-default:"0.0"`
 }
 
 func (o *Ollama) GetAddress() string {

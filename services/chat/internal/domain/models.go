@@ -39,22 +39,13 @@ func (wc *WorkingContext) PrepareContext(query string, cfg config.ContextGenerat
 	sBuilder := strings.Builder{}
 	// Preallocate memory to reduce allocations
 	sBuilder.Grow(
-		len(cfg.BasePrompt) +
-			len(cfg.ContextPrompt) +
+		len(cfg.ContextPrompt) +
+			len(query) +
 			len(cfg.QueryPrompt) +
-			len(wc.Docs)*cfg.VectorDimension +
-			len(query) + AdditionalCountOfTokens,
+			AdditionalCountOfTokens,
 	)
 	// Build the context string
-	sBuilder.WriteString(cfg.BasePrompt)
-	sBuilder.WriteString("\n")
 	sBuilder.WriteString(cfg.ContextPrompt)
-	for _, doc := range wc.Docs {
-		if content, ok := doc.Metadata["content"].(string); ok {
-			sBuilder.WriteString(content)
-			sBuilder.WriteString("\n")
-		}
-	}
 	sBuilder.WriteString(cfg.QueryPrompt)
 	sBuilder.WriteString(query)
 	return sBuilder.String()

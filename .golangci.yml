@@ -27,4 +27,5 @@ formatters:
       sections:
         - Standard
         - Default
-        - Prefix(github.com/artmexbet/raibecas)
+        - Prefix(github.com/artmexbet/raibecas/libs)
+        - Prefix(github.com/artmexbet/raibecas/services)
