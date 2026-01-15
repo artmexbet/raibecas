@@ -58,8 +58,11 @@ func (a *App) Run() error {
 	// Create document connector
 	documentConnector := connector.NewNATSDocumentConnector(natsConn, a.cfg.NATS.RequestTimeout)
 
+	// Create auth connector
+	authConnector := connector.NewNATSAuthConnector(natsConn)
+
 	// Create and start server
-	a.server = server.New(&a.cfg.HTTP, documentConnector)
+	a.server = server.New(&a.cfg.HTTP, documentConnector, authConnector)
 
 	// Start server in goroutine
 	go func() {

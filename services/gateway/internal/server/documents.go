@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
@@ -12,7 +11,7 @@ import (
 )
 
 func (s *Server) setupDocumentRoutes() {
-	documents := s.router.Group("/documents")
+	documents := s.router.Group("/api/v1/documents")
 	documents.Get("/", s.listDocuments)
 	documents.Post("/", s.createDocument)
 	documents.Get("/:id", s.getDocument)
@@ -199,15 +198,4 @@ func (s *Server) deleteDocument(c *fiber.Ctx) error {
 	}
 
 	return c.SendStatus(http.StatusNoContent)
-}
-
-// parseValidationErrors extracts validation errors into a map
-func parseValidationErrors(err error) map[string]string {
-	details := make(map[string]string)
-	if validationErrors, ok := err.(validator.ValidationErrors); ok {
-		for _, e := range validationErrors {
-			details[e.Field()] = e.Tag()
-		}
-	}
-	return details
 }

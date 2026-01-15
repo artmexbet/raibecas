@@ -12,15 +12,38 @@ Client → Gateway → NATS → Document Service
                         → Other Services
 ```
 
-## Функциональность
+## API Endpoints
+
+Все endpoints используют префикс `/api/v1`.
+
+### Аутентификация
+
+- `POST /api/v1/auth/login` - Вход в систему
+- `POST /api/v1/auth/refresh` - Обновление токенов
+- `POST /api/v1/auth/validate` - Валидация токена
+- `POST /api/v1/auth/logout` - Выход из текущего устройства
+- `POST /api/v1/auth/logout-all` - Выход со всех устройств
+- `POST /api/v1/auth/change-password` - Изменение пароля
 
 ### Документы
 
-- `GET /documents` - Получение списка документов с фильтрацией и пагинацией
-- `POST /documents` - Создание нового документа
-- `GET /documents/:id` - Получение документа по ID
-- `PUT /documents/:id` - Обновление документа
-- `DELETE /documents/:id` - Удаление документа
+- `GET /api/v1/documents` - Получение списка документов с фильтрацией и пагинацией
+- `POST /api/v1/documents` - Создание нового документа
+- `GET /api/v1/documents/:id` - Получение документа по ID
+- `PUT /api/v1/documents/:id` - Обновление документа
+- `DELETE /api/v1/documents/:id` - Удаление документа
+
+### Пользователи
+
+- `GET /api/v1/users` - Получение списка пользователей
+- `PATCH /api/v1/users/:id` - Обновление пользователя
+- `DELETE /api/v1/users/:id` - Удаление пользователя
+
+### Запросы на регистрацию
+
+- `GET /api/v1/registration-requests` - Получение списка запросов на регистрацию
+- `POST /api/v1/registration-requests/:id/approve` - Одобрение запроса на регистрацию
+- `POST /api/v1/registration-requests/:id/reject` - Отклонение запроса на регистрацию
 
 ## Настройка
 

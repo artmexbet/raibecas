@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -61,9 +62,13 @@ func (c *NATSDocumentConnector) ListDocuments(ctx context.Context, query domain.
 }
 
 // GetDocument retrieves a single document by ID
-func (c *NATSDocumentConnector) GetDocument(ctx context.Context, id uuid.UUID) (*domain.DocumentResponse, error) {
-	req := domain.IDRequest{ID: id.String()}
-	reqData, err := req.MarshalJSON()
+func (c *NATSDocumentConnector) GetDocument(ctx context.Context, id uuid.UUID) (*domain.GetDocumentResponse, error) {
+	// Create request payload
+	type getDocRequest struct {
+		ID string `json:"id"`
+	}
+	req := getDocRequest{ID: id.String()}
+	reqData, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal get request: %w", err)
 	}
@@ -73,7 +78,7 @@ func (c *NATSDocumentConnector) GetDocument(ctx context.Context, id uuid.UUID) (
 		return nil, fmt.Errorf("failed to send get request: %w", err)
 	}
 
-	var response domain.DocumentResponse
+	var response domain.GetDocumentResponse
 	if err := response.UnmarshalJSON(msg.Data); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal get response: %w", err)
 	}
@@ -82,7 +87,7 @@ func (c *NATSDocumentConnector) GetDocument(ctx context.Context, id uuid.UUID) (
 }
 
 // CreateDocument creates a new document
-func (c *NATSDocumentConnector) CreateDocument(ctx context.Context, req domain.CreateDocumentRequest) (*domain.DocumentResponse, error) {
+func (c *NATSDocumentConnector) CreateDocument(ctx context.Context, req domain.CreateDocumentRequest) (*domain.CreateDocumentResponse, error) {
 	reqData, err := req.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal create request: %w", err)
@@ -93,7 +98,7 @@ func (c *NATSDocumentConnector) CreateDocument(ctx context.Context, req domain.C
 		return nil, fmt.Errorf("failed to send create request: %w", err)
 	}
 
-	var response domain.DocumentResponse
+	var response domain.CreateDocumentResponse
 	if err := response.UnmarshalJSON(msg.Data); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal create response: %w", err)
 	}
@@ -102,13 +107,18 @@ func (c *NATSDocumentConnector) CreateDocument(ctx context.Context, req domain.C
 }
 
 // UpdateDocument updates an existing document
-func (c *NATSDocumentConnector) UpdateDocument(ctx context.Context, id uuid.UUID, req domain.UpdateDocumentRequest) (*domain.DocumentResponse, error) {
-	reqPayload := domain.UpdateDocumentPayload{
+func (c *NATSDocumentConnector) UpdateDocument(ctx context.Context, id uuid.UUID, req domain.UpdateDocumentRequest) (*domain.UpdateDocumentResponse, error) {
+	// Create request payload with ID and updates
+	type updateDocRequest struct {
+		ID      string                       `json:"id"`
+		Updates domain.UpdateDocumentRequest `json:"updates"`
+	}
+	reqPayload := updateDocRequest{
 		ID:      id.String(),
 		Updates: req,
 	}
 
-	reqData, err := reqPayload.MarshalJSON()
+	reqData, err := json.Marshal(reqPayload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal update request: %w", err)
 	}
@@ -118,7 +128,7 @@ func (c *NATSDocumentConnector) UpdateDocument(ctx context.Context, id uuid.UUID
 		return nil, fmt.Errorf("failed to send update request: %w", err)
 	}
 
-	var response domain.DocumentResponse
+	var response domain.UpdateDocumentResponse
 	if err := response.UnmarshalJSON(msg.Data); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal update response: %w", err)
 	}
@@ -128,8 +138,12 @@ func (c *NATSDocumentConnector) UpdateDocument(ctx context.Context, id uuid.UUID
 
 // DeleteDocument deletes a document by ID
 func (c *NATSDocumentConnector) DeleteDocument(ctx context.Context, id uuid.UUID) error {
-	req := domain.IDRequest{ID: id.String()}
-	reqData, err := req.MarshalJSON()
+	// Create request payload
+	type deleteDocRequest struct {
+		ID string `json:"id"`
+	}
+	req := deleteDocRequest{ID: id.String()}
+	reqData, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("failed to marshal delete request: %w", err)
 	}

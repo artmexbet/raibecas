@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 
@@ -12,38 +11,19 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	recoverer "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
-	"github.com/google/uuid"
 	slogfiber "github.com/samber/slog-fiber"
 
 	"github.com/artmexbet/raibecas/services/gateway/internal/config"
-	"github.com/artmexbet/raibecas/services/gateway/internal/domain"
 )
-
-// DocumentServiceConnector defines the interface for interacting with the document service
-type DocumentServiceConnector interface {
-	// ListDocuments retrieves a list of documents based on query parameters
-	ListDocuments(ctx context.Context, query domain.ListDocumentsQuery) (*domain.ListDocumentsResponse, error)
-
-	// GetDocument retrieves a single document by ID
-	GetDocument(ctx context.Context, id uuid.UUID) (*domain.DocumentResponse, error)
-
-	// CreateDocument creates a new document
-	CreateDocument(ctx context.Context, req domain.CreateDocumentRequest) (*domain.DocumentResponse, error)
-
-	// UpdateDocument updates an existing document
-	UpdateDocument(ctx context.Context, id uuid.UUID, req domain.UpdateDocumentRequest) (*domain.DocumentResponse, error)
-
-	// DeleteDocument deletes a document by ID
-	DeleteDocument(ctx context.Context, id uuid.UUID) error
-}
 
 type Server struct {
 	router            *fiber.App
 	documentConnector DocumentServiceConnector
+	authConnector     AuthServiceConnector
 	validator         *validator.Validate
 }
 
-func New(cfg *config.HTTPConfig, documentConnector DocumentServiceConnector) *Server {
+func New(cfg *config.HTTPConfig, documentConnector DocumentServiceConnector, authConnector AuthServiceConnector) *Server {
 	router := fiber.New()
 	logger := slog.Default()
 	router.Use(slogfiber.New(logger))
@@ -58,6 +38,7 @@ func New(cfg *config.HTTPConfig, documentConnector DocumentServiceConnector) *Se
 	s := &Server{
 		router:            router,
 		documentConnector: documentConnector,
+		authConnector:     authConnector,
 		validator:         validator.New(),
 	}
 

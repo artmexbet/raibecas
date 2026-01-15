@@ -64,3 +64,10 @@ type Document struct {
 	Tags            []Tag     `json:"tags" validate:"dive"`
 	Additional
 }
+
+// ErrorResponse represents an API error response
+type ErrorResponse struct {
+	Error   string            `json:"error"`
+	Message string            `json:"message"`
+	Details map[string]string `json:"details,omitempty"`
+}

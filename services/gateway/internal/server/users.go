@@ -3,7 +3,7 @@ package server
 import "github.com/gofiber/fiber/v2"
 
 func (s *Server) setupUsersRoutes() {
-	users := s.router.Group("/users")
+	users := s.router.Group("/api/v1/users")
 	users.Get("/", s.listUsers)
 	users.Patch("/:id", s.updateUser)
 	users.Delete("/:id", s.deleteUser)
