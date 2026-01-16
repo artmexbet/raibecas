@@ -85,7 +85,8 @@ type TokenPair struct {
 
 // RefreshRequest represents a token refresh request
 type RefreshRequest struct {
-	RefreshToken string
+	RefreshToken string // Сам refresh token (криптографически стойкая строка)
+	TokenID      string // ID токена для операций в Redis
 	DeviceID     string
 	UserAgent    string
 	IPAddress    string

@@ -25,8 +25,8 @@ import (
 	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
 )
 
-// NATS represents the NATS-based auth service server
-type NATS struct {
+// App represents the App-based auth service server
+type App struct {
 	cfg           *config.Config
 	pool          *pgxpool.Pool
 	redis         *redis.Client
@@ -35,8 +35,8 @@ type NATS struct {
 	subscriptions []*natsgo.Subscription
 }
 
-// NewNATS creates a new NATS-based server instance
-func NewNATS(cfg *config.Config) (*NATS, error) {
+// New creates a new App-based server instance
+func New(cfg *config.Config) (*App, error) {
 	ctx := context.Background()
 
 	// Initialize database connection pool
@@ -67,7 +67,7 @@ func NewNATS(cfg *config.Config) (*NATS, error) {
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
-	// Initialize NATS connection
+	// Initialize App connection
 	natsConn, err := natsgo.Connect(
 		cfg.NATS.URL,
 		natsgo.Name(cfg.NATS.ConnectionName),
@@ -75,10 +75,10 @@ func NewNATS(cfg *config.Config) (*NATS, error) {
 		natsgo.ReconnectWait(cfg.NATS.ReconnectWait),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to NATS: %w", err)
+		return nil, fmt.Errorf("failed to connect to App: %w", err)
 	}
 
-	// Create NATS wrapper client with middleware
+	// Create App wrapper client with middleware
 	natsClient := natsw.NewClient(natsConn,
 		natsw.WithLogger(slog.Default()),
 		natsw.WithRecover(),
@@ -104,16 +104,16 @@ func NewNATS(cfg *config.Config) (*NATS, error) {
 	authService := service.NewAuthService(authRepo, tokenStore, jwtManager)
 	regService := service.NewRegistrationService(regRepo, authRepo)
 
-	// Initialize NATS publisher and subscriber
+	// Initialize App publisher and subscriber
 	publisher := nats.NewPublisher(natsConn)
 	subscriber := nats.NewSubscriber(natsConn, regService, publisher)
 
-	// Initialize NATS handlers
+	// Initialize App handlers
 	authHandler := handler.NewAuthHandler(authService, publisher)
 	regHandler := handler.NewRegistrationHandler(regService, publisher)
 
-	// Setup NATS subscriptions
-	server := &NATS{
+	// Setup App subscriptions
+	server := &App{
 		cfg:           cfg,
 		pool:          pool,
 		redis:         redisClient,
@@ -135,8 +135,8 @@ func NewNATS(cfg *config.Config) (*NATS, error) {
 	return server, nil
 }
 
-// setupSubscriptions sets up NATS request/reply subscriptions
-func (s *NATS) setupSubscriptions(authHandler *handler.AuthHandler, regHandler *handler.RegistrationHandler) error {
+// setupSubscriptions sets up App request/reply subscriptions
+func (s *App) setupSubscriptions(authHandler *handler.AuthHandler, regHandler *handler.RegistrationHandler) error {
 	// Auth service subscriptions using natsw.Client
 	sub, err := s.natsClient.Subscribe(nats.SubjectAuthRegister, regHandler.HandleRegister)
 	if err != nil {
@@ -180,7 +180,7 @@ func (s *NATS) setupSubscriptions(authHandler *handler.AuthHandler, regHandler *
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	slog.Info("NATS subscriptions setup complete",
+	slog.Info("App subscriptions setup complete",
 		"topics", []string{
 			nats.SubjectAuthRegister,
 			nats.SubjectAuthLogin,
@@ -194,9 +194,9 @@ func (s *NATS) setupSubscriptions(authHandler *handler.AuthHandler, regHandler *
 	return nil
 }
 
-// Start starts the NATS server
-func (s *NATS) Start() error {
-	slog.Info("Auth service is ready and listening on NATS topics")
+// Start starts the App server
+func (s *App) Start() error {
+	slog.Info("Auth service is ready and listening on App topics")
 
 	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
@@ -208,7 +208,7 @@ func (s *NATS) Start() error {
 }
 
 // Shutdown gracefully shuts down the server
-func (s *NATS) Shutdown() error {
+func (s *App) Shutdown() error {
 	// Unsubscribe from all topics
 	for _, sub := range s.subscriptions {
 		if err := sub.Unsubscribe(); err != nil {
@@ -216,12 +216,12 @@ func (s *NATS) Shutdown() error {
 		}
 	}
 
-	// Stop NATS event subscribers
+	// Stop App event subscribers
 	if err := s.subscriber.Stop(); err != nil {
-		slog.Error("Error stopping NATS subscribers", "error", err)
+		slog.Error("Error stopping App subscribers", "error", err)
 	}
 
-	// Close NATS connection
+	// Close App connection
 	s.natsClient.Close()
 
 	// Close Redis connection

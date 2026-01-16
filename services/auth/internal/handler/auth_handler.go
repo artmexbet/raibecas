@@ -57,7 +57,7 @@ func (h *AuthHandler) HandleLogin(msg *natsw.Message) error {
 
 	tokens, userID, err := h.authService.Login(ctx, loginReq)
 	if err != nil {
-		return h.respondError(msg, fmt.Sprintf("invalid credentials: %v", err))
+		return h.respondError(msg, fmt.Sprintf("cannot login: %v", err))
 	}
 
 	// Publish login event

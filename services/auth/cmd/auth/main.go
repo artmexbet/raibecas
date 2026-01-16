@@ -15,8 +15,8 @@ func main() {
 		slog.Error("Failed to load config", "err", err)
 	}
 
-	// CreateUser NATS-based server
-	srv, err := server.NewNATS(cfg)
+	// CreateUser App-based server
+	srv, err := server.New(cfg)
 	if err != nil {
 		slog.Error("Failed to create server", "err", err)
 	}

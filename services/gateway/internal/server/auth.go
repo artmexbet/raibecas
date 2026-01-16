@@ -36,6 +36,7 @@ func (s *Server) login(c *fiber.Ctx) error {
 	// Capture client info
 	req.UserAgent = string(c.Request().Header.UserAgent())
 	req.IPAddress = c.IP()
+	req.DeviceID = c.Get("X-Device-ID", "")
 
 	if err := s.validator.Struct(&req); err != nil {
 		slog.Error("request validation failed", "error", err)
