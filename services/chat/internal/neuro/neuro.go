@@ -144,7 +144,7 @@ func (e *Connector) prepareDoc(doc domain.Document) (string, error) {
 	sBuilder.Grow(len(doc.Metadata)*256 + len(content) + 64)
 	sBuilder.WriteString("Context document:\n")
 	for key, value := range doc.Metadata {
-		if key == "content" {
+		if key == contextContentKey {
 			continue
 		}
 		sBuilder.WriteString(fmt.Sprintf("%s: %v\n", key, value))
