@@ -2,17 +2,26 @@ package neuro
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
-
-	"utils/pointer"
+	"strings"
 
 	ollamaApi "github.com/ollama/ollama/api"
 
+	"github.com/artmexbet/raibecas/libs/utils/pointer"
+
 	"github.com/artmexbet/raibecas/services/chat/internal/config"
 	"github.com/artmexbet/raibecas/services/chat/internal/domain"
+)
+
+const (
+	roleSystem = "system"
+	roleUser   = "user"
+
+	contextContentKey = "chunk_text"
 )
 
 type Connector struct {
@@ -62,27 +71,50 @@ func (e *Connector) Chat(
 ) error {
 	// Prepare chat messages history
 	chatHistory := workingContext.Messages
-	msgs := make([]ollamaApi.Message, len(chatHistory)+1)
-	for i, m := range chatHistory {
-		msgs[i] = ollamaApi.Message{
-			Role:    m.Role,
-			Content: m.Content,
+	docs := workingContext.Docs
+
+	slog.DebugContext(ctx, "Chat request", "history_length", len(chatHistory), "new_prompt", newPrompt, "docs_count", len(docs))
+
+	// Construct messages for the chat request
+	msgs := make([]ollamaApi.Message, 0, len(docs)+len(chatHistory)+2)
+	msgs = append(msgs, ollamaApi.Message{
+		Role:    roleSystem,
+		Content: e.cfg.Context.BasePrompt,
+	})
+
+	for _, doc := range docs {
+		if content, err := e.prepareDoc(doc); err == nil {
+			msgs = append(msgs, ollamaApi.Message{
+				Role:    roleSystem,
+				Content: content, // Add context document content
+			})
+		} else if errors.Is(err, domain.ErrDocumentWithoutContent) {
+			slog.WarnContext(ctx, "document without content", "doc_id", doc.ID)
 		}
 	}
 
+	for _, m := range chatHistory {
+		msgs = append(msgs, ollamaApi.Message{
+			Role:    m.Role,
+			Content: m.Content,
+		})
+	}
+
 	preparedContext := workingContext.PrepareContext(newPrompt, e.cfg.Context)
-	slog.DebugContext(ctx, "Prepared context", "context", preparedContext)
 
 	// Add the new user prompt with prepared context (e.g., including relevant documents)
-	msgs[len(chatHistory)] = ollamaApi.Message{
-		Role:    "user",
+	msgs = append(msgs, ollamaApi.Message{
+		Role:    roleUser,
 		Content: preparedContext,
-	}
+	})
 
 	reqData := &ollamaApi.ChatRequest{
 		Model:    e.cfg.GenerationModel,
 		Messages: msgs,
 		Stream:   pointer.To(e.cfg.StreamAnswers),
+		Options: map[string]interface{}{
+			"temperature": e.cfg.Temperature, // Controls randomness in generation
+		},
 	}
 	err := e.client.Chat(ctx, reqData, func(resp ollamaApi.ChatResponse) error {
 		// Map ollamaApi.ChatResponse to domain.ChatResponse for every chunk
@@ -100,4 +132,25 @@ func (e *Connector) Chat(
 		return fmt.Errorf("error making request: %w", err)
 	}
 	return nil
+}
+
+func (e *Connector) prepareDoc(doc domain.Document) (string, error) {
+	content, ok := doc.Metadata[contextContentKey].(string)
+	if !ok {
+		return "", domain.ErrDocumentWithoutContent
+	}
+	sBuilder := strings.Builder{}
+	// Preallocate memory to reduce allocations
+	sBuilder.Grow(len(doc.Metadata)*256 + len(content) + 64)
+	sBuilder.WriteString("Context document:\n")
+	for key, value := range doc.Metadata {
+		if key == contextContentKey {
+			continue
+		}
+		sBuilder.WriteString(fmt.Sprintf("%s: %v\n", key, value))
+	}
+	sBuilder.WriteString("Content:\n")
+	sBuilder.WriteString(content)
+	return sBuilder.String(), nil
+
 }

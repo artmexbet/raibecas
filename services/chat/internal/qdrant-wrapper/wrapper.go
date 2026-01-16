@@ -6,7 +6,8 @@ import (
 	"log/slog"
 
 	"github.com/qdrant/go-client/qdrant"
-	"utils/pointer"
+
+	"github.com/artmexbet/raibecas/libs/utils/pointer"
 
 	"github.com/artmexbet/raibecas/services/chat/internal/config"
 	"github.com/artmexbet/raibecas/services/chat/internal/domain"
@@ -26,9 +27,9 @@ func New(cfg *config.Qdrant, client *qdrant.Client) *QdrantWrapper {
 	}
 }
 
-// RetrieveVectors queries the Qdrant vector database for similar vectors based on the input vector.
-// It takes a context for cancellation and a slice of float64 representing the query vector.
-// Returns an error if the retrieval fails.
+// CheckConnection verifies the connection to the Qdrant vector database.
+// If the specified collection does not exist, it creates a new collection with the configured parameters.
+// Returns an error if the connection check or collection creation fails.
 func (q *QdrantWrapper) CheckConnection(ctx context.Context) error {
 	exists, err := q.client.CollectionExists(ctx, q.cfg.CollectionName)
 	if err != nil {
@@ -48,6 +49,9 @@ func (q *QdrantWrapper) CheckConnection(ctx context.Context) error {
 	return nil
 }
 
+// RetrieveVectors queries the Qdrant vector database for similar vectors based on the input vector.
+// It takes a context for cancellation and a slice of float64 representing the query vector.
+// Returns an error if the retrieval fails.
 func (q *QdrantWrapper) RetrieveVectors(ctx context.Context, vector []float64) ([]domain.Document, error) {
 	convertedVector := make([]float32, len(vector))
 	for i, v := range vector {
