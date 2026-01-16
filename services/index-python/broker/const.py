@@ -1,0 +1,1 @@
+INDEX_SUBJECT = "index.documents"
