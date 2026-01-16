@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 
+	"github.com/artmexbet/raibecas/libs/natsw"
 	"github.com/artmexbet/raibecas/services/gateway/internal/domain"
 )
 
@@ -23,13 +24,16 @@ const (
 
 // NATSAuthConnector implements server.AuthServiceConnector using NATS for communication
 type NATSAuthConnector struct {
-	conn *nats.Conn
+	client *natsw.Client
 }
 
 // NewNATSAuthConnector creates a new NATS-based auth service connector
 func NewNATSAuthConnector(conn *nats.Conn) *NATSAuthConnector {
+	// Создаём клиент с автоматической пропагацией trace context
+	client := natsw.NewClient(conn)
+
 	return &NATSAuthConnector{
-		conn: conn,
+		client: client,
 	}
 }
 
@@ -47,13 +51,16 @@ func (c *NATSAuthConnector) Login(ctx context.Context, req domain.LoginRequest) 
 		return nil, fmt.Errorf("failed to marshal login request: %w", err)
 	}
 
-	msg, err := c.conn.RequestWithContext(ctx, SubjectAuthLogin, reqData)
+	msg := nats.NewMsg(SubjectAuthLogin)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send login request: %w", err)
 	}
 
 	var response authResponse
-	if err := json.Unmarshal(msg.Data, &response); err != nil {
+	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal login response: %w", err)
 	}
 
@@ -76,13 +83,16 @@ func (c *NATSAuthConnector) RefreshToken(ctx context.Context, req domain.Refresh
 		return nil, fmt.Errorf("failed to marshal refresh request: %w", err)
 	}
 
-	msg, err := c.conn.RequestWithContext(ctx, SubjectAuthRefresh, reqData)
+	msg := nats.NewMsg(SubjectAuthRefresh)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send refresh request: %w", err)
 	}
 
 	var response authResponse
-	if err := json.Unmarshal(msg.Data, &response); err != nil {
+	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal refresh response: %w", err)
 	}
 
@@ -106,13 +116,16 @@ func (c *NATSAuthConnector) ValidateToken(ctx context.Context, token string) (*d
 		return nil, fmt.Errorf("failed to marshal validate request: %w", err)
 	}
 
-	msg, err := c.conn.RequestWithContext(ctx, SubjectAuthValidate, reqData)
+	msg := nats.NewMsg(SubjectAuthValidate)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send validate request: %w", err)
 	}
 
 	var response authResponse
-	if err := json.Unmarshal(msg.Data, &response); err != nil {
+	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal validate response: %w", err)
 	}
 
@@ -145,13 +158,16 @@ func (c *NATSAuthConnector) Logout(ctx context.Context, userID uuid.UUID, token 
 		return fmt.Errorf("failed to marshal logout request: %w", err)
 	}
 
-	msg, err := c.conn.RequestWithContext(ctx, SubjectAuthLogout, reqData)
+	msg := nats.NewMsg(SubjectAuthLogout)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
 	if err != nil {
 		return fmt.Errorf("failed to send logout request: %w", err)
 	}
 
 	var response authResponse
-	if err := json.Unmarshal(msg.Data, &response); err != nil {
+	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
 		return fmt.Errorf("failed to unmarshal logout response: %w", err)
 	}
 
@@ -179,13 +195,16 @@ func (c *NATSAuthConnector) LogoutAll(ctx context.Context, userID uuid.UUID, tok
 		return fmt.Errorf("failed to marshal logout all request: %w", err)
 	}
 
-	msg, err := c.conn.RequestWithContext(ctx, SubjectAuthLogoutAll, reqData)
+	msg := nats.NewMsg(SubjectAuthLogoutAll)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
 	if err != nil {
 		return fmt.Errorf("failed to send logout all request: %w", err)
 	}
 
 	var response authResponse
-	if err := json.Unmarshal(msg.Data, &response); err != nil {
+	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
 		return fmt.Errorf("failed to unmarshal logout all response: %w", err)
 	}
 
@@ -217,13 +236,16 @@ func (c *NATSAuthConnector) ChangePassword(ctx context.Context, userID uuid.UUID
 		return fmt.Errorf("failed to marshal change password request: %w", err)
 	}
 
-	msg, err := c.conn.RequestWithContext(ctx, SubjectAuthChangePassword, reqData)
+	msg := nats.NewMsg(SubjectAuthChangePassword)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
 	if err != nil {
 		return fmt.Errorf("failed to send change password request: %w", err)
 	}
 
 	var response authResponse
-	if err := json.Unmarshal(msg.Data, &response); err != nil {
+	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
 		return fmt.Errorf("failed to unmarshal change password response: %w", err)
 	}
 

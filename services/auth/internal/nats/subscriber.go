@@ -2,7 +2,6 @@ package nats
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 
+	"github.com/artmexbet/raibecas/libs/natsw"
 	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 )
 
@@ -20,16 +20,22 @@ type IRegistrationService interface {
 
 // Subscriber handles subscribing to NATS events
 type Subscriber struct {
-	conn        *nats.Conn
+	client      *natsw.Client
 	regService  IRegistrationService
-	publisher   IEventPublisher
+	publisher   EventPublisher
 	subscribers []*nats.Subscription
 }
 
 // NewSubscriber creates a new NATS subscriber
-func NewSubscriber(conn *nats.Conn, regService IRegistrationService, publisher IEventPublisher) *Subscriber {
+func NewSubscriber(conn *nats.Conn, regService IRegistrationService, publisher EventPublisher) *Subscriber {
+	// Создаём клиент с middleware
+	client := natsw.NewClient(conn,
+		natsw.WithLogger(slog.Default()),
+		natsw.WithRecover(),
+	)
+
 	return &Subscriber{
-		conn:       conn,
+		client:     client,
 		regService: regService,
 		publisher:  publisher,
 	}
@@ -51,16 +57,16 @@ type RegistrationRejectedEvent struct {
 // Start starts all NATS subscriptions
 func (s *Subscriber) Start(_ context.Context) error {
 	// Subscribe to registration approved events
-	sub1, err := s.conn.Subscribe("admin.registration.approved", s.handleRegistrationApproved)
+	sub1, err := s.client.Subscribe(SubjectAdminRegistrationApproved, s.handleRegistrationApproved)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to admin.registration.approved: %w", err)
+		return fmt.Errorf("failed to subscribe to %s: %w", SubjectAdminRegistrationApproved, err)
 	}
 	s.subscribers = append(s.subscribers, sub1)
 
 	// Subscribe to registration rejected events
-	sub2, err := s.conn.Subscribe("admin.registration.rejected", s.handleRegistrationRejected)
+	sub2, err := s.client.Subscribe(SubjectAdminRegistrationRejected, s.handleRegistrationRejected)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to admin.registration.rejected: %w", err)
+		return fmt.Errorf("failed to subscribe to %s: %w", SubjectAdminRegistrationRejected, err)
 	}
 	s.subscribers = append(s.subscribers, sub2)
 
@@ -80,50 +86,56 @@ func (s *Subscriber) Stop() error {
 }
 
 // handleRegistrationApproved handles registration approval events
-func (s *Subscriber) handleRegistrationApproved(msg *nats.Msg) {
+func (s *Subscriber) handleRegistrationApproved(msg *natsw.Message) error {
 	var event RegistrationApprovedEvent
-	if err := json.Unmarshal(msg.Data, &event); err != nil {
-		slog.Error("Failed to unmarshal registration approved event", "error", err)
-		return
+	if err := msg.UnmarshalData(&event); err != nil {
+		return fmt.Errorf("failed to unmarshal registration approved event: %w", err)
 	}
 
-	ctx := context.Background()
+	// Используем контекст из сообщения (содержит trace context)
+	ctx := msg.Ctx
 
 	// Approve registration and create user
 	user, err := s.regService.ApproveRegistration(ctx, event.RequestID, event.ApproverID)
 	if err != nil {
-		slog.Error("Failed to approve registration", "request_id", event.RequestID, "error", err)
-		return
+		return fmt.Errorf("failed to approve registration: %w", err)
 	}
 
-	slog.Info("Registration approved, user created", "request_id", event.RequestID, "user_id", user.ID)
+	slog.InfoContext(ctx, "Registration approved, user created",
+		"request_id", event.RequestID,
+		"user_id", user.ID)
 
 	// Publish user registered event with complete user data
-	if err := s.publisher.PublishUserRegistered(domain.UserRegisteredEvent{
+	if err := s.publisher.PublishUserRegistered(ctx, domain.UserRegisteredEvent{
 		UserID:    user.ID,
 		Username:  user.Username,
 		Email:     user.Email,
 		Timestamp: time.Now(),
 	}); err != nil {
-		slog.Error("Failed to publish user registered event", "error", err)
+		return fmt.Errorf("failed to publish user registered event: %w", err)
 	}
+
+	return nil
 }
 
 // handleRegistrationRejected handles registration rejection events
-func (s *Subscriber) handleRegistrationRejected(msg *nats.Msg) {
+func (s *Subscriber) handleRegistrationRejected(msg *natsw.Message) error {
 	var event RegistrationRejectedEvent
-	if err := json.Unmarshal(msg.Data, &event); err != nil {
-		slog.Error("Failed to unmarshal registration rejected event", "error", err)
-		return
+	if err := msg.UnmarshalData(&event); err != nil {
+		return fmt.Errorf("failed to unmarshal registration rejected event: %w", err)
 	}
 
-	ctx := context.Background()
+	// Используем контекст из сообщения (содержит trace context)
+	ctx := msg.Ctx
 
 	// Reject registration
 	if err := s.regService.RejectRegistration(ctx, event.RequestID, event.ApproverID); err != nil {
-		slog.Error("Failed to reject registration", "request_id", event.RequestID, "error", err)
-		return
+		return fmt.Errorf("failed to reject registration: %w", err)
 	}
 
-	slog.Info("Registration rejected", "request_id", event.RequestID, "approver_id", event.ApproverID)
+	slog.InfoContext(ctx, "Registration rejected",
+		"request_id", event.RequestID,
+		"approver_id", event.ApproverID)
+
+	return nil
 }

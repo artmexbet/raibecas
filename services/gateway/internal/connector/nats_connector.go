@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 
+	"github.com/artmexbet/raibecas/libs/natsw"
 	"github.com/artmexbet/raibecas/services/gateway/internal/domain"
 )
 
@@ -26,7 +27,7 @@ const (
 
 // NATSDocumentConnector implements server.DocumentServiceConnector using NATS for communication
 type NATSDocumentConnector struct {
-	conn    *nats.Conn
+	client  *natsw.Client
 	timeout time.Duration
 }
 
@@ -35,8 +36,12 @@ func NewNATSDocumentConnector(conn *nats.Conn, timeout time.Duration) *NATSDocum
 	if timeout == 0 {
 		timeout = defaultTimeout
 	}
+
+	// Создаём клиент с автоматической пропагацией trace context
+	client := natsw.NewClient(conn)
+
 	return &NATSDocumentConnector{
-		conn:    conn,
+		client:  client,
 		timeout: timeout,
 	}
 }
@@ -48,13 +53,17 @@ func (c *NATSDocumentConnector) ListDocuments(ctx context.Context, query domain.
 		return nil, fmt.Errorf("failed to marshal list request: %w", err)
 	}
 
-	msg, err := c.conn.RequestWithContext(ctx, SubjectDocumentsList, reqData)
+	msg := nats.NewMsg(SubjectDocumentsList)
+	msg.Data = reqData
+
+	// RequestMsg автоматически пропагирует trace context
+	respMsg, err := c.client.RequestMsg(ctx, msg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send list request: %w", err)
 	}
 
 	var response domain.ListDocumentsResponse
-	if err := response.UnmarshalJSON(msg.Data); err != nil {
+	if err := response.UnmarshalJSON(respMsg.Data); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal list response: %w", err)
 	}
 
@@ -73,13 +82,16 @@ func (c *NATSDocumentConnector) GetDocument(ctx context.Context, id uuid.UUID) (
 		return nil, fmt.Errorf("failed to marshal get request: %w", err)
 	}
 
-	msg, err := c.conn.RequestWithContext(ctx, SubjectDocumentsGet, reqData)
+	msg := nats.NewMsg(SubjectDocumentsGet)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send get request: %w", err)
 	}
 
 	var response domain.GetDocumentResponse
-	if err := response.UnmarshalJSON(msg.Data); err != nil {
+	if err := response.UnmarshalJSON(respMsg.Data); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal get response: %w", err)
 	}
 
@@ -93,13 +105,16 @@ func (c *NATSDocumentConnector) CreateDocument(ctx context.Context, req domain.C
 		return nil, fmt.Errorf("failed to marshal create request: %w", err)
 	}
 
-	msg, err := c.conn.RequestWithContext(ctx, SubjectDocumentsCreate, reqData)
+	msg := nats.NewMsg(SubjectDocumentsCreate)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send create request: %w", err)
 	}
 
 	var response domain.CreateDocumentResponse
-	if err := response.UnmarshalJSON(msg.Data); err != nil {
+	if err := response.UnmarshalJSON(respMsg.Data); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal create response: %w", err)
 	}
 
@@ -123,13 +138,16 @@ func (c *NATSDocumentConnector) UpdateDocument(ctx context.Context, id uuid.UUID
 		return nil, fmt.Errorf("failed to marshal update request: %w", err)
 	}
 
-	msg, err := c.conn.RequestWithContext(ctx, SubjectDocumentsUpdate, reqData)
+	msg := nats.NewMsg(SubjectDocumentsUpdate)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send update request: %w", err)
 	}
 
 	var response domain.UpdateDocumentResponse
-	if err := response.UnmarshalJSON(msg.Data); err != nil {
+	if err := response.UnmarshalJSON(respMsg.Data); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal update response: %w", err)
 	}
 
@@ -148,14 +166,17 @@ func (c *NATSDocumentConnector) DeleteDocument(ctx context.Context, id uuid.UUID
 		return fmt.Errorf("failed to marshal delete request: %w", err)
 	}
 
-	msg, err := c.conn.RequestWithContext(ctx, SubjectDocumentsDelete, reqData)
+	msg := nats.NewMsg(SubjectDocumentsDelete)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
 	if err != nil {
 		return fmt.Errorf("failed to send delete request: %w", err)
 	}
 
 	// Check for error response
 	var errorResp domain.ErrorResponse
-	if err := errorResp.UnmarshalJSON(msg.Data); err == nil && errorResp.Error != "" {
+	if err := errorResp.UnmarshalJSON(respMsg.Data); err == nil && errorResp.Error != "" {
 		return fmt.Errorf("delete failed: %s - %s", errorResp.Error, errorResp.Message)
 	}
 

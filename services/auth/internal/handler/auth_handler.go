@@ -14,7 +14,7 @@ import (
 	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
 )
 
-type IAuthService interface {
+type AuthService interface {
 	ValidateAccessToken(context.Context, string) (*jwt.Claims, error)
 	Login(context.Context, domain.LoginRequest) (*domain.TokenPair, uuid.UUID, error)
 	RefreshTokens(context.Context, domain.RefreshRequest) (*domain.TokenPair, uuid.UUID, error)
@@ -23,22 +23,22 @@ type IAuthService interface {
 	ChangePassword(ctx context.Context, req domain.ChangePasswordRequest) error
 }
 
-type IEventPublisher interface {
-	PublishUserLogin(domain.UserLoginEvent) error
-	PublishUserLogout(domain.UserLogoutEvent) error
-	PublishPasswordReset(domain.PasswordResetEvent) error
-	PublishRegistrationRequested(domain.RegistrationRequestedEvent) error
-	PublishUserRegistered(domain.UserRegisteredEvent) error
+type EventPublisher interface {
+	PublishUserLogin(ctx context.Context, event domain.UserLoginEvent) error
+	PublishUserLogout(ctx context.Context, event domain.UserLogoutEvent) error
+	PublishPasswordReset(ctx context.Context, event domain.PasswordResetEvent) error
+	PublishRegistrationRequested(ctx context.Context, event domain.RegistrationRequestedEvent) error
+	PublishUserRegistered(ctx context.Context, event domain.UserRegisteredEvent) error
 }
 
 // AuthHandler handles authentication NATS requests
 type AuthHandler struct {
-	authService IAuthService
-	publisher   IEventPublisher
+	authService AuthService
+	publisher   EventPublisher
 }
 
 // NewAuthHandler creates a new NATS auth handler
-func NewAuthHandler(authService IAuthService, publisher IEventPublisher) *AuthHandler {
+func NewAuthHandler(authService AuthService, publisher EventPublisher) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
 		publisher:   publisher,
@@ -63,7 +63,7 @@ func (h *AuthHandler) HandleLogin(msg *natspkg.Msg) {
 	}
 
 	// Publish login event
-	_ = h.publisher.PublishUserLogin(domain.UserLoginEvent{
+	_ = h.publisher.PublishUserLogin(ctx, domain.UserLoginEvent{
 		UserID:    userID,
 		DeviceID:  req.DeviceID,
 		UserAgent: req.UserAgent,
@@ -153,7 +153,7 @@ func (h *AuthHandler) HandleLogout(msg *natspkg.Msg) {
 	}
 
 	// Publish logout event
-	_ = h.publisher.PublishUserLogout(domain.UserLogoutEvent{
+	_ = h.publisher.PublishUserLogout(ctx, domain.UserLogoutEvent{
 		UserID:    req.UserID,
 		Timestamp: time.Now(),
 	})
@@ -211,7 +211,7 @@ func (h *AuthHandler) HandleChangePassword(msg *natspkg.Msg) {
 	}
 
 	// Publish password reset event
-	_ = h.publisher.PublishPasswordReset(domain.PasswordResetEvent{
+	_ = h.publisher.PublishPasswordReset(ctx, domain.PasswordResetEvent{
 		UserID:    req.UserID,
 		Method:    "self-service",
 		Timestamp: time.Now(),

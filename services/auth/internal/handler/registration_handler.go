@@ -12,18 +12,18 @@ import (
 	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 )
 
-type IRegistrationService interface {
+type RegistrationService interface {
 	CreateRegistrationRequest(context.Context, domain.RegisterRequest) (uuid.UUID, error)
 }
 
 // RegistrationHandler handles registration NATS requests
 type RegistrationHandler struct {
-	regService IRegistrationService
-	publisher  IEventPublisher
+	regService RegistrationService
+	publisher  EventPublisher
 }
 
 // NewRegistrationHandler creates a new NATS registration handler
-func NewRegistrationHandler(regService IRegistrationService, publisher IEventPublisher) *RegistrationHandler {
+func NewRegistrationHandler(regService RegistrationService, publisher EventPublisher) *RegistrationHandler {
 	return &RegistrationHandler{
 		regService: regService,
 		publisher:  publisher,
@@ -48,7 +48,7 @@ func (h *RegistrationHandler) HandleRegister(msg *natspkg.Msg) {
 	}
 
 	// Publish registration requested event
-	_ = h.publisher.PublishRegistrationRequested(domain.RegistrationRequestedEvent{
+	_ = h.publisher.PublishRegistrationRequested(ctx, domain.RegistrationRequestedEvent{
 		RequestID: requestID,
 		Username:  req.Username,
 		Email:     req.Email,

@@ -2,6 +2,7 @@ package natsw
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 
@@ -15,6 +16,20 @@ import (
 type Message struct {
 	*nats.Msg
 	Ctx context.Context
+}
+
+// UnmarshalData десериализует данные сообщения в структуру
+func (m *Message) UnmarshalData(v interface{}) error {
+	return json.Unmarshal(m.Data, v)
+}
+
+// RespondJSON отправляет ответ на запрос с JSON-сериализацией
+func (m *Message) RespondJSON(v interface{}) error {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Errorf("failed to marshal response: %w", err)
+	}
+	return m.Respond(data)
 }
 
 // HandlerFunc - обработчик сообщений с контекстом
