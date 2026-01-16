@@ -5,6 +5,6 @@ use (
 	./libs/utils
 
 	./services/auth
-	./services/chat
 	./services/gateway
+	./services/chat
 )
