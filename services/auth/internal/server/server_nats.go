@@ -13,6 +13,8 @@ import (
 	natsgo "github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/artmexbet/raibecas/libs/natsw"
+
 	"github.com/artmexbet/raibecas/services/auth/internal/config"
 	"github.com/artmexbet/raibecas/services/auth/internal/handler"
 	"github.com/artmexbet/raibecas/services/auth/internal/nats"
@@ -28,7 +30,7 @@ type NATS struct {
 	cfg           *config.Config
 	pool          *pgxpool.Pool
 	redis         *redis.Client
-	natsConn      *natsgo.Conn
+	natsClient    *natsw.Client
 	subscriber    *nats.Subscriber
 	subscriptions []*natsgo.Subscription
 }
@@ -76,6 +78,12 @@ func NewNATS(cfg *config.Config) (*NATS, error) {
 		return nil, fmt.Errorf("failed to connect to NATS: %w", err)
 	}
 
+	// Create NATS wrapper client with middleware
+	natsClient := natsw.NewClient(natsConn,
+		natsw.WithLogger(slog.Default()),
+		natsw.WithRecover(),
+	)
+
 	pgs := postgres.New(pool)
 	// Initialize repositories
 	authRepo := repository.NewAuthRepository(pgs)
@@ -109,7 +117,7 @@ func NewNATS(cfg *config.Config) (*NATS, error) {
 		cfg:           cfg,
 		pool:          pool,
 		redis:         redisClient,
-		natsConn:      natsConn,
+		natsClient:    natsClient,
 		subscriber:    subscriber,
 		subscriptions: make([]*natsgo.Subscription, 0),
 	}
@@ -129,46 +137,44 @@ func NewNATS(cfg *config.Config) (*NATS, error) {
 
 // setupSubscriptions sets up NATS request/reply subscriptions
 func (s *NATS) setupSubscriptions(authHandler *handler.AuthHandler, regHandler *handler.RegistrationHandler) error {
-	var err error
-
-	// Auth service subscriptions
-	sub, err := s.natsConn.Subscribe(nats.SubjectAuthRegister, regHandler.HandleRegister)
+	// Auth service subscriptions using natsw.Client
+	sub, err := s.natsClient.Subscribe(nats.SubjectAuthRegister, regHandler.HandleRegister)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthRegister, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsConn.Subscribe(nats.SubjectAuthLogin, authHandler.HandleLogin)
+	sub, err = s.natsClient.Subscribe(nats.SubjectAuthLogin, authHandler.HandleLogin)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthLogin, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsConn.Subscribe(nats.SubjectAuthRefresh, authHandler.HandleRefresh)
+	sub, err = s.natsClient.Subscribe(nats.SubjectAuthRefresh, authHandler.HandleRefresh)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthRefresh, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsConn.Subscribe(nats.SubjectAuthValidate, authHandler.HandleValidate)
+	sub, err = s.natsClient.Subscribe(nats.SubjectAuthValidate, authHandler.HandleValidate)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthValidate, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsConn.Subscribe(nats.SubjectAuthLogout, authHandler.HandleLogout)
+	sub, err = s.natsClient.Subscribe(nats.SubjectAuthLogout, authHandler.HandleLogout)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthLogout, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsConn.Subscribe(nats.SubjectAuthLogoutAll, authHandler.HandleLogoutAll)
+	sub, err = s.natsClient.Subscribe(nats.SubjectAuthLogoutAll, authHandler.HandleLogoutAll)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthLogoutAll, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsConn.Subscribe(nats.SubjectAuthChangePassword, authHandler.HandleChangePassword)
+	sub, err = s.natsClient.Subscribe(nats.SubjectAuthChangePassword, authHandler.HandleChangePassword)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthChangePassword, err)
 	}
@@ -216,7 +222,7 @@ func (s *NATS) Shutdown() error {
 	}
 
 	// Close NATS connection
-	s.natsConn.Close()
+	s.natsClient.Close()
 
 	// Close Redis connection
 	if err := s.redis.Close(); err != nil {

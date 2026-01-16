@@ -2,13 +2,13 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
-	natspkg "github.com/nats-io/nats.go"
+
+	"github.com/artmexbet/raibecas/libs/natsw"
 
 	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
@@ -46,20 +46,18 @@ func NewAuthHandler(authService AuthService, publisher EventPublisher) *AuthHand
 }
 
 // HandleLogin handles login requests via NATS
-func (h *AuthHandler) HandleLogin(msg *natspkg.Msg) {
+func (h *AuthHandler) HandleLogin(msg *natsw.Message) error {
 	var req LoginRequest
-	if err := json.Unmarshal(msg.Data, &req); err != nil {
-		h.respondError(msg, "Invalid request format")
-		return
+	if err := msg.UnmarshalData(&req); err != nil {
+		return h.respondError(msg, "Invalid request format")
 	}
 
-	ctx := context.Background()
+	ctx := msg.Ctx
 	loginReq := req.ToDomain()
 
 	tokens, userID, err := h.authService.Login(ctx, loginReq)
 	if err != nil {
-		h.respondError(msg, fmt.Sprintf("invalid credentials: %v", err))
-		return
+		return h.respondError(msg, fmt.Sprintf("invalid credentials: %v", err))
 	}
 
 	// Publish login event
@@ -77,23 +75,21 @@ func (h *AuthHandler) HandleLogin(msg *natspkg.Msg) {
 		ExpiresIn:    900, // 15 minutes
 	}
 
-	h.respond(msg, response, nil)
+	return h.respond(msg, response)
 }
 
 // HandleValidate handles token validation requests via NATS
-func (h *AuthHandler) HandleValidate(msg *natspkg.Msg) {
+func (h *AuthHandler) HandleValidate(msg *natsw.Message) error {
 	var req ValidateRequest
-	if err := json.Unmarshal(msg.Data, &req); err != nil {
-		h.respondError(msg, "Invalid request format")
-		return
+	if err := msg.UnmarshalData(&req); err != nil {
+		return h.respondError(msg, "Invalid request format")
 	}
 
-	ctx := context.Background()
+	ctx := msg.Ctx
 	claims, err := h.authService.ValidateAccessToken(ctx, req.Token)
 	if err != nil {
 		response := ValidateResponse{Valid: false}
-		h.respond(msg, response, nil)
-		return
+		return h.respond(msg, response)
 	}
 
 	response := ValidateResponse{
@@ -102,24 +98,22 @@ func (h *AuthHandler) HandleValidate(msg *natspkg.Msg) {
 		Role:   claims.Role,
 	}
 
-	h.respond(msg, response, nil)
+	return h.respond(msg, response)
 }
 
 // HandleRefresh handles token refresh requests via NATS
-func (h *AuthHandler) HandleRefresh(msg *natspkg.Msg) {
+func (h *AuthHandler) HandleRefresh(msg *natsw.Message) error {
 	var req RefreshRequest
-	if err := json.Unmarshal(msg.Data, &req); err != nil {
-		h.respondError(msg, "Invalid request format")
-		return
+	if err := msg.UnmarshalData(&req); err != nil {
+		return h.respondError(msg, "Invalid request format")
 	}
 
-	ctx := context.Background()
+	ctx := msg.Ctx
 	refreshReq := req.ToDomain()
 
 	tokens, _, err := h.authService.RefreshTokens(ctx, refreshReq)
 	if err != nil {
-		h.respondError(msg, "Invalid or expired refresh token")
-		return
+		return h.respondError(msg, "Invalid or expired refresh token")
 	}
 
 	response := LoginResponse{
@@ -128,28 +122,24 @@ func (h *AuthHandler) HandleRefresh(msg *natspkg.Msg) {
 		ExpiresIn:    900,
 	}
 
-	h.respond(msg, response, nil)
+	return h.respond(msg, response)
 }
 
 // HandleLogout handles logout requests via NATS
-func (h *AuthHandler) HandleLogout(msg *natspkg.Msg) {
+func (h *AuthHandler) HandleLogout(msg *natsw.Message) error {
 	var req LogoutRequest
-	if err := json.Unmarshal(msg.Data, &req); err != nil {
-		h.respondError(msg, "Invalid request format")
-		return
+	if err := msg.UnmarshalData(&req); err != nil {
+		return h.respondError(msg, "Invalid request format")
 	}
 
-	// Validate token first
-	ctx := context.Background()
+	ctx := msg.Ctx
 	claims, err := h.authService.ValidateAccessToken(ctx, req.Token)
 	if err != nil || claims.UserID != req.UserID {
-		h.respondError(msg, "Unauthorized")
-		return
+		return h.respondError(msg, "Unauthorized")
 	}
 
 	if err := h.authService.Logout(ctx, req.UserID, req.Token); err != nil {
-		h.respondError(msg, "Failed to logout")
-		return
+		return h.respondError(msg, "Failed to logout")
 	}
 
 	// Publish logout event
@@ -159,55 +149,47 @@ func (h *AuthHandler) HandleLogout(msg *natspkg.Msg) {
 	})
 
 	response := SuccessResponse{Message: "Logged out successfully"}
-	h.respond(msg, response, nil)
+	return h.respond(msg, response)
 }
 
 // HandleLogoutAll handles logout all requests via NATS
-func (h *AuthHandler) HandleLogoutAll(msg *natspkg.Msg) {
+func (h *AuthHandler) HandleLogoutAll(msg *natsw.Message) error {
 	var req LogoutAllRequest
-	if err := json.Unmarshal(msg.Data, &req); err != nil {
-		h.respondError(msg, "Invalid request format")
-		return
+	if err := msg.UnmarshalData(&req); err != nil {
+		return h.respondError(msg, "Invalid request format")
 	}
 
-	// Validate token first
-	ctx := context.Background()
+	ctx := msg.Ctx
 	claims, err := h.authService.ValidateAccessToken(ctx, req.Token)
 	if err != nil || claims.UserID != req.UserID {
-		h.respondError(msg, "Unauthorized")
-		return
+		return h.respondError(msg, "Unauthorized")
 	}
 
 	if err := h.authService.LogoutAll(ctx, req.UserID); err != nil {
-		h.respondError(msg, "Failed to logout from all devices")
-		return
+		return h.respondError(msg, "Failed to logout from all devices")
 	}
 
 	response := SuccessResponse{Message: "Logged out from all devices successfully"}
-	h.respond(msg, response, nil)
+	return h.respond(msg, response)
 }
 
 // HandleChangePassword handles password change requests via NATS
-func (h *AuthHandler) HandleChangePassword(msg *natspkg.Msg) {
+func (h *AuthHandler) HandleChangePassword(msg *natsw.Message) error {
 	var req ChangePasswordRequest
-	if err := json.Unmarshal(msg.Data, &req); err != nil {
-		h.respondError(msg, "Invalid request format")
-		return
+	if err := msg.UnmarshalData(&req); err != nil {
+		return h.respondError(msg, "Invalid request format")
 	}
 
-	// Validate token first
-	ctx := context.Background()
+	ctx := msg.Ctx
 	claims, err := h.authService.ValidateAccessToken(ctx, req.Token)
 	if err != nil || claims.UserID != req.UserID {
-		h.respondError(msg, "Unauthorized")
-		return
+		return h.respondError(msg, "Unauthorized")
 	}
 
 	changeReq := req.ToDomain()
 
 	if err := h.authService.ChangePassword(ctx, changeReq); err != nil {
-		h.respondError(msg, err.Error())
-		return
+		return h.respondError(msg, err.Error())
 	}
 
 	// Publish password reset event
@@ -218,43 +200,28 @@ func (h *AuthHandler) HandleChangePassword(msg *natspkg.Msg) {
 	})
 
 	response := SuccessResponse{Message: "Password changed successfully"}
-	h.respond(msg, response, nil)
+	return h.respond(msg, response)
 }
 
 // Helper methods
-func (h *AuthHandler) respond(msg *natspkg.Msg, data any, err error) {
+func (h *AuthHandler) respond(msg *natsw.Message, data any) error {
 	resp := Response{
-		Success: err == nil,
+		Success: true,
 		Data:    data,
 	}
-	if err != nil {
-		resp.Error = err.Error()
-	}
 
-	response, err := json.Marshal(resp)
-	if err != nil {
-		log.Printf("Failed to marshal response: %v", err)
-		return
-	}
-
-	if err := msg.Respond(response); err != nil {
-		log.Printf("Failed to send response: %v", err)
-	}
+	return msg.RespondJSON(resp)
 }
 
-func (h *AuthHandler) respondError(msg *natspkg.Msg, errorMsg string) {
+func (h *AuthHandler) respondError(msg *natsw.Message, errorMsg string) error {
 	resp := Response{
 		Success: false,
 		Error:   errorMsg,
 	}
 
-	response, err := json.Marshal(resp)
-	if err != nil {
-		log.Printf("Failed to marshal error response: %v", err)
-		return
+	if err := msg.RespondJSON(resp); err != nil {
+		slog.ErrorContext(msg.Ctx, "Failed to send error response", "error", err)
+		return err
 	}
-
-	if err := msg.Respond(response); err != nil {
-		log.Printf("Failed to send error response: %v", err)
-	}
+	return fmt.Errorf("%s", errorMsg)
 }

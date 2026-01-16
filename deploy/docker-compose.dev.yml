@@ -39,11 +39,6 @@ services:
       - "8222:8222"
     volumes:
       - nats_data:/data
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8222/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   qdrant:
     image: qdrant/qdrant
@@ -55,8 +50,8 @@ services:
 
   auth-service:
     build:
-      context: ../services/auth
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: services/auth/Dockerfile
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -75,8 +70,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      nats:
         condition: service_healthy
     restart: unless-stopped
 

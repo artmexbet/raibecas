@@ -10,6 +10,7 @@ import (
 	"github.com/nats-io/nats.go"
 
 	"github.com/artmexbet/raibecas/libs/natsw"
+
 	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 )
 
