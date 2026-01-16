@@ -2,28 +2,28 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
-	natspkg "github.com/nats-io/nats.go"
+
+	"github.com/artmexbet/raibecas/libs/natsw"
 
 	"github.com/artmexbet/raibecas/services/auth/internal/domain"
 )
 
-type IRegistrationService interface {
+type RegistrationService interface {
 	CreateRegistrationRequest(context.Context, domain.RegisterRequest) (uuid.UUID, error)
 }
 
 // RegistrationHandler handles registration NATS requests
 type RegistrationHandler struct {
-	regService IRegistrationService
-	publisher  IEventPublisher
+	regService RegistrationService
+	publisher  EventPublisher
 }
 
 // NewRegistrationHandler creates a new NATS registration handler
-func NewRegistrationHandler(regService IRegistrationService, publisher IEventPublisher) *RegistrationHandler {
+func NewRegistrationHandler(regService RegistrationService, publisher EventPublisher) *RegistrationHandler {
 	return &RegistrationHandler{
 		regService: regService,
 		publisher:  publisher,
@@ -31,24 +31,22 @@ func NewRegistrationHandler(regService IRegistrationService, publisher IEventPub
 }
 
 // HandleRegister handles registration requests via NATS
-func (h *RegistrationHandler) HandleRegister(msg *natspkg.Msg) {
+func (h *RegistrationHandler) HandleRegister(msg *natsw.Message) error {
 	var req RegisterRequest
-	if err := json.Unmarshal(msg.Data, &req); err != nil {
-		h.respondError(msg, "Invalid request format")
-		return
+	if err := msg.UnmarshalData(&req); err != nil {
+		return h.respondError(msg, "Invalid request format")
 	}
 
-	ctx := context.Background()
+	ctx := msg.Ctx
 	regReq := req.ToDomain()
 
 	requestID, err := h.regService.CreateRegistrationRequest(ctx, regReq)
 	if err != nil {
-		h.respondError(msg, err.Error())
-		return
+		return h.respondError(msg, err.Error())
 	}
 
 	// Publish registration requested event
-	_ = h.publisher.PublishRegistrationRequested(domain.RegistrationRequestedEvent{
+	_ = h.publisher.PublishRegistrationRequested(ctx, domain.RegistrationRequestedEvent{
 		RequestID: requestID,
 		Username:  req.Username,
 		Email:     req.Email,
@@ -61,43 +59,28 @@ func (h *RegistrationHandler) HandleRegister(msg *natspkg.Msg) {
 		Message:   "Registration request submitted successfully. Waiting for admin approval.",
 	}
 
-	h.respond(msg, response, nil)
+	return h.respond(msg, response)
 }
 
 // Helper methods
-func (h *RegistrationHandler) respond(msg *natspkg.Msg, data any, err error) {
+func (h *RegistrationHandler) respond(msg *natsw.Message, data any) error {
 	resp := Response{
-		Success: err == nil,
+		Success: true,
 		Data:    data,
 	}
-	if err != nil {
-		resp.Error = err.Error()
-	}
 
-	response, err := json.Marshal(resp)
-	if err != nil {
-		slog.Error("Failed to marshal response", "error", err)
-		return
-	}
-
-	if err := msg.Respond(response); err != nil {
-		slog.Error("Failed to send response", "error", err)
-	}
+	return msg.RespondJSON(resp)
 }
 
-func (h *RegistrationHandler) respondError(msg *natspkg.Msg, errorMsg string) {
+func (h *RegistrationHandler) respondError(msg *natsw.Message, errorMsg string) error {
 	resp := Response{
 		Success: false,
 		Error:   errorMsg,
 	}
 
-	response, err := json.Marshal(resp)
-	if err != nil {
-		slog.Error("Failed to marshal error response", "error", err)
-		return
+	if err := msg.RespondJSON(resp); err != nil {
+		slog.ErrorContext(msg.Ctx, "Failed to send error response", "error", err)
+		return err
 	}
-
-	if err := msg.Respond(response); err != nil {
-		slog.Error("Failed to send error response", "error", err)
-	}
+	return nil
 }

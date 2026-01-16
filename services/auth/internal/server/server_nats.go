@@ -13,6 +13,8 @@ import (
 	natsgo "github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/artmexbet/raibecas/libs/natsw"
+
 	"github.com/artmexbet/raibecas/services/auth/internal/config"
 	"github.com/artmexbet/raibecas/services/auth/internal/handler"
 	"github.com/artmexbet/raibecas/services/auth/internal/nats"
@@ -28,7 +30,7 @@ type NATS struct {
 	cfg           *config.Config
 	pool          *pgxpool.Pool
 	redis         *redis.Client
-	natsConn      *natsgo.Conn
+	natsClient    *natsw.Client
 	subscriber    *nats.Subscriber
 	subscriptions []*natsgo.Subscription
 }
@@ -76,6 +78,12 @@ func NewNATS(cfg *config.Config) (*NATS, error) {
 		return nil, fmt.Errorf("failed to connect to NATS: %w", err)
 	}
 
+	// Create NATS wrapper client with middleware
+	natsClient := natsw.NewClient(natsConn,
+		natsw.WithLogger(slog.Default()),
+		natsw.WithRecover(),
+	)
+
 	pgs := postgres.New(pool)
 	// Initialize repositories
 	authRepo := repository.NewAuthRepository(pgs)
@@ -109,7 +117,7 @@ func NewNATS(cfg *config.Config) (*NATS, error) {
 		cfg:           cfg,
 		pool:          pool,
 		redis:         redisClient,
-		natsConn:      natsConn,
+		natsClient:    natsClient,
 		subscriber:    subscriber,
 		subscriptions: make([]*natsgo.Subscription, 0),
 	}
@@ -129,53 +137,59 @@ func NewNATS(cfg *config.Config) (*NATS, error) {
 
 // setupSubscriptions sets up NATS request/reply subscriptions
 func (s *NATS) setupSubscriptions(authHandler *handler.AuthHandler, regHandler *handler.RegistrationHandler) error {
-	var err error
-
-	// Auth service subscriptions
-	sub, err := s.natsConn.Subscribe("auth.register", regHandler.HandleRegister)
+	// Auth service subscriptions using natsw.Client
+	sub, err := s.natsClient.Subscribe(nats.SubjectAuthRegister, regHandler.HandleRegister)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to auth.register: %w", err)
+		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthRegister, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsConn.Subscribe("auth.login", authHandler.HandleLogin)
+	sub, err = s.natsClient.Subscribe(nats.SubjectAuthLogin, authHandler.HandleLogin)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to auth.login: %w", err)
+		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthLogin, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsConn.Subscribe("auth.refresh", authHandler.HandleRefresh)
+	sub, err = s.natsClient.Subscribe(nats.SubjectAuthRefresh, authHandler.HandleRefresh)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to auth.refresh: %w", err)
+		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthRefresh, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsConn.Subscribe("auth.validate", authHandler.HandleValidate)
+	sub, err = s.natsClient.Subscribe(nats.SubjectAuthValidate, authHandler.HandleValidate)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to auth.validate: %w", err)
+		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthValidate, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsConn.Subscribe("auth.logout", authHandler.HandleLogout)
+	sub, err = s.natsClient.Subscribe(nats.SubjectAuthLogout, authHandler.HandleLogout)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to auth.logout: %w", err)
+		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthLogout, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsConn.Subscribe("auth.logout_all", authHandler.HandleLogoutAll)
+	sub, err = s.natsClient.Subscribe(nats.SubjectAuthLogoutAll, authHandler.HandleLogoutAll)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to auth.logout_all: %w", err)
+		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthLogoutAll, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsConn.Subscribe("auth.change_password", authHandler.HandleChangePassword)
+	sub, err = s.natsClient.Subscribe(nats.SubjectAuthChangePassword, authHandler.HandleChangePassword)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to auth.change_password: %w", err)
+		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthChangePassword, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
 	slog.Info("NATS subscriptions setup complete",
-		"topics", []string{"auth.register", "auth.login", "auth.refresh", "auth.validate", "auth.logout", "auth.logout_all", "auth.change_password"})
+		"topics", []string{
+			nats.SubjectAuthRegister,
+			nats.SubjectAuthLogin,
+			nats.SubjectAuthRefresh,
+			nats.SubjectAuthValidate,
+			nats.SubjectAuthLogout,
+			nats.SubjectAuthLogoutAll,
+			nats.SubjectAuthChangePassword,
+		})
 
 	return nil
 }
@@ -208,7 +222,7 @@ func (s *NATS) Shutdown() error {
 	}
 
 	// Close NATS connection
-	s.natsConn.Close()
+	s.natsClient.Close()
 
 	// Close Redis connection
 	if err := s.redis.Close(); err != nil {
