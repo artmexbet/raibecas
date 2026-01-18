@@ -47,7 +47,8 @@ func (s *Server) login(c *fiber.Ctx) error {
 		})
 	}
 
-	response, err := s.authConnector.Login(c.UserContext(), req)
+	// Call auth service
+	authResp, err := s.authConnector.Login(c.UserContext(), req)
 	if err != nil {
 		slog.Error("failed to login", "error", err)
 		return c.Status(http.StatusUnauthorized).JSON(domain.ErrorResponse{
@@ -56,7 +57,33 @@ func (s *Server) login(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.Status(http.StatusOK).JSON(response)
+	// Store refresh token and metadata in HttpOnly cookies
+	setSecureCookie(c, CookieRefreshToken, authResp.RefreshToken, RefreshTokenMaxAge)
+	setSecureCookie(c, CookieTokenID, authResp.TokenID, RefreshTokenMaxAge)
+	setSecureCookie(c, CookieFingerprint, authResp.Fingerprint, RefreshTokenMaxAge)
+
+	// Validate token to get user info
+	userInfo, err := s.authConnector.ValidateToken(c.UserContext(), authResp.AccessToken, authResp.Fingerprint)
+	if err != nil {
+		slog.Error("failed to validate token for user info", "error", err)
+	}
+
+	// Return only public data to client
+	publicResp := domain.LoginResponse{
+		AccessToken: authResp.AccessToken,
+		ExpiresIn:   authResp.ExpiresIn,
+		TokenType:   "Bearer",
+	}
+
+	// Add user info if available
+	if userInfo != nil && userInfo.Valid {
+		publicResp.User = &domain.UserInfo{
+			ID:   userInfo.UserID,
+			Role: userInfo.Role,
+		}
+	}
+
+	return c.Status(http.StatusOK).JSON(publicResp)
 }
 
 // refreshToken handles POST /api/v1/auth/refresh - refresh access token
@@ -68,6 +95,19 @@ func (s *Server) refreshToken(c *fiber.Ctx) error {
 		return c.Status(http.StatusBadRequest).JSON(domain.ErrorResponse{
 			Error:   "bad_request",
 			Message: "Invalid request body",
+		})
+	}
+
+	// Get refresh token and metadata from cookies
+	refreshToken := getSecureCookie(c, CookieRefreshToken)
+	tokenID := getSecureCookie(c, CookieTokenID)
+	fingerprint := getSecureCookie(c, CookieFingerprint)
+
+	if refreshToken == "" || tokenID == "" || fingerprint == "" {
+		slog.Error("missing refresh token or metadata in cookies")
+		return c.Status(http.StatusUnauthorized).JSON(domain.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "Refresh token not found",
 		})
 	}
 
@@ -84,16 +124,56 @@ func (s *Server) refreshToken(c *fiber.Ctx) error {
 		})
 	}
 
-	response, err := s.authConnector.RefreshToken(c.UserContext(), req)
+	// Build internal request to auth service
+	authReq := domain.AuthServiceRefreshRequest{
+		RefreshToken: refreshToken,
+		TokenID:      tokenID,
+		Fingerprint:  fingerprint,
+		DeviceID:     req.DeviceID,
+		UserAgent:    req.UserAgent,
+		IPAddress:    req.IPAddress,
+	}
+
+	authResp, err := s.authConnector.RefreshToken(c.UserContext(), authReq)
 	if err != nil {
 		slog.Error("failed to refresh token", "error", err)
+		// Clear cookies on failure
+		clearSecureCookie(c, CookieRefreshToken)
+		clearSecureCookie(c, CookieTokenID)
+		clearSecureCookie(c, CookieFingerprint)
 		return c.Status(http.StatusUnauthorized).JSON(domain.ErrorResponse{
 			Error:   "unauthorized",
 			Message: "Invalid or expired refresh token",
 		})
 	}
 
-	return c.Status(http.StatusOK).JSON(response)
+	// Update cookies with new tokens
+	setSecureCookie(c, CookieRefreshToken, authResp.RefreshToken, RefreshTokenMaxAge)
+	setSecureCookie(c, CookieTokenID, authResp.TokenID, RefreshTokenMaxAge)
+	setSecureCookie(c, CookieFingerprint, authResp.Fingerprint, RefreshTokenMaxAge)
+
+	// Validate token to get user info
+	userInfo, err := s.authConnector.ValidateToken(c.UserContext(), authResp.AccessToken, authResp.Fingerprint)
+	if err != nil {
+		slog.Error("failed to validate token for user info", "error", err)
+	}
+
+	// Return only public data to client
+	publicResp := domain.LoginResponse{
+		AccessToken: authResp.AccessToken,
+		ExpiresIn:   authResp.ExpiresIn,
+		TokenType:   "Bearer",
+	}
+
+	// Add user info if available
+	if userInfo != nil && userInfo.Valid {
+		publicResp.User = &domain.UserInfo{
+			ID:   userInfo.UserID,
+			Role: userInfo.Role,
+		}
+	}
+
+	return c.Status(http.StatusOK).JSON(publicResp)
 }
 
 // validateToken handles POST /api/v1/auth/validate - validate access token
@@ -117,7 +197,10 @@ func (s *Server) validateToken(c *fiber.Ctx) error {
 		})
 	}
 
-	response, err := s.authConnector.ValidateToken(c.UserContext(), req.Token)
+	// Get fingerprint from cookie (optional for validation)
+	fingerprint := getSecureCookie(c, CookieFingerprint)
+
+	response, err := s.authConnector.ValidateToken(c.UserContext(), req.Token, fingerprint)
 	if err != nil {
 		slog.Error("failed to validate token", "error", err)
 		return c.Status(http.StatusOK).JSON(domain.ValidateTokenResponse{
@@ -149,8 +232,11 @@ func (s *Server) logout(c *fiber.Ctx) error {
 		})
 	}
 
+	// Get fingerprint from cookie
+	fingerprint := getSecureCookie(c, CookieFingerprint)
+
 	// First validate the token to get user ID
-	validateResp, err := s.authConnector.ValidateToken(c.UserContext(), req.Token)
+	validateResp, err := s.authConnector.ValidateToken(c.UserContext(), req.Token, fingerprint)
 	if err != nil || !validateResp.Valid {
 		slog.Error("invalid token for logout", "error", err)
 		return c.Status(http.StatusUnauthorized).JSON(domain.ErrorResponse{
@@ -166,6 +252,11 @@ func (s *Server) logout(c *fiber.Ctx) error {
 			Message: "Failed to logout",
 		})
 	}
+
+	// Clear cookies
+	clearSecureCookie(c, CookieRefreshToken)
+	clearSecureCookie(c, CookieTokenID)
+	clearSecureCookie(c, CookieFingerprint)
 
 	return c.Status(http.StatusOK).JSON(domain.SuccessResponse{
 		Message: "Logged out successfully",
@@ -193,8 +284,11 @@ func (s *Server) logoutAll(c *fiber.Ctx) error {
 		})
 	}
 
+	// Get fingerprint from cookie
+	fingerprint := getSecureCookie(c, CookieFingerprint)
+
 	// First validate the token to get user ID
-	validateResp, err := s.authConnector.ValidateToken(c.UserContext(), req.Token)
+	validateResp, err := s.authConnector.ValidateToken(c.UserContext(), req.Token, fingerprint)
 	if err != nil || !validateResp.Valid {
 		slog.Error("invalid token for logout all", "error", err)
 		return c.Status(http.StatusUnauthorized).JSON(domain.ErrorResponse{
@@ -210,6 +304,11 @@ func (s *Server) logoutAll(c *fiber.Ctx) error {
 			Message: "Failed to logout from all devices",
 		})
 	}
+
+	// Clear cookies
+	clearSecureCookie(c, CookieRefreshToken)
+	clearSecureCookie(c, CookieTokenID)
+	clearSecureCookie(c, CookieFingerprint)
 
 	return c.Status(http.StatusOK).JSON(domain.SuccessResponse{
 		Message: "Logged out from all devices successfully",
@@ -237,8 +336,11 @@ func (s *Server) changePassword(c *fiber.Ctx) error {
 		})
 	}
 
+	// Get fingerprint from cookie
+	fingerprint := getSecureCookie(c, CookieFingerprint)
+
 	// First validate the token to get user ID
-	validateResp, err := s.authConnector.ValidateToken(c.UserContext(), req.Token)
+	validateResp, err := s.authConnector.ValidateToken(c.UserContext(), req.Token, fingerprint)
 	if err != nil || !validateResp.Valid {
 		slog.Error("invalid token for change password", "error", err)
 		return c.Status(http.StatusUnauthorized).JSON(domain.ErrorResponse{

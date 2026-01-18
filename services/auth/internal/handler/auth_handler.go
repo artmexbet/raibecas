@@ -15,10 +15,10 @@ import (
 )
 
 type AuthService interface {
-	ValidateAccessToken(context.Context, string) (*jwt.Claims, error)
-	Login(context.Context, domain.LoginRequest) (*domain.TokenPair, uuid.UUID, error)
-	RefreshTokens(context.Context, domain.RefreshRequest) (*domain.TokenPair, uuid.UUID, error)
-	Logout(ctx context.Context, userID uuid.UUID, token string) error
+	ValidateAccessToken(ctx context.Context, token string, fingerprint string) (*jwt.AccessTokenClaims, error)
+	Login(ctx context.Context, req domain.LoginRequest) (*domain.LoginResult, error)
+	RefreshTokens(ctx context.Context, req domain.RefreshRequest, fingerprint string) (*domain.LoginResult, error)
+	Logout(ctx context.Context, tokenID string, accessTokenJTI string) error
 	LogoutAll(ctx context.Context, userID uuid.UUID) error
 	ChangePassword(ctx context.Context, req domain.ChangePasswordRequest) error
 }
@@ -55,14 +55,14 @@ func (h *AuthHandler) HandleLogin(msg *natsw.Message) error {
 	ctx := msg.Ctx
 	loginReq := req.ToDomain()
 
-	tokens, userID, err := h.authService.Login(ctx, loginReq)
+	result, err := h.authService.Login(ctx, loginReq)
 	if err != nil {
 		return h.respondError(msg, fmt.Sprintf("cannot login: %v", err))
 	}
 
 	// Publish login event
 	_ = h.publisher.PublishUserLogin(ctx, domain.UserLoginEvent{
-		UserID:    userID,
+		UserID:    result.UserID,
 		DeviceID:  req.DeviceID,
 		UserAgent: req.UserAgent,
 		IPAddress: req.IPAddress,
@@ -70,8 +70,10 @@ func (h *AuthHandler) HandleLogin(msg *natsw.Message) error {
 	})
 
 	response := LoginResponse{
-		AccessToken:  tokens.AccessToken,
-		RefreshToken: tokens.RefreshToken,
+		AccessToken:  result.AccessToken,
+		RefreshToken: result.RefreshToken,
+		TokenID:      result.TokenID,
+		Fingerprint:  result.Fingerprint,
 		ExpiresIn:    900, // 15 minutes
 	}
 
@@ -85,8 +87,14 @@ func (h *AuthHandler) HandleValidate(msg *natsw.Message) error {
 		return h.respondError(msg, "Invalid request format")
 	}
 
+	// Проверяем наличие fingerprint
+	if req.Fingerprint == "" {
+		response := ValidateResponse{Valid: false}
+		return h.respond(msg, response)
+	}
+
 	ctx := msg.Ctx
-	claims, err := h.authService.ValidateAccessToken(ctx, req.Token)
+	claims, err := h.authService.ValidateAccessToken(ctx, req.Token, req.Fingerprint)
 	if err != nil {
 		response := ValidateResponse{Valid: false}
 		return h.respond(msg, response)
@@ -96,6 +104,7 @@ func (h *AuthHandler) HandleValidate(msg *natsw.Message) error {
 		Valid:  true,
 		UserID: claims.UserID,
 		Role:   claims.Role,
+		JTI:    claims.JTI,
 	}
 
 	return h.respond(msg, response)
@@ -108,17 +117,24 @@ func (h *AuthHandler) HandleRefresh(msg *natsw.Message) error {
 		return h.respondError(msg, "Invalid request format")
 	}
 
+	// Проверяем наличие fingerprint
+	if req.Fingerprint == "" {
+		return h.respondError(msg, "Fingerprint is required")
+	}
+
 	ctx := msg.Ctx
 	refreshReq := req.ToDomain()
 
-	tokens, _, err := h.authService.RefreshTokens(ctx, refreshReq)
+	result, err := h.authService.RefreshTokens(ctx, refreshReq, req.Fingerprint)
 	if err != nil {
 		return h.respondError(msg, "Invalid or expired refresh token")
 	}
 
 	response := LoginResponse{
-		AccessToken:  tokens.AccessToken,
-		RefreshToken: tokens.RefreshToken,
+		AccessToken:  result.AccessToken,
+		RefreshToken: result.RefreshToken,
+		TokenID:      result.TokenID,
+		Fingerprint:  result.Fingerprint,
 		ExpiresIn:    900,
 	}
 
@@ -133,12 +149,8 @@ func (h *AuthHandler) HandleLogout(msg *natsw.Message) error {
 	}
 
 	ctx := msg.Ctx
-	claims, err := h.authService.ValidateAccessToken(ctx, req.Token)
-	if err != nil || claims.UserID != req.UserID {
-		return h.respondError(msg, "Unauthorized")
-	}
 
-	if err := h.authService.Logout(ctx, req.UserID, req.Token); err != nil {
+	if err := h.authService.Logout(ctx, req.TokenID, req.AccessTokenJTI); err != nil {
 		return h.respondError(msg, "Failed to logout")
 	}
 
@@ -160,14 +172,16 @@ func (h *AuthHandler) HandleLogoutAll(msg *natsw.Message) error {
 	}
 
 	ctx := msg.Ctx
-	claims, err := h.authService.ValidateAccessToken(ctx, req.Token)
-	if err != nil || claims.UserID != req.UserID {
-		return h.respondError(msg, "Unauthorized")
-	}
 
 	if err := h.authService.LogoutAll(ctx, req.UserID); err != nil {
 		return h.respondError(msg, "Failed to logout from all devices")
 	}
+
+	// Publish logout event
+	_ = h.publisher.PublishUserLogout(ctx, domain.UserLogoutEvent{
+		UserID:    req.UserID,
+		Timestamp: time.Now(),
+	})
 
 	response := SuccessResponse{Message: "Logged out from all devices successfully"}
 	return h.respond(msg, response)
@@ -181,11 +195,6 @@ func (h *AuthHandler) HandleChangePassword(msg *natsw.Message) error {
 	}
 
 	ctx := msg.Ctx
-	claims, err := h.authService.ValidateAccessToken(ctx, req.Token)
-	if err != nil || claims.UserID != req.UserID {
-		return h.respondError(msg, "Unauthorized")
-	}
-
 	changeReq := req.ToDomain()
 
 	if err := h.authService.ChangePassword(ctx, changeReq); err != nil {

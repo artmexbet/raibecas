@@ -10,14 +10,14 @@ import (
 
 // AuthServiceConnector defines the interface for communicating with the auth service
 type AuthServiceConnector interface {
-	// Login authenticates a user and returns tokens
-	Login(ctx context.Context, req domain.LoginRequest) (*domain.LoginResponse, error)
+	// Login authenticates a user and returns full auth service response (internal)
+	Login(ctx context.Context, req domain.LoginRequest) (*domain.AuthServiceLoginResponse, error)
 
 	// RefreshToken refreshes an access token using a refresh token
-	RefreshToken(ctx context.Context, req domain.RefreshTokenRequest) (*domain.RefreshTokenResponse, error)
+	RefreshToken(ctx context.Context, req domain.AuthServiceRefreshRequest) (*domain.AuthServiceLoginResponse, error)
 
-	// ValidateToken validates an access token
-	ValidateToken(ctx context.Context, token string) (*domain.ValidateTokenResponse, error)
+	// ValidateToken validates an access token with fingerprint
+	ValidateToken(ctx context.Context, token string, fingerprint string) (*domain.ValidateTokenResponse, error)
 
 	// Logout logs out a user from the current device
 	Logout(ctx context.Context, userID uuid.UUID, token string) error

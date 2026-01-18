@@ -1,0 +1,74 @@
+sequenceDiagram
+    participant F as Frontend
+    participant G as Gateway
+    participant A as Auth Service
+    participant R as Redis
+
+    Note over F,R: Login Flow
+
+    F->>G: POST /auth/login<br/>{email, password}
+    G->>A: NATS: auth.login<br/>{email, password, device_id, ip, user_agent}
+    A->>R: Generate & Store Tokens
+    R-->>A: OK
+    A-->>G: {access_token, refresh_token, token_id, fingerprint, expires_in}
+
+    Note over G: Store sensitive data in HttpOnly cookies
+    G->>G: Set-Cookie: refresh_token<br/>Set-Cookie: token_id<br/>Set-Cookie: fingerprint
+
+    G-->>F: {access_token, expires_in, token_type: "Bearer", user: {...}}
+
+    Note over F: Store access_token in localStorage
+    F->>F: localStorage.setItem('access_token', token)
+
+    Note over F,R: API Request with Token
+
+    F->>G: GET /documents<br/>Authorization: Bearer <access_token>
+    G->>G: Extract fingerprint from cookie
+    G->>A: NATS: auth.validate<br/>{token, fingerprint}
+    A->>R: Validate Token + Fingerprint
+    R-->>A: Valid: {user_id, role, jti}
+    A-->>G: {valid: true, user_id, role, jti}
+    G->>G: Process request with user context
+    G-->>F: Response
+
+    Note over F,R: Token Refresh Flow
+
+    F->>G: POST /auth/refresh<br/>(empty body or {device_id})<br/>Cookie: refresh_token, token_id, fingerprint
+
+    Note over G: Extract from cookies
+    G->>G: refresh_token = getCookie('refresh_token')<br/>token_id = getCookie('token_id')<br/>fingerprint = getCookie('fingerprint')
+
+    G->>A: NATS: auth.refresh<br/>{refresh_token, token_id, fingerprint, device_id, ip, user_agent}
+    A->>R: Validate Refresh Token<br/>Rotate Tokens
+    R-->>A: New Tokens
+    A-->>G: {access_token, refresh_token, token_id, fingerprint, expires_in}
+
+    Note over G: Update cookies
+    G->>G: Set-Cookie: refresh_token (new)<br/>Set-Cookie: token_id (new)<br/>Set-Cookie: fingerprint (new)
+
+    G-->>F: {access_token, expires_in, token_type: "Bearer", user: {...}}
+
+    Note over F: Update access_token
+    F->>F: localStorage.setItem('access_token', new_token)
+
+    Note over F,R: Logout Flow
+
+    F->>G: POST /auth/logout<br/>{token: access_token}<br/>Cookie: fingerprint
+    G->>G: Extract fingerprint from cookie
+    G->>A: NATS: auth.validate<br/>{token, fingerprint}
+    A->>R: Validate Token
+    R-->>A: Valid: {user_id, role, jti}
+    A-->>G: {valid: true, user_id, role, jti}
+
+    G->>A: NATS: auth.logout<br/>{user_id, token}
+    A->>R: Blacklist Token<br/>Delete Session
+    R-->>A: OK
+    A-->>G: {success: true}
+
+    Note over G: Clear cookies
+    G->>G: Clear-Cookie: refresh_token<br/>Clear-Cookie: token_id<br/>Clear-Cookie: fingerprint
+
+    G-->>F: {message: "Logged out successfully"}
+
+    Note over F: Clear local storage
+    F->>F: localStorage.removeItem('access_token')

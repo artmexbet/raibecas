@@ -41,17 +41,8 @@ func NewAuthService(
 	}
 }
 
-// LoginResult contains the result of a successful login
-type LoginResult struct {
-	AccessToken  string
-	RefreshToken string
-	TokenID      string // ID refresh токена для последующих операций
-	Fingerprint  string // Fingerprint для клиента (должен храниться в HttpOnly cookie)
-	UserID       uuid.UUID
-}
-
 // Login authenticates a user and returns tokens with enhanced security
-func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*LoginResult, error) {
+func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*domain.LoginResult, error) {
 	// Get user by email
 	user, err := s.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
@@ -102,7 +93,7 @@ func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*Logi
 		return nil, fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
-	return &LoginResult{
+	return &domain.LoginResult{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		TokenID:      refreshMetadata.TokenID,
@@ -139,7 +130,7 @@ func (s *AuthService) LogoutAll(ctx context.Context, userID uuid.UUID) error {
 }
 
 // RefreshTokens refreshes access and refresh tokens with rotation
-func (s *AuthService) RefreshTokens(ctx context.Context, req domain.RefreshRequest, fingerprint string) (*LoginResult, error) {
+func (s *AuthService) RefreshTokens(ctx context.Context, req domain.RefreshRequest, fingerprint string) (*domain.LoginResult, error) {
 	// Получаем refresh token metadata через валидацию
 	oldMetadata, err := s.jwtManager.ValidateRefreshToken(ctx, req.TokenID, fingerprint)
 	if err != nil {
@@ -173,7 +164,7 @@ func (s *AuthService) RefreshTokens(ctx context.Context, req domain.RefreshReque
 		return nil, fmt.Errorf("failed to rotate tokens: %w", err)
 	}
 
-	return &LoginResult{
+	return &domain.LoginResult{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		TokenID:      oldMetadata.TokenID, // Новый ID будет в refresh token

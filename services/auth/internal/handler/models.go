@@ -32,10 +32,12 @@ func (r *LoginRequest) ToDomain() domain.LoginRequest {
 	}
 }
 
-// LoginResponse represents a login response
+// LoginResponse represents a login response with new JWT system
 type LoginResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
+	TokenID      string `json:"token_id"`    // ID токена для операций
+	Fingerprint  string `json:"fingerprint"` // Fingerprint для клиента (HttpOnly cookie)
 	ExpiresIn    int    `json:"expires_in"`
 }
 
@@ -46,7 +48,8 @@ type ErrorResponse struct {
 
 // ValidateRequest represents a token validation request
 type ValidateRequest struct {
-	Token string `json:"token"`
+	Token       string `json:"token"`
+	Fingerprint string `json:"fingerprint"` // ВАЖНО: обязателен для валидации
 }
 
 // ValidateResponse represents a token validation response
@@ -54,11 +57,14 @@ type ValidateResponse struct {
 	Valid  bool      `json:"valid"`
 	UserID uuid.UUID `json:"user_id,omitempty"`
 	Role   string    `json:"role,omitempty"`
+	JTI    string    `json:"jti,omitempty"` // JWT ID для blacklist
 }
 
 // RefreshRequest represents a token refresh request
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
+	TokenID      string `json:"token_id"`    // НОВОЕ: ID токена
+	Fingerprint  string `json:"fingerprint"` // ВАЖНО: обязателен для refresh
 	DeviceID     string `json:"device_id,omitempty"`
 	UserAgent    string `json:"user_agent,omitempty"`
 	IPAddress    string `json:"ip_address,omitempty"`
@@ -67,6 +73,7 @@ type RefreshRequest struct {
 func (r *RefreshRequest) ToDomain() domain.RefreshRequest {
 	return domain.RefreshRequest{
 		RefreshToken: r.RefreshToken,
+		TokenID:      r.TokenID,
 		DeviceID:     r.DeviceID,
 		UserAgent:    r.UserAgent,
 		IPAddress:    r.IPAddress,
@@ -75,8 +82,10 @@ func (r *RefreshRequest) ToDomain() domain.RefreshRequest {
 
 // LogoutRequest represents a logout request
 type LogoutRequest struct {
-	UserID uuid.UUID `json:"user_id"`
-	Token  string    `json:"token"`
+	TokenID        string    `json:"token_id"`         // ID refresh токена
+	AccessTokenJTI string    `json:"access_token_jti"` // JTI для blacklist
+	UserID         uuid.UUID `json:"user_id"`          // Для проверки прав
+	Token          string    `json:"token"`            // Access token для валидации
 }
 
 // SuccessResponse represents a success response

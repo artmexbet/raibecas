@@ -45,7 +45,7 @@ type authResponse struct {
 }
 
 // Login authenticates a user and returns tokens
-func (c *NATSAuthConnector) Login(ctx context.Context, req domain.LoginRequest) (*domain.LoginResponse, error) {
+func (c *NATSAuthConnector) Login(ctx context.Context, req domain.LoginRequest) (*domain.AuthServiceLoginResponse, error) {
 	reqData, err := req.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal login request: %w", err)
@@ -68,7 +68,7 @@ func (c *NATSAuthConnector) Login(ctx context.Context, req domain.LoginRequest) 
 		return nil, fmt.Errorf("login failed: %s", response.Error)
 	}
 
-	var loginResp domain.LoginResponse
+	var loginResp domain.AuthServiceLoginResponse
 	if err := json.Unmarshal(response.Data, &loginResp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal login data: %w", err)
 	}
@@ -77,8 +77,8 @@ func (c *NATSAuthConnector) Login(ctx context.Context, req domain.LoginRequest) 
 }
 
 // RefreshToken refreshes an access token using a refresh token
-func (c *NATSAuthConnector) RefreshToken(ctx context.Context, req domain.RefreshTokenRequest) (*domain.RefreshTokenResponse, error) {
-	reqData, err := req.MarshalJSON()
+func (c *NATSAuthConnector) RefreshToken(ctx context.Context, req domain.AuthServiceRefreshRequest) (*domain.AuthServiceLoginResponse, error) {
+	reqData, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal refresh request: %w", err)
 	}
@@ -100,7 +100,7 @@ func (c *NATSAuthConnector) RefreshToken(ctx context.Context, req domain.Refresh
 		return nil, fmt.Errorf("refresh failed: %s", response.Error)
 	}
 
-	var refreshResp domain.RefreshTokenResponse
+	var refreshResp domain.AuthServiceLoginResponse
 	if err := json.Unmarshal(response.Data, &refreshResp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal refresh data: %w", err)
 	}
@@ -108,10 +108,13 @@ func (c *NATSAuthConnector) RefreshToken(ctx context.Context, req domain.Refresh
 	return &refreshResp, nil
 }
 
-// ValidateToken validates an access token
-func (c *NATSAuthConnector) ValidateToken(ctx context.Context, token string) (*domain.ValidateTokenResponse, error) {
-	req := domain.ValidateTokenRequest{Token: token}
-	reqData, err := req.MarshalJSON()
+// ValidateToken validates an access token with fingerprint
+func (c *NATSAuthConnector) ValidateToken(ctx context.Context, token string, fingerprint string) (*domain.ValidateTokenResponse, error) {
+	req := domain.AuthServiceValidateRequest{
+		Token:       token,
+		Fingerprint: fingerprint,
+	}
+	reqData, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal validate request: %w", err)
 	}

@@ -27,9 +27,15 @@ func New(cfg *config.HTTPConfig, documentConnector DocumentServiceConnector, aut
 	router := fiber.New()
 	logger := slog.Default()
 	router.Use(slogfiber.New(logger))
+
+	// CORS configuration for cookie-based authentication
 	router.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-	})) // Enable CORS middleware
+		AllowOrigins:     "https://localhost", // TODO: Configure specific origins in production
+		AllowCredentials: true,                // Required for cookies
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Device-ID",
+		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
+	}))
+
 	router.Use(requestid.New())
 	router.Use(limiter.New(limiter.Config{Max: cfg.RPS}))
 	router.Use(recoverer.New())

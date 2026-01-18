@@ -106,3 +106,12 @@ type RegisterRequest struct {
 	Password string
 	Metadata map[string]any
 }
+
+// LoginResult contains the result of a successful login
+type LoginResult struct {
+	AccessToken  string
+	RefreshToken string
+	TokenID      string // ID refresh токена для последующих операций
+	Fingerprint  string // Fingerprint для клиента (должен храниться в HttpOnly cookie)
+	UserID       uuid.UUID
+}

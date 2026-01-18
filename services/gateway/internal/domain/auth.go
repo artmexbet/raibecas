@@ -15,26 +15,45 @@ type LoginRequest struct {
 	IPAddress string `json:"ipAddress,omitempty"`
 }
 
-// LoginResponse represents a login response
+// AuthServiceLoginResponse represents the full response from Auth service (internal)
+type AuthServiceLoginResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	TokenID      string `json:"token_id"`
+	Fingerprint  string `json:"fingerprint"`
+	ExpiresIn    int    `json:"expires_in"`
+}
+
+// LoginResponse represents a login response sent to client (public)
 type LoginResponse struct {
-	AccessToken  string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
-	ExpiresIn    int    `json:"expiresIn"`
+	AccessToken string    `json:"access_token"`
+	ExpiresIn   int       `json:"expires_in"`
+	TokenType   string    `json:"token_type"`
+	User        *UserInfo `json:"user,omitempty"`
 }
 
-// RefreshTokenRequest represents a token refresh request
+// UserInfo represents user information sent to client
+type UserInfo struct {
+	ID    uuid.UUID `json:"id"`
+	Email string    `json:"email"`
+	Role  string    `json:"role"`
+}
+
+// RefreshTokenRequest represents a token refresh request (cookie-based)
 type RefreshTokenRequest struct {
-	RefreshToken string `json:"refreshToken" validate:"required"`
-	DeviceID     string `json:"deviceId,omitempty"`
-	UserAgent    string `json:"userAgent,omitempty"`
-	IPAddress    string `json:"ipAddress,omitempty"`
+	DeviceID  string `json:"deviceId,omitempty"`
+	UserAgent string `json:"userAgent,omitempty"`
+	IPAddress string `json:"ipAddress,omitempty"`
 }
 
-// RefreshTokenResponse represents a token refresh response
-type RefreshTokenResponse struct {
-	AccessToken  string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken"`
-	ExpiresIn    int    `json:"expiresIn"`
+// AuthServiceRefreshRequest represents the request to Auth service (internal)
+type AuthServiceRefreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+	TokenID      string `json:"token_id"`
+	Fingerprint  string `json:"fingerprint"`
+	DeviceID     string `json:"device_id,omitempty"`
+	UserAgent    string `json:"user_agent,omitempty"`
+	IPAddress    string `json:"ip_address,omitempty"`
 }
 
 // LogoutRequest represents a logout request
@@ -59,11 +78,18 @@ type ValidateTokenRequest struct {
 	Token string `json:"token" validate:"required"`
 }
 
+// AuthServiceValidateRequest represents validation request to Auth service (internal)
+type AuthServiceValidateRequest struct {
+	Token       string `json:"token"`
+	Fingerprint string `json:"fingerprint"`
+}
+
 // ValidateTokenResponse represents a token validation response
 type ValidateTokenResponse struct {
 	Valid  bool      `json:"valid"`
 	UserID uuid.UUID `json:"userId,omitempty"`
 	Role   string    `json:"role,omitempty"`
+	JTI    string    `json:"jti,omitempty"`
 }
 
 // SuccessResponse represents a success response

@@ -90,7 +90,7 @@ func New(cfg *config.Config) (*App, error) {
 	regRepo := repository.NewRegistrationRepository(pgs)
 
 	// Initialize stores
-	tokenStore := storeredis.NewTokenStore(redisClient)
+	tokenStore := storeredis.NewTokenStoreRedis(redisClient, nil)
 
 	// Initialize JWT manager
 	jwtManager := jwt.NewManager(
@@ -98,10 +98,11 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.JWT.Issuer,
 		cfg.JWT.AccessTokenTTL,
 		cfg.JWT.RefreshTokenTTL,
+		tokenStore,
 	)
 
 	// Initialize services
-	authService := service.NewAuthService(authRepo, tokenStore, jwtManager)
+	authService := service.NewAuthService(authRepo, jwtManager)
 	regService := service.NewRegistrationService(regRepo, authRepo)
 
 	// Initialize App publisher and subscriber
