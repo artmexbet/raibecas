@@ -8,7 +8,7 @@ import (
 
 // UserLoginEvent represents a user login event
 type UserLoginEvent struct {
-	UserID    uuid.UUID `json:"user_id"`
+	User      *User     `json:"user"`
 	DeviceID  string    `json:"device_id"`
 	UserAgent string    `json:"user_agent"`
 	IPAddress string    `json:"ip_address"`

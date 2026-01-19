@@ -34,11 +34,12 @@ func (r *LoginRequest) ToDomain() domain.LoginRequest {
 
 // LoginResponse represents a login response with new JWT system
 type LoginResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	TokenID      string `json:"token_id"`    // ID токена для операций
-	Fingerprint  string `json:"fingerprint"` // Fingerprint для клиента (HttpOnly cookie)
-	ExpiresIn    int    `json:"expires_in"`
+	AccessToken  string       `json:"access_token"`
+	RefreshToken string       `json:"refresh_token"`
+	TokenID      string       `json:"token_id"`    // ID токена для операций
+	Fingerprint  string       `json:"fingerprint"` // Fingerprint для клиента (HttpOnly cookie)
+	ExpiresIn    int          `json:"expires_in"`
+	User         *domain.User `json:"user"`
 }
 
 // ErrorResponse represents an error response

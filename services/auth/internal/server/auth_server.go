@@ -19,7 +19,6 @@ import (
 	"github.com/artmexbet/raibecas/services/auth/internal/handler"
 	"github.com/artmexbet/raibecas/services/auth/internal/nats"
 	"github.com/artmexbet/raibecas/services/auth/internal/postgres"
-	"github.com/artmexbet/raibecas/services/auth/internal/repository"
 	"github.com/artmexbet/raibecas/services/auth/internal/service"
 	"github.com/artmexbet/raibecas/services/auth/internal/storeredis"
 	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
@@ -86,8 +85,6 @@ func New(cfg *config.Config) (*App, error) {
 
 	pgs := postgres.New(pool)
 	// Initialize repositories
-	authRepo := repository.NewAuthRepository(pgs)
-	regRepo := repository.NewRegistrationRepository(pgs)
 
 	// Initialize stores
 	tokenStore := storeredis.NewTokenStoreRedis(redisClient, nil)
@@ -102,8 +99,8 @@ func New(cfg *config.Config) (*App, error) {
 	)
 
 	// Initialize services
-	authService := service.NewAuthService(authRepo, jwtManager)
-	regService := service.NewRegistrationService(regRepo, authRepo)
+	authService := service.NewAuthService(pgs, jwtManager)
+	regService := service.NewRegistrationService(pgs, pgs)
 
 	// Initialize App publisher and subscriber
 	publisher := nats.NewPublisher(natsConn)

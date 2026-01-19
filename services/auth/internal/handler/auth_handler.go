@@ -62,7 +62,7 @@ func (h *AuthHandler) HandleLogin(msg *natsw.Message) error {
 
 	// Publish login event
 	_ = h.publisher.PublishUserLogin(ctx, domain.UserLoginEvent{
-		UserID:    result.UserID,
+		User:      result.User,
 		DeviceID:  req.DeviceID,
 		UserAgent: req.UserAgent,
 		IPAddress: req.IPAddress,
@@ -75,6 +75,7 @@ func (h *AuthHandler) HandleLogin(msg *natsw.Message) error {
 		TokenID:      result.TokenID,
 		Fingerprint:  result.Fingerprint,
 		ExpiresIn:    900, // 15 minutes
+		User:         result.User,
 	}
 
 	return h.respond(msg, response)
@@ -136,6 +137,7 @@ func (h *AuthHandler) HandleRefresh(msg *natsw.Message) error {
 		TokenID:      result.TokenID,
 		Fingerprint:  result.Fingerprint,
 		ExpiresIn:    900,
+		User:         result.User,
 	}
 
 	return h.respond(msg, response)

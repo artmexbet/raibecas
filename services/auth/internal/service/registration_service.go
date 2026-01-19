@@ -15,11 +15,11 @@ var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-
 
 // RegistrationRepository defines the interface for registration request data access
 type RegistrationRepository interface {
-	Create(ctx context.Context, req *domain.RegistrationRequest) (uuid.UUID, error)
-	GetByID(ctx context.Context, id uuid.UUID) (*domain.RegistrationRequest, error)
-	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.RegistrationStatus, approvedBy *uuid.UUID) error
-	ExistsByEmail(ctx context.Context, email string) (bool, error)
-	ExistsByUsername(ctx context.Context, username string) (bool, error)
+	CreateRegistrationRequest(ctx context.Context, req *domain.RegistrationRequest) (uuid.UUID, error)
+	GetRegistrationRequestByID(ctx context.Context, id uuid.UUID) (*domain.RegistrationRequest, error)
+	UpdateRegistrationRequestStatus(ctx context.Context, id uuid.UUID, status domain.RegistrationStatus, approvedBy *uuid.UUID) error
+	ExistsPendingRegistrationByEmail(ctx context.Context, email string) (bool, error)
+	ExistsPendingRegistrationByUsername(ctx context.Context, username string) (bool, error)
 }
 
 // RegistrationService handles registration business logic
@@ -54,7 +54,7 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 	}
 
 	// Check if user already exists
-	exists, err := s.userRepo.ExistsByEmail(ctx, req.Email)
+	exists, err := s.userRepo.ExistsUserByEmail(ctx, req.Email)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to check user existence: %w", err)
 	}
@@ -62,7 +62,7 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 		return uuid.Nil, domain.ErrEmailAlreadyExists
 	}
 
-	exists, err = s.userRepo.ExistsByUsername(ctx, req.Username)
+	exists, err = s.userRepo.ExistsUserByUsername(ctx, req.Username)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to check user existence: %w", err)
 	}
@@ -71,7 +71,7 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 	}
 
 	// Check if registration request already exists
-	exists, err = s.regRepo.ExistsByEmail(ctx, req.Email)
+	exists, err = s.regRepo.ExistsPendingRegistrationByEmail(ctx, req.Email)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to check registration existence: %w", err)
 	}
@@ -79,7 +79,7 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 		return uuid.Nil, domain.ErrEmailAlreadyExists
 	}
 
-	exists, err = s.regRepo.ExistsByUsername(ctx, req.Username)
+	exists, err = s.regRepo.ExistsPendingRegistrationByUsername(ctx, req.Username)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to check registration existence: %w", err)
 	}
@@ -101,7 +101,7 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 		Metadata: req.Metadata,
 	}
 
-	id, err := s.regRepo.Create(ctx, regReq)
+	id, err := s.regRepo.CreateRegistrationRequest(ctx, regReq)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to create registration request: %w", err)
 	}
@@ -112,7 +112,7 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 // ApproveRegistration approves a registration request and creates a user
 func (s *RegistrationService) ApproveRegistration(ctx context.Context, requestID, approverID uuid.UUID) (*domain.User, error) {
 	// Get registration request
-	regReq, err := s.regRepo.GetByID(ctx, requestID)
+	regReq, err := s.regRepo.GetRegistrationRequestByID(ctx, requestID)
 	if err != nil {
 		return nil, err
 	}
@@ -129,12 +129,12 @@ func (s *RegistrationService) ApproveRegistration(ctx context.Context, requestID
 		PasswordHash: regReq.Password, // Already hashed
 	}
 
-	if err := s.userRepo.Create(ctx, user); err != nil {
+	if err := s.userRepo.CreateUser(ctx, user); err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
 	// Update registration request status
-	if err := s.regRepo.UpdateStatus(ctx, requestID, domain.StatusApproved, &approverID); err != nil {
+	if err := s.regRepo.UpdateRegistrationRequestStatus(ctx, requestID, domain.StatusApproved, &approverID); err != nil {
 		return nil, fmt.Errorf("failed to update registration status: %w", err)
 	}
 
@@ -144,7 +144,7 @@ func (s *RegistrationService) ApproveRegistration(ctx context.Context, requestID
 // RejectRegistration rejects a registration request
 func (s *RegistrationService) RejectRegistration(ctx context.Context, requestID, approverID uuid.UUID) error {
 	// Get registration request
-	regReq, err := s.regRepo.GetByID(ctx, requestID)
+	regReq, err := s.regRepo.GetRegistrationRequestByID(ctx, requestID)
 	if err != nil {
 		return err
 	}
@@ -155,7 +155,7 @@ func (s *RegistrationService) RejectRegistration(ctx context.Context, requestID,
 	}
 
 	// Update registration request status
-	if err := s.regRepo.UpdateStatus(ctx, requestID, domain.StatusRejected, &approverID); err != nil {
+	if err := s.regRepo.UpdateRegistrationRequestStatus(ctx, requestID, domain.StatusRejected, &approverID); err != nil {
 		return fmt.Errorf("failed to update registration status: %w", err)
 	}
 

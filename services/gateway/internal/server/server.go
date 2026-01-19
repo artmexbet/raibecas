@@ -30,8 +30,8 @@ func New(cfg *config.HTTPConfig, documentConnector DocumentServiceConnector, aut
 
 	// CORS configuration for cookie-based authentication
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     "https://localhost", // TODO: Configure specific origins in production
-		AllowCredentials: true,                // Required for cookies
+		AllowOrigins:     "http://localhost:3000", // TODO: Configure specific origins in production
+		AllowCredentials: true,                    // Required for cookies
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Device-ID",
 		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
 	}))

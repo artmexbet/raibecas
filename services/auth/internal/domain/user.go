@@ -113,5 +113,5 @@ type LoginResult struct {
 	RefreshToken string
 	TokenID      string // ID refresh токена для последующих операций
 	Fingerprint  string // Fingerprint для клиента (должен храниться в HttpOnly cookie)
-	UserID       uuid.UUID
+	User         *User
 }

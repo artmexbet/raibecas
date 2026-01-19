@@ -13,13 +13,12 @@ import (
 
 // UserRepository defines the interface for user data access
 type UserRepository interface {
-	Create(ctx context.Context, user *domain.User) error
-	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
-	GetByEmail(ctx context.Context, email string) (*domain.User, error)
-	GetByUsername(ctx context.Context, username string) (*domain.User, error)
-	ExistsByEmail(ctx context.Context, email string) (bool, error)
-	ExistsByUsername(ctx context.Context, username string) (bool, error)
+	CreateUser(ctx context.Context, user *domain.User) error
+	GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
+	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
+	ExistsUserByEmail(ctx context.Context, email string) (bool, error)
+	ExistsUserByUsername(ctx context.Context, username string) (bool, error)
 }
 
 // AuthService handles authentication business logic
@@ -44,7 +43,7 @@ func NewAuthService(
 // Login authenticates a user and returns tokens with enhanced security
 func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*domain.LoginResult, error) {
 	// Get user by email
-	user, err := s.userRepo.GetByEmail(ctx, req.Email)
+	user, err := s.userRepo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, domain.ErrUserNotFound
 	}
@@ -98,7 +97,7 @@ func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*doma
 		RefreshToken: refreshToken,
 		TokenID:      refreshMetadata.TokenID,
 		Fingerprint:  fingerprint,
-		UserID:       user.ID,
+		User:         user,
 	}, nil
 }
 
@@ -138,7 +137,7 @@ func (s *AuthService) RefreshTokens(ctx context.Context, req domain.RefreshReque
 	}
 
 	// Проверяем, что пользователь всё ещё активен
-	user, err := s.userRepo.GetByID(ctx, oldMetadata.UserID)
+	user, err := s.userRepo.GetUserByID(ctx, oldMetadata.UserID)
 	if err != nil {
 		return nil, domain.ErrUserNotFound
 	}
@@ -169,7 +168,7 @@ func (s *AuthService) RefreshTokens(ctx context.Context, req domain.RefreshReque
 		RefreshToken: refreshToken,
 		TokenID:      oldMetadata.TokenID, // Новый ID будет в refresh token
 		Fingerprint:  fingerprint,
-		UserID:       user.ID,
+		User:         user,
 	}, nil
 }
 
@@ -185,7 +184,7 @@ func (s *AuthService) ValidateAccessToken(ctx context.Context, token string, fin
 	}
 
 	// Optionally verify user still exists and is active
-	user, err := s.userRepo.GetByID(ctx, result.Claims.UserID)
+	user, err := s.userRepo.GetUserByID(ctx, result.Claims.UserID)
 	if err != nil {
 		return nil, domain.ErrUserNotFound
 	}
@@ -200,7 +199,7 @@ func (s *AuthService) ValidateAccessToken(ctx context.Context, token string, fin
 // ChangePassword changes a user's password
 func (s *AuthService) ChangePassword(ctx context.Context, req domain.ChangePasswordRequest) error {
 	// Get user
-	user, err := s.userRepo.GetByID(ctx, req.UserID)
+	user, err := s.userRepo.GetUserByID(ctx, req.UserID)
 	if err != nil {
 		return err
 	}
