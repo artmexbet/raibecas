@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/go-playground/validator/v10"
+	"github.com/gofiber/contrib/otelfiber/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
@@ -15,6 +17,8 @@ import (
 
 	"github.com/artmexbet/raibecas/services/gateway/internal/config"
 )
+
+const serviceName = "gateway"
 
 type Server struct {
 	router            *fiber.App
@@ -40,6 +44,17 @@ func New(cfg *config.HTTPConfig, documentConnector DocumentServiceConnector, aut
 	router.Use(limiter.New(limiter.Config{Max: cfg.RPS}))
 	router.Use(recoverer.New())
 	router.Use(healthcheck.New())
+
+	// Init http metrics
+	prometheus := fiberprometheus.New(serviceName)
+	prometheus.RegisterAt(router, "/metrics")
+	prometheus.SetSkipPaths([]string{"/livez", "/readyz"})
+	prometheus.SetIgnoreStatusCodes([]int{401, 403, 404})
+	router.Use(prometheus.Middleware)
+
+	router.Use(
+		otelfiber.Middleware(otelfiber.WithoutMetrics(true)),
+	)
 
 	s := &Server{
 		router:            router,
