@@ -21,4 +21,16 @@ type UserServiceConnector interface {
 
 	// DeleteUser deletes a user by ID
 	DeleteUser(ctx context.Context, id uuid.UUID) error
+
+	// CreateRegistrationRequest creates a new registration request
+	CreateRegistrationRequest(ctx context.Context, req domain.CreateRegistrationRequestRequest) (*domain.CreateRegistrationRequestResponse, error)
+
+	// ListRegistrationRequests retrieves a list of registration requests
+	ListRegistrationRequests(ctx context.Context, query domain.ListRegistrationRequestsQuery) (*domain.ListRegistrationRequestsResponse, error)
+
+	// ApproveRegistrationRequest approves a registration request
+	ApproveRegistrationRequest(ctx context.Context, requestID, approverID uuid.UUID) (*domain.ApproveRegistrationRequestResponse, error)
+
+	// RejectRegistrationRequest rejects a registration request
+	RejectRegistrationRequest(ctx context.Context, requestID, approverID uuid.UUID, reason string) (*domain.RejectRegistrationRequestResponse, error)
 }

@@ -19,6 +19,12 @@ const (
 	SubjectUsersGet    = "users.get"
 	SubjectUsersUpdate = "users.update"
 	SubjectUsersDelete = "users.delete"
+
+	// Registration requests
+	SubjectRegistrationRequestCreate  = "users.registration.create"
+	SubjectRegistrationRequestList    = "users.registration.list"
+	SubjectRegistrationRequestApprove = "users.registration.approve"
+	SubjectRegistrationRequestReject  = "users.registration.reject"
 )
 
 // NATSUserConnector implements server.UserServiceConnector using NATS for communication
@@ -177,4 +183,154 @@ func (c *NATSUserConnector) DeleteUser(ctx context.Context, id uuid.UUID) error 
 	}
 
 	return nil
+}
+
+// CreateRegistrationRequest creates a new registration request
+func (c *NATSUserConnector) CreateRegistrationRequest(ctx context.Context, req domain.CreateRegistrationRequestRequest) (*domain.CreateRegistrationRequestResponse, error) {
+	reqData, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal create registration request: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectRegistrationRequestCreate)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send create registration request: %w", err)
+	}
+
+	var response usersResponse
+	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal create registration response: %w", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("create registration request failed: %s", response.Error)
+	}
+
+	var createResp domain.CreateRegistrationRequestResponse
+	if err := json.Unmarshal(response.Data, &createResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal create registration data: %w", err)
+	}
+
+	return &createResp, nil
+}
+
+// ListRegistrationRequests retrieves a list of registration requests
+func (c *NATSUserConnector) ListRegistrationRequests(ctx context.Context, query domain.ListRegistrationRequestsQuery) (*domain.ListRegistrationRequestsResponse, error) {
+	reqData, err := json.Marshal(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal list registration requests: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectRegistrationRequestList)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send list registration requests: %w", err)
+	}
+
+	var response usersResponse
+	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal list registration response: %w", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("list registration requests failed: %s", response.Error)
+	}
+
+	var listResp domain.ListRegistrationRequestsResponse
+	if err := json.Unmarshal(response.Data, &listResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal list registration data: %w", err)
+	}
+
+	return &listResp, nil
+}
+
+// ApproveRegistrationRequest approves a registration request
+func (c *NATSUserConnector) ApproveRegistrationRequest(ctx context.Context, requestID, approverID uuid.UUID) (*domain.ApproveRegistrationRequestResponse, error) {
+	type approveRequest struct {
+		RequestID  uuid.UUID `json:"request_id"`
+		ApproverID uuid.UUID `json:"approver_id"`
+	}
+
+	req := approveRequest{
+		RequestID:  requestID,
+		ApproverID: approverID,
+	}
+
+	reqData, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal approve request: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectRegistrationRequestApprove)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send approve request: %w", err)
+	}
+
+	var response usersResponse
+	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal approve response: %w", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("approve registration request failed: %s", response.Error)
+	}
+
+	var approveResp domain.ApproveRegistrationRequestResponse
+	if err := json.Unmarshal(response.Data, &approveResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal approve data: %w", err)
+	}
+
+	return &approveResp, nil
+}
+
+// RejectRegistrationRequest rejects a registration request
+func (c *NATSUserConnector) RejectRegistrationRequest(ctx context.Context, requestID, approverID uuid.UUID, reason string) (*domain.RejectRegistrationRequestResponse, error) {
+	type rejectRequest struct {
+		RequestID  uuid.UUID `json:"request_id"`
+		ApproverID uuid.UUID `json:"approver_id"`
+		Reason     string    `json:"reason,omitempty"`
+	}
+
+	req := rejectRequest{
+		RequestID:  requestID,
+		ApproverID: approverID,
+		Reason:     reason,
+	}
+
+	reqData, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal reject request: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectRegistrationRequestReject)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send reject request: %w", err)
+	}
+
+	var response usersResponse
+	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal reject response: %w", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("reject registration request failed: %s", response.Error)
+	}
+
+	var rejectResp domain.RejectRegistrationRequestResponse
+	if err := json.Unmarshal(response.Data, &rejectResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal reject data: %w", err)
+	}
+
+	return &rejectResp, nil
 }
