@@ -2,11 +2,8 @@ package server
 
 import "github.com/gofiber/fiber/v2"
 
-func (s *Server) setupRegistrationRequestRoutes() {
-	registrationRequests := s.router.Group("/api/v1/registration-requests")
-	registrationRequests.Get("/", s.listRegistrationRequests)
-	registrationRequests.Post("/:id/approve", s.approveRegistrationRequest)
-	registrationRequests.Post("/:id/reject", s.rejectRegistrationRequest)
+func (s *Server) createRegistrationRequest(c *fiber.Ctx) error {
+	return c.SendString("create registration request")
 }
 
 func (s *Server) listRegistrationRequests(c *fiber.Ctx) error {

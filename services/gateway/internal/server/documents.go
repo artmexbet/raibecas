@@ -10,15 +10,6 @@ import (
 	"github.com/artmexbet/raibecas/services/gateway/internal/domain"
 )
 
-func (s *Server) setupDocumentRoutes() {
-	documents := s.router.Group("/api/v1/documents")
-	documents.Get("/", s.listDocuments)
-	documents.Post("/", s.createDocument)
-	documents.Get("/:id", s.getDocument)
-	documents.Put("/:id", s.updateDocument)
-	documents.Delete("/:id", s.deleteDocument)
-}
-
 // listDocuments handles GET /documents - list documents with filtering and pagination
 func (s *Server) listDocuments(c *fiber.Ctx) error {
 	var query domain.ListDocumentsQuery

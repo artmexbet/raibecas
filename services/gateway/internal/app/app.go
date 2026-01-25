@@ -11,7 +11,11 @@ import (
 	"github.com/nats-io/nats.go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+
+	"github.com/artmexbet/raibecas/libs/natsw"
 
 	"github.com/artmexbet/raibecas/services/gateway/internal/config"
 	"github.com/artmexbet/raibecas/services/gateway/internal/connector"
@@ -62,14 +66,16 @@ func (a *App) Run() error {
 
 	a.createTracer()
 
-	// Create document connector
-	documentConnector := connector.NewNATSDocumentConnector(natsConn, a.cfg.NATS.RequestTimeout)
+	// Create single NATS wrapper client for trace propagation
+	natsClient := natsw.NewClient(natsConn)
 
-	// Create auth connector
-	authConnector := connector.NewNATSAuthConnector(natsConn)
+	// Create connectors with shared NATS client
+	documentConnector := connector.NewNATSDocumentConnector(natsClient, a.cfg.NATS.RequestTimeout)
+	authConnector := connector.NewNATSAuthConnector(natsClient)
+	userConnector := connector.NewNATSUserConnector(natsClient)
 
 	// Create and start server
-	a.server = server.New(&a.cfg.HTTP, documentConnector, authConnector)
+	a.server = server.New(&a.cfg.HTTP, documentConnector, authConnector, userConnector)
 
 	// Start server in goroutine
 	go func() {
@@ -115,8 +121,20 @@ func (a *App) createTracer() {
 		slog.Error("failed to create OTLP trace exporter", "error", err)
 	}
 
-	tracerProvider := trace.NewTracerProvider(trace.WithBatcher(exporter))
+	res, _ := resource.Merge(
+		resource.Default(),
+		resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceName("Gateway"),
+		),
+	)
+
+	tracerProvider := trace.NewTracerProvider(
+		trace.WithBatcher(exporter),
+		trace.WithResource(res),
+	)
 	otel.SetTracerProvider(tracerProvider)
+	a.tracer = tracerProvider
 }
 
 func getEnvOrDefault(key, defaultValue string) string {

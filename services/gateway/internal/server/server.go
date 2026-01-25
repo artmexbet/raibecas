@@ -24,10 +24,11 @@ type Server struct {
 	router            *fiber.App
 	documentConnector DocumentServiceConnector
 	authConnector     AuthServiceConnector
+	userConnector     UserServiceConnector
 	validator         *validator.Validate
 }
 
-func New(cfg *config.HTTPConfig, documentConnector DocumentServiceConnector, authConnector AuthServiceConnector) *Server {
+func New(cfg *config.HTTPConfig, documentConnector DocumentServiceConnector, authConnector AuthServiceConnector, userConnector UserServiceConnector) *Server {
 	router := fiber.New()
 	logger := slog.Default()
 	router.Use(slogfiber.New(logger))
@@ -60,16 +61,61 @@ func New(cfg *config.HTTPConfig, documentConnector DocumentServiceConnector, aut
 		router:            router,
 		documentConnector: documentConnector,
 		authConnector:     authConnector,
+		userConnector:     userConnector,
 		validator:         validator.New(),
 	}
 
 	// Setup routes
-	s.setupDocumentRoutes()
-	s.setupUsersRoutes()
-	s.setupAuthRoutes()
-	s.setupRegistrationRequestRoutes()
+	s.setupPublicRoutes()
+	s.setupProtectedRoutes()
 
 	return s
+}
+
+// setupPublicRoutes sets up public routes that don't require authentication
+func (s *Server) setupPublicRoutes() {
+	// Auth routes - login doesn't require authentication
+	auth := s.router.Group("/api/v1/auth")
+	auth.Post("/login", s.login)
+
+	// Registration requests - creating request is public
+	registrationRequests := s.router.Group("/api/v1/registration-requests")
+	registrationRequests.Post("/", s.createRegistrationRequest)
+}
+
+// setupProtectedRoutes sets up protected routes that require authentication
+func (s *Server) setupProtectedRoutes() {
+	// Apply auth middleware to all protected routes
+	protected := s.router.Group("", s.authMiddleware())
+
+	// Auth routes (except login)
+	auth := protected.Group("/api/v1/auth")
+	auth.Post("/refresh", s.refreshToken)
+	auth.Post("/validate", s.validateToken)
+	auth.Post("/logout", s.logout)
+	auth.Post("/logout-all", s.logoutAll)
+	auth.Post("/change-password", s.changePassword)
+
+	// Documents routes
+	docs := protected.Group("/api/v1/documents")
+	docs.Get("/", s.listDocuments)
+	docs.Get("/:id", s.getDocument)
+	docs.Post("/", s.createDocument)
+	docs.Patch("/:id", s.updateDocument)
+	docs.Delete("/:id", s.deleteDocument)
+
+	// Users routes
+	users := protected.Group("/api/v1/users")
+	users.Get("/", s.listUsers)
+	users.Get("/:id", s.getUser)
+	users.Patch("/:id", s.updateUser)
+	users.Delete("/:id", s.deleteUser)
+
+	// Registration requests (protected actions)
+	registrationRequests := protected.Group("/api/v1/registration-requests")
+	registrationRequests.Get("/", s.listRegistrationRequests)
+	registrationRequests.Post("/:id/approve", s.approveRegistrationRequest)
+	registrationRequests.Post("/:id/reject", s.rejectRegistrationRequest)
 }
 
 func (s *Server) Listen(cfg *config.HTTPConfig) error {

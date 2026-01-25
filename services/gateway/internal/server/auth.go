@@ -11,16 +11,6 @@ import (
 	"github.com/artmexbet/raibecas/services/gateway/internal/domain"
 )
 
-func (s *Server) setupAuthRoutes() {
-	auth := s.router.Group("/api/v1/auth")
-	auth.Post("/login", s.login)
-	auth.Post("/refresh", s.refreshToken)
-	auth.Post("/validate", s.validateToken)
-	auth.Post("/logout", s.logout)
-	auth.Post("/logout-all", s.logoutAll)
-	auth.Post("/change-password", s.changePassword)
-}
-
 // login handles POST /api/v1/auth/login - authenticate user
 func (s *Server) login(c *fiber.Ctx) error {
 	var req domain.LoginRequest

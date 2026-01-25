@@ -29,10 +29,7 @@ type NATSAuthConnector struct {
 }
 
 // NewNATSAuthConnector creates a new NATS-based auth service connector
-func NewNATSAuthConnector(conn *nats.Conn) *NATSAuthConnector {
-	// Создаём клиент с автоматической пропагацией trace context
-	client := natsw.NewClient(conn)
-
+func NewNATSAuthConnector(client *natsw.Client) *NATSAuthConnector {
 	return &NATSAuthConnector{
 		client: client,
 	}

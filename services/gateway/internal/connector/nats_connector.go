@@ -33,13 +33,10 @@ type NATSDocumentConnector struct {
 }
 
 // NewNATSDocumentConnector creates a new NATS-based document service connector
-func NewNATSDocumentConnector(conn *nats.Conn, timeout time.Duration) *NATSDocumentConnector {
+func NewNATSDocumentConnector(client *natsw.Client, timeout time.Duration) *NATSDocumentConnector {
 	if timeout == 0 {
 		timeout = defaultTimeout
 	}
-
-	// Создаём клиент с автоматической пропагацией trace context
-	client := natsw.NewClient(conn)
 
 	return &NATSDocumentConnector{
 		client:  client,
