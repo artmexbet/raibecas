@@ -210,11 +210,25 @@ func easyjson4a0f95aaDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 			} else {
 				out.Email = string(in.String())
 			}
+		case "username":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Username = string(in.String())
+			}
 		case "role":
 			if in.IsNull() {
 				in.Skip()
 			} else {
 				out.Role = string(in.String())
+			}
+		case "createdAt":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				if data := in.Raw(); in.Ok() {
+					in.AddError((out.CreatedAt).UnmarshalJSON(data))
+				}
 			}
 		default:
 			in.SkipRecursive()
@@ -241,9 +255,19 @@ func easyjson4a0f95aaEncodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 		out.String(string(in.Email))
 	}
 	{
+		const prefix string = ",\"username\":"
+		out.RawString(prefix)
+		out.String(string(in.Username))
+	}
+	{
 		const prefix string = ",\"role\":"
 		out.RawString(prefix)
 		out.String(string(in.Role))
+	}
+	{
+		const prefix string = ",\"createdAt\":"
+		out.RawString(prefix)
+		out.Raw((in.CreatedAt).MarshalJSON())
 	}
 	out.RawByte('}')
 }
@@ -1106,6 +1130,20 @@ func easyjson4a0f95aaDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 			} else {
 				out.ExpiresIn = int(in.Int())
 			}
+		case "user":
+			if in.IsNull() {
+				in.Skip()
+				out.User = nil
+			} else {
+				if out.User == nil {
+					out.User = new(UserInfo)
+				}
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.User).UnmarshalEasyJSON(in)
+				}
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -1144,6 +1182,11 @@ func easyjson4a0f95aaEncodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 		const prefix string = ",\"expires_in\":"
 		out.RawString(prefix)
 		out.Int(int(in.ExpiresIn))
+	}
+	if in.User != nil {
+		const prefix string = ",\"user\":"
+		out.RawString(prefix)
+		(*in.User).MarshalEasyJSON(out)
 	}
 	out.RawByte('}')
 }

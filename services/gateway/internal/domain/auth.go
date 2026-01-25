@@ -1,6 +1,10 @@
 package domain
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 //go:generate easyjson -all auth.go
 
@@ -17,11 +21,12 @@ type LoginRequest struct {
 
 // AuthServiceLoginResponse represents the full response from Auth service (internal)
 type AuthServiceLoginResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	TokenID      string `json:"token_id"`
-	Fingerprint  string `json:"fingerprint"`
-	ExpiresIn    int    `json:"expires_in"`
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token"`
+	TokenID      string    `json:"token_id"`
+	Fingerprint  string    `json:"fingerprint"`
+	ExpiresIn    int       `json:"expires_in"`
+	User         *UserInfo `json:"user,omitempty"`
 }
 
 // LoginResponse represents a login response sent to client (public)
@@ -34,9 +39,11 @@ type LoginResponse struct {
 
 // UserInfo represents user information sent to client
 type UserInfo struct {
-	ID    uuid.UUID `json:"id"`
-	Email string    `json:"email"`
-	Role  string    `json:"role"`
+	ID        uuid.UUID `json:"id"`
+	Email     string    `json:"email"`
+	Username  string    `json:"username"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // RefreshTokenRequest represents a token refresh request (cookie-based)

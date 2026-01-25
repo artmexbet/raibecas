@@ -52,25 +52,12 @@ func (s *Server) login(c *fiber.Ctx) error {
 	setSecureCookie(c, CookieTokenID, authResp.TokenID, RefreshTokenMaxAge)
 	setSecureCookie(c, CookieFingerprint, authResp.Fingerprint, RefreshTokenMaxAge)
 
-	// Validate token to get user info
-	userInfo, err := s.authConnector.ValidateToken(c.UserContext(), authResp.AccessToken, authResp.Fingerprint)
-	if err != nil {
-		slog.Error("failed to validate token for user info", "error", err)
-	}
-
 	// Return only public data to client
 	publicResp := domain.LoginResponse{
 		AccessToken: authResp.AccessToken,
 		ExpiresIn:   authResp.ExpiresIn,
 		TokenType:   "Bearer",
-	}
-
-	// Add user info if available
-	if userInfo != nil && userInfo.Valid {
-		publicResp.User = &domain.UserInfo{
-			ID:   userInfo.UserID,
-			Role: userInfo.Role,
-		}
+		User:        authResp.User,
 	}
 
 	return c.Status(http.StatusOK).JSON(publicResp)
@@ -142,25 +129,12 @@ func (s *Server) refreshToken(c *fiber.Ctx) error {
 	setSecureCookie(c, CookieTokenID, authResp.TokenID, RefreshTokenMaxAge)
 	setSecureCookie(c, CookieFingerprint, authResp.Fingerprint, RefreshTokenMaxAge)
 
-	// Validate token to get user info
-	userInfo, err := s.authConnector.ValidateToken(c.UserContext(), authResp.AccessToken, authResp.Fingerprint)
-	if err != nil {
-		slog.Error("failed to validate token for user info", "error", err)
-	}
-
 	// Return only public data to client
 	publicResp := domain.LoginResponse{
 		AccessToken: authResp.AccessToken,
 		ExpiresIn:   authResp.ExpiresIn,
 		TokenType:   "Bearer",
-	}
-
-	// Add user info if available
-	if userInfo != nil && userInfo.Valid {
-		publicResp.User = &domain.UserInfo{
-			ID:   userInfo.UserID,
-			Role: userInfo.Role,
-		}
+		User:        authResp.User,
 	}
 
 	return c.Status(http.StatusOK).JSON(publicResp)
