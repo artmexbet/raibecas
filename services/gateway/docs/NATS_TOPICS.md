@@ -12,6 +12,34 @@
 
 ## Auth Service Topics
 
+### `auth.register`
+Создание заявки на регистрацию (требует одобрения администратора)
+
+**Request:**
+```json
+{
+  "username": "john_doe",
+  "email": "user@example.com",
+  "password": "password123",
+  "metadata": {
+    "organization": "University",
+    "purpose": "Research"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "request_id": "123e4567-e89b-12d3-a456-426614174000",
+    "status": "pending",
+    "message": "Registration request submitted successfully. Waiting for admin approval."
+  }
+}
+```
+
 ### `auth.login`
 Аутентификация пользователя
 
@@ -33,7 +61,16 @@
   "data": {
     "access_token": "eyJhbGciOiJIUzI1NiIs...",
     "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
-    "expires_in": 900
+    "token_id": "550e8400-e29b-41d4-a716-446655440000",
+    "fingerprint": "abc123def456...",
+    "expires_in": 900,
+    "user": {
+      "id": "123e4567-e89b-12d3-a456-426614174000",
+      "username": "john_doe",
+      "email": "user@example.com",
+      "role": "user",
+      "created_at": "2026-01-15T10:00:00Z"
+    }
   }
 }
 ```
@@ -45,6 +82,8 @@
 ```json
 {
   "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_id": "550e8400-e29b-41d4-a716-446655440000",
+  "fingerprint": "abc123def456...",
   "device_id": "optional-device-uuid",
   "user_agent": "Mozilla/5.0...",
   "ip_address": "192.168.1.1"
@@ -58,18 +97,28 @@
   "data": {
     "access_token": "eyJhbGciOiJIUzI1NiIs...",
     "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
-    "expires_in": 900
+    "token_id": "550e8400-e29b-41d4-a716-446655440000",
+    "fingerprint": "abc123def456...",
+    "expires_in": 900,
+    "user": {
+      "id": "123e4567-e89b-12d3-a456-426614174000",
+      "username": "john_doe",
+      "email": "user@example.com",
+      "role": "user",
+      "created_at": "2026-01-15T10:00:00Z"
+    }
   }
 }
 ```
 
 ### `auth.validate`
-Валидация токена
+Валидация токена (fingerprint обязателен для безопасности)
 
 **Request:**
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIs..."
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "fingerprint": "abc123def456..."
 }
 ```
 
@@ -80,7 +129,18 @@
   "data": {
     "valid": true,
     "user_id": "123e4567-e89b-12d3-a456-426614174000",
-    "role": "user"
+    "role": "user",
+    "jti": "550e8400-e29b-41d4-a716-446655440000"
+  }
+}
+```
+
+**Response (Invalid Token):**
+```json
+{
+  "success": true,
+  "data": {
+    "valid": false
   }
 }
 ```
@@ -91,6 +151,8 @@
 **Request:**
 ```json
 {
+  "token_id": "550e8400-e29b-41d4-a716-446655440000",
+  "access_token_jti": "jwt-id-from-access-token",
   "user_id": "123e4567-e89b-12d3-a456-426614174000",
   "token": "eyJhbGciOiJIUzI1NiIs..."
 }
@@ -152,174 +214,81 @@
 
 ---
 
-## Document Service Topics
+## Auth Service Events (Pub/Sub)
 
-### `documents.list`
-Получение списка документов с фильтрацией и пагинацией
+Эти события публикуются Auth Service и могут быть прослушаны другими сервисами.
 
-**Request:**
+### `auth.registration.requested`
+Событие создания заявки на регистрацию
+
+**Payload:**
 ```json
 {
-  "page": 1,
-  "limit": 20,
-  "author_id": "123e4567-e89b-12d3-a456-426614174000",
-  "category_id": 5,
-  "tag_id": 10,
-  "search": "keyword"
+  "request_id": "123e4567-e89b-12d3-a456-426614174000",
+  "username": "john_doe",
+  "email": "user@example.com",
+  "timestamp": "2026-01-15T10:00:00Z"
 }
 ```
 
-**Response:**
+### `auth.user.registered`
+Событие успешной регистрации пользователя (после одобрения админа)
+
+**Payload:**
 ```json
 {
-  "success": true,
-  "data": {
-    "documents": [
-      {
-        "id": "123e4567-e89b-12d3-a456-426614174000",
-        "title": "Document Title",
-        "description": "Description...",
-        "author": {
-          "id": "123e4567-e89b-12d3-a456-426614174001",
-          "name": "Author Name"
-        },
-        "category": {
-          "id": 5,
-          "title": "Category Title"
-        },
-        "publication_date": "2026-01-15T00:00:00Z",
-        "tags": [
-          {"id": 1, "title": "Tag 1"},
-          {"id": 2, "title": "Tag 2"}
-        ],
-        "created_at": "2026-01-15T10:00:00Z",
-        "updated_at": "2026-01-15T10:00:00Z"
-      }
-    ],
-    "total": 100,
-    "page": 1,
-    "limit": 20,
-    "total_pages": 5
-  }
+  "user_id": "123e4567-e89b-12d3-a456-426614174000",
+  "username": "john_doe",
+  "email": "user@example.com",
+  "role": "user",
+  "timestamp": "2026-01-15T10:00:00Z"
 }
 ```
 
-### `documents.get`
-Получение документа по ID
+### `auth.user.login`
+Событие входа пользователя
 
-**Request:**
+**Payload:**
 ```json
 {
-  "id": "123e4567-e89b-12d3-a456-426614174000"
+  "user_id": "123e4567-e89b-12d3-a456-426614174000",
+  "username": "john_doe",
+  "email": "user@example.com",
+  "role": "user",
+  "device_id": "optional-device-uuid",
+  "user_agent": "Mozilla/5.0...",
+  "ip_address": "192.168.1.1",
+  "timestamp": "2026-01-15T10:00:00Z"
 }
 ```
 
-**Response:**
+### `auth.user.logout`
+Событие выхода пользователя
+
+**Payload:**
 ```json
 {
-  "success": true,
-  "data": {
-    "document": {
-      "id": "123e4567-e89b-12d3-a456-426614174000",
-      "title": "Document Title",
-      "description": "Description...",
-      "author": {
-        "id": "123e4567-e89b-12d3-a456-426614174001",
-        "name": "Author Name"
-      },
-      "category": {
-        "id": 5,
-        "title": "Category Title"
-      },
-      "publication_date": "2026-01-15T00:00:00Z",
-      "tags": [
-        {"id": 1, "title": "Tag 1"}
-      ],
-      "created_at": "2026-01-15T10:00:00Z",
-      "updated_at": "2026-01-15T10:00:00Z"
-    }
-  }
+  "user_id": "123e4567-e89b-12d3-a456-426614174000",
+  "device_id": "optional-device-uuid",
+  "reason": "user_initiated",
+  "timestamp": "2026-01-15T10:00:00Z"
 }
 ```
 
-### `documents.create`
-Создание нового документа
+### `auth.password.reset`
+Событие изменения пароля
 
-**Request:**
+**Payload:**
 ```json
 {
-  "title": "New Document",
-  "description": "Description...",
-  "author_id": "123e4567-e89b-12d3-a456-426614174000",
-  "category_id": 5,
-  "publication_date": "2026-01-15T00:00:00Z",
-  "tag_ids": [1, 2, 3]
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "document": {
-      "id": "123e4567-e89b-12d3-a456-426614174000",
-      "title": "New Document",
-      ...
-    }
-  }
-}
-```
-
-### `documents.update`
-Обновление документа
-
-**Request:**
-```json
-{
-  "id": "123e4567-e89b-12d3-a456-426614174000",
-  "title": "Updated Title",
-  "description": "Updated description...",
-  "author_id": "123e4567-e89b-12d3-a456-426614174000",
-  "category_id": 6,
-  "publication_date": "2026-01-16T00:00:00Z",
-  "tag_ids": [2, 3, 4]
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "document": {
-      "id": "123e4567-e89b-12d3-a456-426614174000",
-      "title": "Updated Title",
-      ...
-    }
-  }
-}
-```
-
-### `documents.delete`
-Удаление документа
-
-**Request:**
-```json
-{
-  "id": "123e4567-e89b-12d3-a456-426614174000"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": null
+  "user_id": "123e4567-e89b-12d3-a456-426614174000",
+  "method": "self-service",
+  "timestamp": "2026-01-15T10:00:00Z"
 }
 ```
 
 ---
+
 
 ## Обработка ошибок
 
