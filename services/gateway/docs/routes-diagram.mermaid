@@ -1,0 +1,63 @@
+graph TB
+    subgraph "Public Routes (No Auth)"
+        A[POST /api/v1/auth/login]
+        B[POST /api/v1/registration-requests]
+    end
+
+    subgraph "Protected Routes (Auth Required)"
+        subgraph "Auth Endpoints"
+            C[POST /api/v1/auth/refresh]
+            D[POST /api/v1/auth/validate]
+            E[POST /api/v1/auth/logout]
+            F[POST /api/v1/auth/logout-all]
+            G[POST /api/v1/auth/change-password]
+        end
+
+        subgraph "Documents"
+            H[GET /api/v1/documents]
+            I[GET /api/v1/documents/:id]
+            J[POST /api/v1/documents]
+            K[PATCH /api/v1/documents/:id]
+            L[DELETE /api/v1/documents/:id]
+        end
+
+        subgraph "Users"
+            M[GET /api/v1/users]
+            N[GET /api/v1/users/:id]
+            O[PATCH /api/v1/users/:id]
+            P[DELETE /api/v1/users/:id]
+        end
+
+        subgraph "Registration Management"
+            Q[GET /api/v1/registration-requests]
+            R[POST /api/v1/registration-requests/:id/approve]
+            S[POST /api/v1/registration-requests/:id/reject]
+        end
+    end
+
+    MW[Auth Middleware]
+
+    C --> MW
+    D --> MW
+    E --> MW
+    F --> MW
+    G --> MW
+    H --> MW
+    I --> MW
+    J --> MW
+    K --> MW
+    L --> MW
+    M --> MW
+    N --> MW
+    O --> MW
+    P --> MW
+    Q --> MW
+    R --> MW
+    S --> MW
+
+    MW -->|Validate Token| AUTH[Auth Service via NATS]
+
+    style A fill:#90EE90
+    style B fill:#90EE90
+    style MW fill:#FFB6C1
+    style AUTH fill:#87CEEB

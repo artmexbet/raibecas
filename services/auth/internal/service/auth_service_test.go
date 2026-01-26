@@ -22,8 +22,8 @@ func TestAuthService_Login_Success(t *testing.T) {
 	passwordHash, _ := bcrypt.GenerateFromPassword([]byte(password), 12)
 
 	// Use generated mocks
-	mockUsers := NewMockIUserRepository(t)
-	mockTokens := NewMockITokenStore(t)
+	mockUsers := NewMockUserRepository(t)
+	mockTokenStore := jwt.NewMockTokenStore(t)
 
 	// Expectations
 	expectedUser := &domain.User{
@@ -33,11 +33,11 @@ func TestAuthService_Login_Success(t *testing.T) {
 		Role:         domain.RoleUser,
 		IsActive:     true,
 	}
-	mockUsers.EXPECT().GetByEmail(mock.Anything, email).Return(expectedUser, nil)
-	mockTokens.EXPECT().StoreRefreshToken(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockUsers.EXPECT().GetUserByEmail(mock.Anything, email).Return(expectedUser, nil)
+	mockTokenStore.EXPECT().StoreRefreshToken(mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour)
-	authService := NewAuthService(mockUsers, mockTokens, jwtManager)
+	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour, mockTokenStore)
+	authService := NewAuthService(mockUsers, jwtManager)
 
 	// Test
 	req := domain.LoginRequest{
@@ -48,27 +48,27 @@ func TestAuthService_Login_Success(t *testing.T) {
 		IPAddress: "127.0.0.1",
 	}
 
-	tokens, returnedUserID, err := authService.Login(context.Background(), req)
+	result, err := authService.Login(context.Background(), req)
 
 	// Assert
 	if err != nil {
 		t.Fatalf("Expected successful login, got error: %v", err)
 	}
 
-	if tokens == nil {
-		t.Fatal("Expected tokens, got nil")
+	if result == nil {
+		t.Fatal("Expected result, got nil")
 	}
 
-	if tokens.AccessToken == "" {
+	if result.AccessToken == "" {
 		t.Error("Access token is empty")
 	}
 
-	if tokens.RefreshToken == "" {
+	if result.RefreshToken == "" {
 		t.Error("Refresh token is empty")
 	}
 
-	if returnedUserID != userID {
-		t.Errorf("Expected user ID %s, got %s", userID, returnedUserID)
+	if result.User != expectedUser {
+		t.Errorf("Expected user ID %v, got %v", expectedUser, result.User)
 	}
 
 	// Expectations asserted by mock cleanup
@@ -81,10 +81,10 @@ func TestAuthService_Login_InvalidPassword(t *testing.T) {
 	password := "password123"
 	passwordHash, _ := bcrypt.GenerateFromPassword([]byte(password), 12)
 
-	mockUsers := NewMockIUserRepository(t)
-	mockTokens := NewMockITokenStore(t)
+	mockUsers := NewMockUserRepository(t)
+	mockTokenStore := jwt.NewMockTokenStore(t)
 
-	mockUsers.EXPECT().GetByEmail(mock.Anything, email).Return(&domain.User{
+	mockUsers.EXPECT().GetUserByEmail(mock.Anything, email).Return(&domain.User{
 		ID:           userID,
 		Email:        email,
 		PasswordHash: string(passwordHash),
@@ -92,8 +92,8 @@ func TestAuthService_Login_InvalidPassword(t *testing.T) {
 		IsActive:     true,
 	}, nil)
 
-	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour)
-	authService := NewAuthService(mockUsers, mockTokens, jwtManager)
+	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour, mockTokenStore)
+	authService := NewAuthService(mockUsers, jwtManager)
 
 	// Test
 	req := domain.LoginRequest{
@@ -101,7 +101,7 @@ func TestAuthService_Login_InvalidPassword(t *testing.T) {
 		Password: "wrongpassword",
 	}
 
-	_, _, err := authService.Login(context.Background(), req)
+	_, err := authService.Login(context.Background(), req)
 
 	// Assert
 	if !errors.Is(err, domain.ErrInvalidCredentials) {
@@ -116,10 +116,10 @@ func TestAuthService_Login_UserNotActive(t *testing.T) {
 	password := "password123"
 	passwordHash, _ := bcrypt.GenerateFromPassword([]byte(password), 12)
 
-	mockUsers := NewMockIUserRepository(t)
-	mockTokens := NewMockITokenStore(t)
+	mockUsers := NewMockUserRepository(t)
+	mockTokenStore := jwt.NewMockTokenStore(t)
 
-	mockUsers.EXPECT().GetByEmail(mock.Anything, email).Return(&domain.User{
+	mockUsers.EXPECT().GetUserByEmail(mock.Anything, email).Return(&domain.User{
 		ID:           userID,
 		Email:        email,
 		PasswordHash: string(passwordHash),
@@ -127,8 +127,8 @@ func TestAuthService_Login_UserNotActive(t *testing.T) {
 		IsActive:     false, // User is not active
 	}, nil)
 
-	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour)
-	authService := NewAuthService(mockUsers, mockTokens, jwtManager)
+	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour, mockTokenStore)
+	authService := NewAuthService(mockUsers, jwtManager)
 
 	// Test
 	req := domain.LoginRequest{
@@ -136,7 +136,7 @@ func TestAuthService_Login_UserNotActive(t *testing.T) {
 		Password: password,
 	}
 
-	_, _, err := authService.Login(context.Background(), req)
+	_, err := authService.Login(context.Background(), req)
 
 	// Assert
 	if !errors.Is(err, domain.ErrUserNotActive) {
@@ -146,18 +146,22 @@ func TestAuthService_Login_UserNotActive(t *testing.T) {
 
 func TestAuthService_Logout(t *testing.T) {
 	// Setup
-	userID := uuid.New()
-	mockUsers := NewMockIUserRepository(t)
-	mockTokens := NewMockITokenStore(t)
+	tokenID := uuid.New().String()
+	accessTokenJTI := "test-jti"
 
-	// Expect DeleteRefreshToken to be called with provided token
-	mockTokens.EXPECT().DeleteRefreshToken(mock.Anything, userID, "test-token").Return(nil)
+	mockUsers := NewMockUserRepository(t)
+	mockTokenStore := jwt.NewMockTokenStore(t)
 
-	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour)
-	authService := NewAuthService(mockUsers, mockTokens, jwtManager)
+	// Expect RevokeRefreshToken to be called with provided tokenID
+	mockTokenStore.EXPECT().RevokeRefreshToken(mock.Anything, tokenID).Return(nil)
+	// Expect BlacklistAccessToken to be called with provided JTI
+	mockTokenStore.EXPECT().BlacklistAccessToken(mock.Anything, accessTokenJTI, mock.Anything).Return(nil)
+
+	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour, mockTokenStore)
+	authService := NewAuthService(mockUsers, jwtManager)
 
 	// Test
-	err := authService.Logout(context.Background(), userID, "test-token")
+	err := authService.Logout(context.Background(), tokenID, accessTokenJTI)
 
 	// Assert
 	if err != nil {

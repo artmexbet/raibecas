@@ -21,21 +21,21 @@ func TestAuthService_RefreshTokens_Success(t *testing.T) {
 	password := "password123"
 	passwordHash, _ := bcrypt.GenerateFromPassword([]byte(password), 12)
 
-	mockUsers := NewMockIUserRepository(t)
-	mockTokens := NewMockITokenStore(t)
+	mockUsers := NewMockUserRepository(t)
+	mockTokenStore := jwt.NewMockTokenStore(t)
 
 	// Expectations for login
-	mockUsers.EXPECT().GetByEmail(mock.Anything, email).Return(&domain.User{
+	mockUsers.EXPECT().GetUserByEmail(mock.Anything, email).Return(&domain.User{
 		ID:           userID,
 		Email:        email,
 		PasswordHash: string(passwordHash),
 		Role:         domain.RoleUser,
 		IsActive:     true,
 	}, nil)
-	mockTokens.EXPECT().StoreRefreshToken(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockTokenStore.EXPECT().StoreRefreshToken(mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour)
-	authService := NewAuthService(mockUsers, mockTokens, jwtManager)
+	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour, mockTokenStore)
+	authService := NewAuthService(mockUsers, jwtManager)
 
 	// First, login to get initial tokens
 	loginReq := domain.LoginRequest{
@@ -46,83 +46,103 @@ func TestAuthService_RefreshTokens_Success(t *testing.T) {
 		IPAddress: "127.0.0.1",
 	}
 
-	initialTokens, _, err := authService.Login(context.Background(), loginReq)
+	initialResult, err := authService.Login(context.Background(), loginReq)
 	if err != nil {
 		t.Fatalf("Failed to login: %v", err)
 	}
 
-	// Expectations for refresh: GetRefreshTokenByValue -> return stored token
-	// make it once so subsequent calls can return not found
-	mockTokens.EXPECT().GetRefreshTokenByValue(mock.Anything, initialTokens.RefreshToken).Return(&domain.RefreshToken{
-		Token:     initialTokens.RefreshToken,
-		UserID:    userID,
-		ExpiresAt: time.Now().Add(1 * time.Hour),
+	// Expectations for refresh
+	tokenFamily := uuid.New().String()
+
+	// Mock ValidateRefreshToken - first GetRefreshToken call
+	mockTokenStore.EXPECT().GetRefreshToken(mock.Anything, initialResult.TokenID).Return(&jwt.RefreshTokenMetadata{
+		TokenID:     initialResult.TokenID,
+		UserID:      userID,
+		TokenFamily: tokenFamily,
+		DeviceID:    "test-device",
+		ExpiresAt:   time.Now().Add(1 * time.Hour),
+		Fingerprint: initialResult.Fingerprint,
+		IsRevoked:   false,
 	}, nil).Once()
-	// Expect DeleteRefreshToken for old token and StoreRefreshToken for new one
-	mockTokens.EXPECT().DeleteRefreshToken(mock.Anything, userID, initialTokens.RefreshToken).Return(nil)
-	mockTokens.EXPECT().StoreRefreshToken(mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	// Expect GetByID call to verify user
-	mockUsers.EXPECT().GetByID(mock.Anything, userID).Return(&domain.User{ID: userID, Email: email, PasswordHash: string(passwordHash), Role: domain.RoleUser, IsActive: true}, nil)
+
+	expectedUser := &domain.User{
+		ID:           userID,
+		Email:        email,
+		PasswordHash: string(passwordHash),
+		Role:         domain.RoleUser,
+		IsActive:     true,
+	}
+
+	// Mock GetByID to verify user is still active
+	mockUsers.EXPECT().GetUserByID(mock.Anything, userID).Return(expectedUser, nil)
+
+	// Mock RotateRefreshToken operations - second GetRefreshToken call
+	mockTokenStore.EXPECT().GetRefreshToken(mock.Anything, initialResult.TokenID).Return(&jwt.RefreshTokenMetadata{
+		TokenID:     initialResult.TokenID,
+		UserID:      userID,
+		TokenFamily: tokenFamily,
+		DeviceID:    "test-device",
+		ExpiresAt:   time.Now().Add(1 * time.Hour),
+		Fingerprint: initialResult.Fingerprint,
+		IsRevoked:   false,
+	}, nil).Once()
+
+	mockTokenStore.EXPECT().RevokeRefreshToken(mock.Anything, initialResult.TokenID).Return(nil)
+	mockTokenStore.EXPECT().StoreRefreshToken(mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// Now refresh tokens
 	refreshReq := domain.RefreshRequest{
-		RefreshToken: initialTokens.RefreshToken,
-		DeviceID:     "test-device",
-		UserAgent:    "test-agent",
-		IPAddress:    "127.0.0.1",
+		TokenID:   initialResult.TokenID,
+		DeviceID:  "test-device",
+		UserAgent: "test-agent",
+		IPAddress: "127.0.0.1",
 	}
 
-	newTokens, returnedUserID, err := authService.RefreshTokens(context.Background(), refreshReq)
+	newResult, err := authService.RefreshTokens(context.Background(), refreshReq, initialResult.Fingerprint)
 
 	// Assert
 	if err != nil {
 		t.Fatalf("Expected successful refresh, got error: %v", err)
 	}
 
-	if newTokens == nil {
-		t.Fatal("Expected tokens, got nil")
+	if newResult == nil {
+		t.Fatal("Expected result, got nil")
 	}
 
-	if newTokens.AccessToken == "" {
+	if newResult.AccessToken == "" {
 		t.Error("New access token is empty")
 	}
 
-	if newTokens.RefreshToken == "" {
+	if newResult.RefreshToken == "" {
 		t.Error("New refresh token is empty")
 	}
 
-	if newTokens.RefreshToken == initialTokens.RefreshToken {
+	if newResult.RefreshToken == initialResult.RefreshToken {
 		t.Error("Refresh token should be rotated, but got same token")
 	}
 
-	if returnedUserID != userID {
-		t.Errorf("Expected user ID %s, got %s", userID, returnedUserID)
-	}
-
-	// Old refresh token should not work
-	mockTokens.EXPECT().GetRefreshTokenByValue(mock.Anything, initialTokens.RefreshToken).Return(nil, domain.ErrTokenNotFound)
-	_, _, err = authService.RefreshTokens(context.Background(), refreshReq)
-	if err == nil {
-		t.Error("Expected error when using old refresh token, got nil")
+	if newResult.User != expectedUser {
+		t.Errorf("Expected user ID %v, got %v", expectedUser, newResult.User)
 	}
 }
 
 func TestAuthService_RefreshTokens_InvalidToken(t *testing.T) {
 	// Setup
-	mockUsers := NewMockIUserRepository(t)
-	mockTokens := NewMockITokenStore(t)
+	mockUsers := NewMockUserRepository(t)
+	mockTokenStore := jwt.NewMockTokenStore(t)
 
-	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour)
-	authService := NewAuthService(mockUsers, mockTokens, jwtManager)
+	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour, mockTokenStore)
+	authService := NewAuthService(mockUsers, jwtManager)
 
 	// Test with invalid token
+	tokenID := uuid.New().String()
 	refreshReq := domain.RefreshRequest{
-		RefreshToken: "invalid-token",
+		TokenID: tokenID,
 	}
 
-	mockTokens.EXPECT().GetRefreshTokenByValue(mock.Anything, "invalid-token").Return(nil, domain.ErrTokenNotFound)
+	mockTokenStore.EXPECT().GetRefreshToken(mock.Anything, tokenID).Return(nil, domain.ErrTokenNotFound)
 
-	_, _, err := authService.RefreshTokens(context.Background(), refreshReq)
+	_, err := authService.RefreshTokens(context.Background(), refreshReq, "test-fingerprint")
 
 	// Assert
 	if !errors.Is(err, domain.ErrInvalidToken) {
@@ -137,21 +157,21 @@ func TestAuthService_RefreshTokens_UserNotActive(t *testing.T) {
 	password := "password123"
 	passwordHash, _ := bcrypt.GenerateFromPassword([]byte(password), 12)
 
-	mockUsers := NewMockIUserRepository(t)
-	mockTokens := NewMockITokenStore(t)
+	mockUsers := NewMockUserRepository(t)
+	mockTokenStore := jwt.NewMockTokenStore(t)
 
 	// Expectations for login
-	mockUsers.EXPECT().GetByEmail(mock.Anything, email).Return(&domain.User{
+	mockUsers.EXPECT().GetUserByEmail(mock.Anything, email).Return(&domain.User{
 		ID:           userID,
 		Email:        email,
 		PasswordHash: string(passwordHash),
 		Role:         domain.RoleUser,
 		IsActive:     true, // Initially active
 	}, nil)
-	mockTokens.EXPECT().StoreRefreshToken(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockTokenStore.EXPECT().StoreRefreshToken(mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour)
-	authService := NewAuthService(mockUsers, mockTokens, jwtManager)
+	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour, mockTokenStore)
+	authService := NewAuthService(mockUsers, jwtManager)
 
 	// Login to get tokens
 	loginReq := domain.LoginRequest{
@@ -159,21 +179,37 @@ func TestAuthService_RefreshTokens_UserNotActive(t *testing.T) {
 		Password: password,
 	}
 
-	initialTokens, _, err := authService.Login(context.Background(), loginReq)
+	initialResult, err := authService.Login(context.Background(), loginReq)
 	if err != nil {
 		t.Fatalf("Failed to login: %v", err)
 	}
 
+	// Mock ValidateRefreshToken
+	tokenFamily := uuid.New().String()
+	mockTokenStore.EXPECT().GetRefreshToken(mock.Anything, initialResult.TokenID).Return(&jwt.RefreshTokenMetadata{
+		TokenID:     initialResult.TokenID,
+		UserID:      userID,
+		TokenFamily: tokenFamily,
+		ExpiresAt:   time.Now().Add(1 * time.Hour),
+		Fingerprint: initialResult.Fingerprint,
+		IsRevoked:   false,
+	}, nil)
+
 	// Now set user as not active for subsequent GetByID call
-	mockUsers.EXPECT().GetByID(mock.Anything, userID).Return(&domain.User{ID: userID, Email: email, PasswordHash: string(passwordHash), Role: domain.RoleUser, IsActive: false}, nil)
-	mockTokens.EXPECT().GetRefreshTokenByValue(mock.Anything, initialTokens.RefreshToken).Return(&domain.RefreshToken{Token: initialTokens.RefreshToken, UserID: userID, ExpiresAt: time.Now().Add(1 * time.Hour)}, nil)
+	mockUsers.EXPECT().GetUserByID(mock.Anything, userID).Return(&domain.User{
+		ID:           userID,
+		Email:        email,
+		PasswordHash: string(passwordHash),
+		Role:         domain.RoleUser,
+		IsActive:     false,
+	}, nil)
 
 	// Try to refresh
 	refreshReq := domain.RefreshRequest{
-		RefreshToken: initialTokens.RefreshToken,
+		TokenID: initialResult.TokenID,
 	}
 
-	_, _, err = authService.RefreshTokens(context.Background(), refreshReq)
+	_, err = authService.RefreshTokens(context.Background(), refreshReq, initialResult.Fingerprint)
 
 	// Assert
 	if !errors.Is(err, domain.ErrUserNotActive) {

@@ -16,3 +16,7 @@ packages:
     config:
       all: true
       include-auto-generated: false
+  github.com/artmexbet/raibecas/services/auth/pkg/jwt:
+    config:
+      all: true
+      include-auto-generated: false

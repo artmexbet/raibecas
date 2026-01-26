@@ -1,12 +1,16 @@
 package nats
 
-import "github.com/artmexbet/raibecas/services/auth/internal/domain"
+import (
+	"context"
 
-// IEventPublisher defines the interface for publishing events
-type IEventPublisher interface {
-	PublishUserLogin(domain.UserLoginEvent) error
-	PublishUserLogout(domain.UserLogoutEvent) error
-	PublishPasswordReset(domain.PasswordResetEvent) error
-	PublishRegistrationRequested(domain.RegistrationRequestedEvent) error
-	PublishUserRegistered(domain.UserRegisteredEvent) error
+	"github.com/artmexbet/raibecas/services/auth/internal/domain"
+)
+
+// EventPublisher defines the interface for publishing events
+type EventPublisher interface {
+	PublishUserLogin(ctx context.Context, event domain.UserLoginEvent) error
+	PublishUserLogout(ctx context.Context, event domain.UserLogoutEvent) error
+	PublishPasswordReset(ctx context.Context, event domain.PasswordResetEvent) error
+	PublishRegistrationRequested(ctx context.Context, event domain.RegistrationRequestedEvent) error
+	PublishUserRegistered(ctx context.Context, event domain.UserRegisteredEvent) error
 }

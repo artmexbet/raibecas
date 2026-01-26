@@ -7,7 +7,7 @@ sequenceDiagram
     participant NATS
     participant Indexing as Indexing Service
     participant Ollama
-    participant PG as PostgreSQL (pgvector)
+    participant PG as PostgreSQL
     participant Qdrant as Qdrant
 
     Admin->>Gateway: POST /api/v1/documents\n(upload MD file)

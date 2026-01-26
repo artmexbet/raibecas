@@ -12,7 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U raibecas"]
+      test: [ "CMD-SHELL", "pg_isready -U raibecas" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,14 +24,14 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
   nats:
     image: nats:latest
-    command: 
+    command:
       - "-js"
       - "-sd=/data"
     ports:
@@ -39,11 +39,41 @@ services:
       - "8222:8222"
     volumes:
       - nats_data:/data
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8222/healthz"]
-      interval: 10s
+      test: [ "CMD-SHELL", "wget --spider --timeout=5 http://localhost:9090/-/ready || exit 1" ]
+      interval: 15s
       timeout: 5s
       retries: 5
+
+  jaeger:
+    image: jaegertracing/all-in-one
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    volumes:
+      - grafana_data:/var/lib/grafana
 
   qdrant:
     image: qdrant/qdrant
@@ -55,8 +85,8 @@ services:
 
   auth-service:
     build:
-      context: ../services/auth
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: services/auth/Dockerfile
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -76,8 +106,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      nats:
-        condition: service_healthy
     restart: unless-stopped
 
 volumes:
@@ -85,3 +113,5 @@ volumes:
   redis_data:
   nats_data:
   qdrant_data:
+  prometheus_data:
+  grafana_data:

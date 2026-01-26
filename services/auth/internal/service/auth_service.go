@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -12,185 +11,133 @@ import (
 	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
 )
 
-// IUserRepository defines the interface for user data access
-type IUserRepository interface {
-	Create(ctx context.Context, user *domain.User) error
-	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
-	GetByEmail(ctx context.Context, email string) (*domain.User, error)
-	GetByUsername(ctx context.Context, username string) (*domain.User, error)
-	ExistsByEmail(ctx context.Context, email string) (bool, error)
-	ExistsByUsername(ctx context.Context, username string) (bool, error)
+// UserRepository defines the interface for user data access
+type UserRepository interface {
+	CreateUser(ctx context.Context, user *domain.User) error
+	GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
+	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
-}
-
-// ITokenStore defines the interface for token storage
-type ITokenStore interface {
-	StoreRefreshToken(ctx context.Context, token *domain.RefreshToken, ttl time.Duration) error
-	GetRefreshTokenByValue(ctx context.Context, tokenValue string) (*domain.RefreshToken, error)
-	DeleteRefreshToken(ctx context.Context, userID uuid.UUID, tokenValue string) error
-	DeleteAllRefreshTokens(ctx context.Context, userID uuid.UUID) error
+	ExistsUserByEmail(ctx context.Context, email string) (bool, error)
+	ExistsUserByUsername(ctx context.Context, username string) (bool, error)
 }
 
 // AuthService handles authentication business logic
 type AuthService struct {
-	userRepo   IUserRepository
-	tokenStore ITokenStore
-	jwtManager *jwt.Manager
+	userRepo   UserRepository
+	jwtManager jwt.TokenManager
 	bcryptCost int
 }
 
 // NewAuthService creates a new auth service
 func NewAuthService(
-	userRepo IUserRepository,
-	tokenStore ITokenStore,
-	jwtManager *jwt.Manager,
+	userRepo UserRepository,
+	jwtManager jwt.TokenManager,
 ) *AuthService {
 	return &AuthService{
 		userRepo:   userRepo,
-		tokenStore: tokenStore,
 		jwtManager: jwtManager,
 		bcryptCost: 12, // Default bcrypt cost
 	}
 }
 
-// Login authenticates a user and returns tokens
-func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*domain.TokenPair, uuid.UUID, error) {
+// Login authenticates a user and returns tokens with enhanced security
+func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*domain.LoginResult, error) {
 	// Get user by email
-	user, err := s.userRepo.GetByEmail(ctx, req.Email)
+	user, err := s.userRepo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
-		return nil, uuid.Nil, domain.ErrInvalidCredentials
+		return nil, domain.ErrUserNotFound
 	}
 
 	// Check if user is active
 	if !user.IsActive {
-		return nil, uuid.Nil, domain.ErrUserNotActive
+		return nil, domain.ErrUserNotActive
 	}
 
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		return nil, uuid.Nil, domain.ErrInvalidCredentials
+		return nil, domain.ErrInvalidCredentials
 	}
 
-	// Generate tokens
-	accessToken, err := s.jwtManager.GenerateAccessToken(user.ID, string(user.Role))
+	// Генерируем fingerprint для защиты от XSS
+	fingerprint, err := jwt.GenerateFingerprint()
 	if err != nil {
-		return nil, uuid.Nil, fmt.Errorf("failed to generate access token: %w", err)
+		return nil, fmt.Errorf("failed to generate fingerprint: %w", err)
 	}
 
-	refreshToken, err := s.jwtManager.GenerateRefreshToken()
+	// Создаём метаданные для токенов
+	metadata := &jwt.TokenMetadata{
+		UserID:      user.ID,
+		Role:        string(user.Role),
+		DeviceID:    req.DeviceID,
+		UserAgent:   req.UserAgent,
+		IPAddress:   req.IPAddress,
+		Fingerprint: fingerprint,
+		// TokenFamily будет создан автоматически в GenerateRefreshToken
+	}
+
+	// Генерируем access token
+	accessToken, _, err := s.jwtManager.GenerateAccessToken(metadata)
 	if err != nil {
-		return nil, uuid.Nil, fmt.Errorf("failed to generate refresh token: %w", err)
+		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	// Store refresh token in Redis
-	refreshTokenData := &domain.RefreshToken{
-		Token:     refreshToken,
-		UserID:    user.ID,
-		DeviceID:  req.DeviceID,
-		UserAgent: req.UserAgent,
-		IPAddress: req.IPAddress,
-		ExpiresAt: time.Now().Add(s.jwtManager.GetRefreshTokenTTL()),
-		CreatedAt: time.Now(),
+	// Генерируем refresh token
+	refreshToken, refreshMetadata, err := s.jwtManager.GenerateRefreshToken(metadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
 	}
 
-	if err := s.tokenStore.StoreRefreshToken(ctx, refreshTokenData, s.jwtManager.GetRefreshTokenTTL()); err != nil {
-		return nil, uuid.Nil, fmt.Errorf("failed to store refresh token: %w", err)
+	// Сохраняем refresh token в хранилище
+	if err := s.jwtManager.StoreRefreshToken(ctx, refreshMetadata); err != nil {
+		return nil, fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
-	return &domain.TokenPair{
+	return &domain.LoginResult{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-	}, user.ID, nil
+		TokenID:      refreshMetadata.TokenID,
+		Fingerprint:  fingerprint,
+		User:         user,
+	}, nil
 }
 
 // Logout logs out a user by revoking their refresh token
-func (s *AuthService) Logout(ctx context.Context, userID uuid.UUID, token string) error {
-	if err := s.tokenStore.DeleteRefreshToken(ctx, userID, token); err != nil {
-		return fmt.Errorf("failed to delete refresh token: %w", err)
+func (s *AuthService) Logout(ctx context.Context, tokenID string, accessTokenJTI string) error {
+	// Отзываем refresh token
+	if err := s.jwtManager.RevokeRefreshToken(ctx, tokenID); err != nil {
+		return fmt.Errorf("failed to revoke refresh token: %w", err)
 	}
+
+	// Добавляем access token в blacklist
+	if accessTokenJTI != "" {
+		if err := s.jwtManager.RevokeAccessToken(ctx, accessTokenJTI); err != nil {
+			// Логируем ошибку, но не прерываем операцию
+			// так как refresh token уже отозван
+			return fmt.Errorf("failed to blacklist access token: %w", err)
+		}
+	}
+
 	return nil
 }
 
 // LogoutAll logs out a user from all devices
 func (s *AuthService) LogoutAll(ctx context.Context, userID uuid.UUID) error {
-	if err := s.tokenStore.DeleteAllRefreshTokens(ctx, userID); err != nil {
-		return fmt.Errorf("failed to delete all refresh tokens: %w", err)
+	if err := s.jwtManager.RevokeAllUserTokens(ctx, userID); err != nil {
+		return fmt.Errorf("failed to revoke all tokens: %w", err)
 	}
 	return nil
 }
 
-// RefreshTokens refreshes access and refresh tokens
-func (s *AuthService) RefreshTokens(ctx context.Context, req domain.RefreshRequest) (*domain.TokenPair, uuid.UUID, error) {
-	// Get refresh token from storage by token value
-	storedToken, err := s.tokenStore.GetRefreshTokenByValue(ctx, req.RefreshToken)
-	if err != nil {
-		return nil, uuid.Nil, domain.ErrInvalidToken
-	}
-
-	// Check if token has expired
-	if time.Now().After(storedToken.ExpiresAt) {
-		// Clean up expired token
-		_ = s.tokenStore.DeleteRefreshToken(ctx, storedToken.UserID, storedToken.Token)
-		return nil, uuid.Nil, domain.ErrExpiredToken
-	}
-
-	// Verify user still exists and is active
-	user, err := s.userRepo.GetByID(ctx, storedToken.UserID)
-	if err != nil {
-		return nil, uuid.Nil, domain.ErrUserNotFound
-	}
-
-	if !user.IsActive {
-		return nil, uuid.Nil, domain.ErrUserNotActive
-	}
-
-	// Generate new access token
-	accessToken, err := s.jwtManager.GenerateAccessToken(user.ID, string(user.Role))
-	if err != nil {
-		return nil, uuid.Nil, fmt.Errorf("failed to generate access token: %w", err)
-	}
-
-	// Generate new refresh token
-	newRefreshToken, err := s.jwtManager.GenerateRefreshToken()
-	if err != nil {
-		return nil, uuid.Nil, fmt.Errorf("failed to generate refresh token: %w", err)
-	}
-
-	// Delete old refresh token
-	if err := s.tokenStore.DeleteRefreshToken(ctx, storedToken.UserID, storedToken.Token); err != nil {
-		return nil, uuid.Nil, fmt.Errorf("failed to delete old refresh token: %w", err)
-	}
-
-	// Store new refresh token
-	newRefreshTokenData := &domain.RefreshToken{
-		Token:     newRefreshToken,
-		UserID:    user.ID,
-		DeviceID:  req.DeviceID,
-		UserAgent: req.UserAgent,
-		IPAddress: req.IPAddress,
-		ExpiresAt: time.Now().Add(s.jwtManager.GetRefreshTokenTTL()),
-		CreatedAt: time.Now(),
-	}
-
-	if err := s.tokenStore.StoreRefreshToken(ctx, newRefreshTokenData, s.jwtManager.GetRefreshTokenTTL()); err != nil {
-		return nil, uuid.Nil, fmt.Errorf("failed to store refresh token: %w", err)
-	}
-
-	return &domain.TokenPair{
-		AccessToken:  accessToken,
-		RefreshToken: newRefreshToken,
-	}, user.ID, nil
-}
-
-// ValidateAccessToken validates an access token and returns user info
-func (s *AuthService) ValidateAccessToken(ctx context.Context, token string) (*jwt.Claims, error) {
-	claims, err := s.jwtManager.ValidateAccessToken(token)
+// RefreshTokens refreshes access and refresh tokens with rotation
+func (s *AuthService) RefreshTokens(ctx context.Context, req domain.RefreshRequest, fingerprint string) (*domain.LoginResult, error) {
+	// Получаем refresh token metadata через валидацию
+	oldMetadata, err := s.jwtManager.ValidateRefreshToken(ctx, req.TokenID, fingerprint)
 	if err != nil {
 		return nil, domain.ErrInvalidToken
 	}
 
-	// Optionally verify user still exists and is active
-	user, err := s.userRepo.GetByID(ctx, claims.UserID)
+	// Проверяем, что пользователь всё ещё активен
+	user, err := s.userRepo.GetUserByID(ctx, oldMetadata.UserID)
 	if err != nil {
 		return nil, domain.ErrUserNotFound
 	}
@@ -199,13 +146,60 @@ func (s *AuthService) ValidateAccessToken(ctx context.Context, token string) (*j
 		return nil, domain.ErrUserNotActive
 	}
 
-	return claims, nil
+	// Создаём метаданные для новых токенов
+	metadata := &jwt.TokenMetadata{
+		UserID:      user.ID,
+		Role:        string(user.Role),
+		DeviceID:    req.DeviceID,
+		UserAgent:   req.UserAgent,
+		IPAddress:   req.IPAddress,
+		Fingerprint: fingerprint,
+		TokenFamily: oldMetadata.TokenFamily, // Сохраняем семью
+	}
+
+	// Выполняем ротацию токенов
+	accessToken, refreshToken, err := s.jwtManager.RotateRefreshToken(ctx, req.TokenID, metadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to rotate tokens: %w", err)
+	}
+
+	return &domain.LoginResult{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenID:      oldMetadata.TokenID, // Новый ID будет в refresh token
+		Fingerprint:  fingerprint,
+		User:         user,
+	}, nil
+}
+
+// ValidateAccessToken validates an access token and returns user info
+func (s *AuthService) ValidateAccessToken(ctx context.Context, token string, fingerprint string) (*jwt.AccessTokenClaims, error) {
+	result, err := s.jwtManager.ValidateAccessToken(ctx, token, fingerprint)
+	if err != nil {
+		return nil, domain.ErrInvalidToken
+	}
+
+	if !result.Valid {
+		return nil, domain.ErrInvalidToken
+	}
+
+	// Optionally verify user still exists and is active
+	user, err := s.userRepo.GetUserByID(ctx, result.Claims.UserID)
+	if err != nil {
+		return nil, domain.ErrUserNotFound
+	}
+
+	if !user.IsActive {
+		return nil, domain.ErrUserNotActive
+	}
+
+	return result.Claims, nil
 }
 
 // ChangePassword changes a user's password
 func (s *AuthService) ChangePassword(ctx context.Context, req domain.ChangePasswordRequest) error {
 	// Get user
-	user, err := s.userRepo.GetByID(ctx, req.UserID)
+	user, err := s.userRepo.GetUserByID(ctx, req.UserID)
 	if err != nil {
 		return err
 	}

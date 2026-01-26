@@ -1,0 +1,50 @@
+sequenceDiagram
+    participant Client
+    participant Gateway
+    participant Middleware as Auth Middleware
+    participant AuthService as Auth Service (NATS)
+    participant Handler as Protected Handler
+
+    Note over Client,Handler: Запрос к защищенному эндпоинту
+
+    Client->>Gateway: GET /api/v1/users<br/>Authorization: Bearer {token}<br/>Cookie: fingerprint={fp}
+
+    Gateway->>Middleware: Process Request
+
+    Middleware->>Middleware: Extract token from<br/>Authorization header
+
+    alt Missing Authorization header
+        Middleware-->>Client: 401 Unauthorized<br/>"Authorization header required"
+    end
+
+    Middleware->>Middleware: Extract fingerprint<br/>from cookie
+
+    alt Missing fingerprint cookie
+        Middleware-->>Client: 401 Unauthorized<br/>"Authentication fingerprint missing"
+    end
+
+    Middleware->>AuthService: NATS Request: auth.validate<br/>{token, fingerprint}
+
+    AuthService->>AuthService: Validate token<br/>Check signature<br/>Check expiration<br/>Check fingerprint match<br/>Check blacklist
+
+    alt Token invalid or expired
+        AuthService-->>Middleware: {success: true, data: {valid: false}}
+        Middleware-->>Client: 401 Unauthorized<br/>"Invalid or expired token"
+    end
+
+    alt Fingerprint mismatch
+        AuthService-->>Middleware: {success: true, data: {valid: false}}
+        Middleware-->>Client: 401 Unauthorized<br/>"Invalid or expired token"
+    end
+
+    AuthService-->>Middleware: {success: true,<br/>data: {valid: true, user_id, role, jti}}
+
+    Middleware->>Middleware: Store AuthUser in context<br/>{ID, Role, JTI}
+
+    Middleware->>Handler: Next() - Pass to handler
+
+    Handler->>Handler: Get AuthUser from context<br/>Process business logic
+
+    Handler-->>Client: 200 OK<br/>Response data
+
+    Note over Client,Handler: Пользователь успешно авторизован

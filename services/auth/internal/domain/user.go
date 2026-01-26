@@ -85,7 +85,8 @@ type TokenPair struct {
 
 // RefreshRequest represents a token refresh request
 type RefreshRequest struct {
-	RefreshToken string
+	RefreshToken string // Сам refresh token (криптографически стойкая строка)
+	TokenID      string // ID токена для операций в Redis
 	DeviceID     string
 	UserAgent    string
 	IPAddress    string
@@ -104,4 +105,13 @@ type RegisterRequest struct {
 	Email    string
 	Password string
 	Metadata map[string]any
+}
+
+// LoginResult contains the result of a successful login
+type LoginResult struct {
+	AccessToken  string
+	RefreshToken string
+	TokenID      string // ID refresh токена для последующих операций
+	Fingerprint  string // Fingerprint для клиента (должен храниться в HttpOnly cookie)
+	User         *User
 }
