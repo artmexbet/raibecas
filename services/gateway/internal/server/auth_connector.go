@@ -20,7 +20,7 @@ type AuthServiceConnector interface {
 	ValidateToken(ctx context.Context, token string, fingerprint string) (*domain.ValidateTokenResponse, error)
 
 	// Logout logs out a user from the current device
-	Logout(ctx context.Context, userID uuid.UUID, token string) error
+	Logout(ctx context.Context, tokenID, accessTokenJTI string, userID uuid.UUID, token string) error
 
 	// LogoutAll logs out a user from all devices
 	LogoutAll(ctx context.Context, userID uuid.UUID, token string) error

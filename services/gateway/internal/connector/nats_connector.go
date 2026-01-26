@@ -70,12 +70,8 @@ func (c *NATSDocumentConnector) ListDocuments(ctx context.Context, query domain.
 
 // GetDocument retrieves a single document by ID
 func (c *NATSDocumentConnector) GetDocument(ctx context.Context, id uuid.UUID) (*domain.GetDocumentResponse, error) {
-	// Create request payload
-	type getDocRequest struct {
-		ID string `json:"id"`
-	}
-	req := getDocRequest{ID: id.String()}
-	reqData, err := json.Marshal(req)
+	req := GetDocumentRequest{ID: id.String()}
+	reqData, err := req.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal get request: %w", err)
 	}
@@ -154,12 +150,8 @@ func (c *NATSDocumentConnector) UpdateDocument(ctx context.Context, id uuid.UUID
 
 // DeleteDocument deletes a document by ID
 func (c *NATSDocumentConnector) DeleteDocument(ctx context.Context, id uuid.UUID) error {
-	// Create request payload
-	type deleteDocRequest struct {
-		ID string `json:"id"`
-	}
-	req := deleteDocRequest{ID: id.String()}
-	reqData, err := json.Marshal(req)
+	req := DeleteDocumentRequest{ID: id.String()}
+	reqData, err := req.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("failed to marshal delete request: %w", err)
 	}

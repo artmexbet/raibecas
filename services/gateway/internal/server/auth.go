@@ -199,7 +199,10 @@ func (s *Server) logout(c *fiber.Ctx) error {
 	// Get fingerprint from cookie
 	fingerprint := getSecureCookie(c, CookieFingerprint)
 
-	// First validate the token to get user ID
+	// Get token_id from cookie
+	tokenID := getSecureCookie(c, CookieTokenID)
+
+	// First validate the token to get user ID and JTI
 	validateResp, err := s.authConnector.ValidateToken(c.UserContext(), req.Token, fingerprint)
 	if err != nil || !validateResp.Valid {
 		slog.Error("invalid token for logout", "error", err)
@@ -209,7 +212,8 @@ func (s *Server) logout(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := s.authConnector.Logout(c.UserContext(), validateResp.UserID, req.Token); err != nil {
+	// Call logout with all required parameters
+	if err := s.authConnector.Logout(c.UserContext(), tokenID, validateResp.JTI, validateResp.UserID, req.Token); err != nil {
 		slog.Error("failed to logout", "error", err)
 		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
 			Error:   "internal_error",
@@ -313,6 +317,7 @@ func (s *Server) changePassword(c *fiber.Ctx) error {
 		})
 	}
 
+	// Call ChangePassword - token already in req
 	if err := s.authConnector.ChangePassword(c.UserContext(), validateResp.UserID, req); err != nil {
 		slog.Error("failed to change password", "error", err)
 		return c.Status(http.StatusBadRequest).JSON(domain.ErrorResponse{

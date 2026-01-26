@@ -153,7 +153,7 @@ func (h *AuthHandler) HandleLogout(msg *natsw.Message) error {
 	ctx := msg.Ctx
 
 	if err := h.authService.Logout(ctx, req.TokenID, req.AccessTokenJTI); err != nil {
-		return h.respondError(msg, "Failed to logout")
+		return h.respondError(msg, fmt.Sprintf("Failed to logout: %v", err))
 	}
 
 	// Publish logout event

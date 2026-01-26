@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	natsgo "github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/artmexbet/raibecas/libs/natsw"
 
@@ -21,22 +22,39 @@ import (
 	"github.com/artmexbet/raibecas/services/auth/internal/postgres"
 	"github.com/artmexbet/raibecas/services/auth/internal/service"
 	"github.com/artmexbet/raibecas/services/auth/internal/storeredis"
+	"github.com/artmexbet/raibecas/services/auth/internal/telemetry"
 	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
 )
 
 // App represents the App-based auth service server
 type App struct {
-	cfg           *config.Config
-	pool          *pgxpool.Pool
-	redis         *redis.Client
-	natsClient    *natsw.Client
-	subscriber    *nats.Subscriber
-	subscriptions []*natsgo.Subscription
+	cfg            *config.Config
+	pool           *pgxpool.Pool
+	redis          *redis.Client
+	natsClient     *natsw.Client
+	subscriber     *nats.Subscriber
+	subscriptions  []*natsgo.Subscription
+	tracerProvider *sdktrace.TracerProvider
 }
 
 // New creates a new App-based server instance
 func New(cfg *config.Config) (*App, error) {
 	ctx := context.Background()
+
+	// Initialize OpenTelemetry tracing
+	tracerProvider, err := telemetry.InitTracer(telemetry.TracerConfig{
+		ServiceName:    cfg.Telemetry.ServiceName,
+		ServiceVersion: cfg.Telemetry.ServiceVersion,
+		OTLPEndpoint:   cfg.Telemetry.OTLPEndpoint,
+		Enabled:        cfg.Telemetry.Enabled,
+		ExportTimeout:  cfg.Telemetry.ExportTimeout,
+		BatchTimeout:   cfg.Telemetry.BatchTimeout,
+		MaxQueueSize:   cfg.Telemetry.MaxQueueSize,
+		MaxExportBatch: cfg.Telemetry.MaxExportBatch,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize tracer: %w", err)
+	}
 
 	// Initialize database connection pool
 	poolConfig, err := pgxpool.ParseConfig(cfg.GetDatabaseDSN())
@@ -112,12 +130,13 @@ func New(cfg *config.Config) (*App, error) {
 
 	// Setup App subscriptions
 	server := &App{
-		cfg:           cfg,
-		pool:          pool,
-		redis:         redisClient,
-		natsClient:    natsClient,
-		subscriber:    subscriber,
-		subscriptions: make([]*natsgo.Subscription, 0),
+		cfg:            cfg,
+		pool:           pool,
+		redis:          redisClient,
+		natsClient:     natsClient,
+		subscriber:     subscriber,
+		subscriptions:  make([]*natsgo.Subscription, 0),
+		tracerProvider: tracerProvider,
 	}
 
 	// Subscribe to request/reply topics
@@ -207,6 +226,10 @@ func (s *App) Start() error {
 
 // Shutdown gracefully shuts down the server
 func (s *App) Shutdown() error {
+	// Создаем контекст с таймаутом для shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	// Unsubscribe from all topics
 	for _, sub := range s.subscriptions {
 		if err := sub.Unsubscribe(); err != nil {
@@ -221,6 +244,11 @@ func (s *App) Shutdown() error {
 
 	// Close App connection
 	s.natsClient.Close()
+
+	// Shutdown tracer provider (flush all pending spans)
+	if err := telemetry.Shutdown(ctx, s.tracerProvider); err != nil {
+		slog.Error("Error shutting down tracer provider", "error", err)
+	}
 
 	// Close Redis connection
 	if err := s.redis.Close(); err != nil {

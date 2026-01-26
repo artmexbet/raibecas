@@ -21,6 +21,7 @@ const (
 	SubjectUsersDelete = "users.delete"
 
 	// Registration requests
+
 	SubjectRegistrationRequestCreate  = "users.registration.create"
 	SubjectRegistrationRequestList    = "users.registration.list"
 	SubjectRegistrationRequestApprove = "users.registration.approve"
@@ -48,7 +49,7 @@ type usersResponse struct {
 
 // ListUsers retrieves a list of users based on query parameters
 func (c *NATSUserConnector) ListUsers(ctx context.Context, query domain.ListUsersQuery) (*domain.ListUsersResponse, error) {
-	reqData, err := json.Marshal(query)
+	reqData, err := query.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal list users request: %w", err)
 	}
@@ -81,7 +82,7 @@ func (c *NATSUserConnector) ListUsers(ctx context.Context, query domain.ListUser
 // GetUser retrieves a single user by ID
 func (c *NATSUserConnector) GetUser(ctx context.Context, id uuid.UUID) (*domain.GetUserResponse, error) {
 	req := domain.GetUserRequest{ID: id}
-	reqData, err := json.Marshal(req)
+	reqData, err := req.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal get user request: %w", err)
 	}
@@ -113,17 +114,17 @@ func (c *NATSUserConnector) GetUser(ctx context.Context, id uuid.UUID) (*domain.
 
 // UpdateUser updates an existing user
 func (c *NATSUserConnector) UpdateUser(ctx context.Context, id uuid.UUID, req domain.UpdateUserRequest) (*domain.UpdateUserResponse, error) {
-	type updateUserRequest struct {
-		ID      uuid.UUID                `json:"id"`
-		Updates domain.UpdateUserRequest `json:"updates"`
+	reqPayload := UpdateUserRequestWrapper{
+		ID: id,
+		Updates: UpdateUserUpdates{
+			Email:    req.Email,
+			Username: req.Username,
+			FullName: req.FullName,
+			IsActive: req.IsActive,
+		},
 	}
 
-	reqPayload := updateUserRequest{
-		ID:      id,
-		Updates: req,
-	}
-
-	reqData, err := json.Marshal(reqPayload)
+	reqData, err := reqPayload.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal update user request: %w", err)
 	}
@@ -155,12 +156,8 @@ func (c *NATSUserConnector) UpdateUser(ctx context.Context, id uuid.UUID, req do
 
 // DeleteUser deletes a user by ID
 func (c *NATSUserConnector) DeleteUser(ctx context.Context, id uuid.UUID) error {
-	type deleteUserRequest struct {
-		ID uuid.UUID `json:"id"`
-	}
-
-	req := deleteUserRequest{ID: id}
-	reqData, err := json.Marshal(req)
+	req := DeleteUserRequest{ID: id}
+	reqData, err := req.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("failed to marshal delete user request: %w", err)
 	}
@@ -187,7 +184,7 @@ func (c *NATSUserConnector) DeleteUser(ctx context.Context, id uuid.UUID) error 
 
 // CreateRegistrationRequest creates a new registration request
 func (c *NATSUserConnector) CreateRegistrationRequest(ctx context.Context, req domain.CreateRegistrationRequestRequest) (*domain.CreateRegistrationRequestResponse, error) {
-	reqData, err := json.Marshal(req)
+	reqData, err := req.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal create registration request: %w", err)
 	}
@@ -219,7 +216,7 @@ func (c *NATSUserConnector) CreateRegistrationRequest(ctx context.Context, req d
 
 // ListRegistrationRequests retrieves a list of registration requests
 func (c *NATSUserConnector) ListRegistrationRequests(ctx context.Context, query domain.ListRegistrationRequestsQuery) (*domain.ListRegistrationRequestsResponse, error) {
-	reqData, err := json.Marshal(query)
+	reqData, err := query.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal list registration requests: %w", err)
 	}
@@ -251,17 +248,12 @@ func (c *NATSUserConnector) ListRegistrationRequests(ctx context.Context, query 
 
 // ApproveRegistrationRequest approves a registration request
 func (c *NATSUserConnector) ApproveRegistrationRequest(ctx context.Context, requestID, approverID uuid.UUID) (*domain.ApproveRegistrationRequestResponse, error) {
-	type approveRequest struct {
-		RequestID  uuid.UUID `json:"request_id"`
-		ApproverID uuid.UUID `json:"approver_id"`
-	}
-
-	req := approveRequest{
+	req := ApproveRegistrationRequest{
 		RequestID:  requestID,
 		ApproverID: approverID,
 	}
 
-	reqData, err := json.Marshal(req)
+	reqData, err := req.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal approve request: %w", err)
 	}
@@ -293,19 +285,13 @@ func (c *NATSUserConnector) ApproveRegistrationRequest(ctx context.Context, requ
 
 // RejectRegistrationRequest rejects a registration request
 func (c *NATSUserConnector) RejectRegistrationRequest(ctx context.Context, requestID, approverID uuid.UUID, reason string) (*domain.RejectRegistrationRequestResponse, error) {
-	type rejectRequest struct {
-		RequestID  uuid.UUID `json:"request_id"`
-		ApproverID uuid.UUID `json:"approver_id"`
-		Reason     string    `json:"reason,omitempty"`
-	}
-
-	req := rejectRequest{
+	req := RejectRegistrationRequest{
 		RequestID:  requestID,
 		ApproverID: approverID,
 		Reason:     reason,
 	}
 
-	reqData, err := json.Marshal(req)
+	reqData, err := req.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal reject request: %w", err)
 	}

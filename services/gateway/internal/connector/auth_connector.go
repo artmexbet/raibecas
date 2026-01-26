@@ -76,7 +76,7 @@ func (c *NATSAuthConnector) Login(ctx context.Context, req domain.LoginRequest) 
 
 // RefreshToken refreshes an access token using a refresh token
 func (c *NATSAuthConnector) RefreshToken(ctx context.Context, req domain.AuthServiceRefreshRequest) (*domain.AuthServiceLoginResponse, error) {
-	reqData, err := json.Marshal(req)
+	reqData, err := req.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal refresh request: %w", err)
 	}
@@ -112,7 +112,7 @@ func (c *NATSAuthConnector) ValidateToken(ctx context.Context, token string, fin
 		Token:       token,
 		Fingerprint: fingerprint,
 	}
-	reqData, err := json.Marshal(req)
+	reqData, err := req.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal validate request: %w", err)
 	}
@@ -143,18 +143,15 @@ func (c *NATSAuthConnector) ValidateToken(ctx context.Context, token string, fin
 }
 
 // Logout logs out a user from the current device
-func (c *NATSAuthConnector) Logout(ctx context.Context, userID uuid.UUID, token string) error {
-	type logoutRequest struct {
-		UserID uuid.UUID `json:"user_id"`
-		Token  string    `json:"token"`
+func (c *NATSAuthConnector) Logout(ctx context.Context, tokenID, accessTokenJTI string, userID uuid.UUID, token string) error {
+	req := LogoutRequest{
+		TokenID:        tokenID,
+		AccessTokenJTI: accessTokenJTI,
+		UserID:         userID,
+		Token:          token,
 	}
 
-	req := logoutRequest{
-		UserID: userID,
-		Token:  token,
-	}
-
-	reqData, err := json.Marshal(req)
+	reqData, err := req.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("failed to marshal logout request: %w", err)
 	}
@@ -181,17 +178,12 @@ func (c *NATSAuthConnector) Logout(ctx context.Context, userID uuid.UUID, token 
 
 // LogoutAll logs out a user from all devices
 func (c *NATSAuthConnector) LogoutAll(ctx context.Context, userID uuid.UUID, token string) error {
-	type logoutAllRequest struct {
-		UserID uuid.UUID `json:"user_id"`
-		Token  string    `json:"token"`
-	}
-
-	req := logoutAllRequest{
+	req := LogoutAllRequest{
 		UserID: userID,
 		Token:  token,
 	}
 
-	reqData, err := json.Marshal(req)
+	reqData, err := req.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("failed to marshal logout all request: %w", err)
 	}
@@ -218,21 +210,14 @@ func (c *NATSAuthConnector) LogoutAll(ctx context.Context, userID uuid.UUID, tok
 
 // ChangePassword changes a user's password
 func (c *NATSAuthConnector) ChangePassword(ctx context.Context, userID uuid.UUID, req domain.ChangePasswordRequest) error {
-	type changePasswordRequest struct {
-		UserID      uuid.UUID `json:"user_id"`
-		Token       string    `json:"token"`
-		OldPassword string    `json:"old_password"`
-		NewPassword string    `json:"new_password"`
-	}
-
-	changeReq := changePasswordRequest{
+	changeReq := ChangePasswordRequest{
 		UserID:      userID,
 		Token:       req.Token,
 		OldPassword: req.OldPassword,
 		NewPassword: req.NewPassword,
 	}
 
-	reqData, err := json.Marshal(changeReq)
+	reqData, err := changeReq.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("failed to marshal change password request: %w", err)
 	}
