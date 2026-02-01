@@ -15,6 +15,10 @@ func (n *NATS) GetURL() string {
 	return fmt.Sprintf("%s:%d", n.Host, n.Port)
 }
 
+type Metrics struct {
+	Port int `yaml:"port" env:"PORT" env-default:"9091"`
+}
+
 // DatabaseConfig holds PostgreSQL configuration
 type DatabaseConfig struct {
 	Host     string `env:"HOST" env-default:"localhost"`
@@ -30,6 +34,7 @@ type DatabaseConfig struct {
 type Config struct {
 	NATS     NATS           `yaml:"nats" env-prefix:"NATS_"`
 	Database DatabaseConfig `yaml:"database" env-prefix:"DB_"`
+	Metrics  Metrics        `yaml:"metrics" env-prefix:"METRICS_"`
 }
 
 func Load() (Config, error) {

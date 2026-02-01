@@ -62,6 +62,14 @@ func (p *Postgres) ListUsers(ctx context.Context, params ListUsersParams) ([]dom
 	return users, int(total), nil
 }
 
+func (p *Postgres) CountTotalUsers(ctx context.Context) (int64, error) {
+	total, err := p.q.CountUsers(ctx, queries.CountUsersParams{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count users: %w", err)
+	}
+	return total, nil
+}
+
 func (p *Postgres) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	u, err := p.q.GetUserByID(ctx, id)
 	if err != nil {

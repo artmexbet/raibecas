@@ -16,12 +16,21 @@ var (
 	ErrInvalidStatus = errors.New("invalid status")
 )
 
-type Service struct {
-	repo *postgres.Postgres
+// Metrics defines the interface for business metrics collection
+type Metrics interface {
+	IncRegisteredUsers()
 }
 
-func New(repo *postgres.Postgres) *Service {
-	return &Service{repo: repo}
+type Service struct {
+	repo    *postgres.Postgres
+	metrics Metrics
+}
+
+func New(repo *postgres.Postgres, metrics Metrics) *Service {
+	return &Service{
+		repo:    repo,
+		metrics: metrics,
+	}
 }
 
 // User methods
@@ -90,7 +99,12 @@ func (s *Service) ListRegistrationRequests(ctx context.Context, status domain.Re
 }
 
 func (s *Service) ApproveRegistrationRequest(ctx context.Context, requestID uuid.UUID, approverID uuid.UUID) (*domain.User, error) {
-	return s.repo.ApproveRegistrationRequest(ctx, requestID, approverID)
+	u, err := s.repo.ApproveRegistrationRequest(ctx, requestID, approverID)
+	if err != nil {
+		return nil, err
+	}
+	s.metrics.IncRegisteredUsers()
+	return u, nil
 }
 
 func (s *Service) RejectRegistrationRequest(ctx context.Context, requestID uuid.UUID, approverID uuid.UUID, reason string) error {
