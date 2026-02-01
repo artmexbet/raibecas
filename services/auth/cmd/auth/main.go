@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"log/slog"
 
 	"github.com/artmexbet/raibecas/services/auth/internal/config"
@@ -23,6 +22,6 @@ func main() {
 
 	// Start server (blocks until shutdown signal)
 	if err := srv.Start(); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		slog.Error("Server error", "err", err)
 	}
 }
