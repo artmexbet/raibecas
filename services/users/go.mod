@@ -3,6 +3,7 @@ module github.com/artmexbet/raibecas/services/users
 go 1.25.1
 
 require (
+	github.com/artmexbet/raibecas/libs/dto v0.0.0
 	github.com/artmexbet/raibecas/libs/natsw v0.0.0-20260126080331-f6cbb701e26d
 	github.com/exaring/otelpgx v0.10.0
 	github.com/google/uuid v1.6.0
@@ -54,3 +55,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	olympos.io/encoding/edn v0.0.0-20201019073823-d3554ca0b0a3 // indirect
 )
+
+replace github.com/artmexbet/raibecas/libs/dto => ../../libs/dto
+

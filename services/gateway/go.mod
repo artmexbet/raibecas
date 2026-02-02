@@ -4,6 +4,7 @@ go 1.25.1
 
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.15.0
+	github.com/artmexbet/raibecas/libs/dto v0.0.0
 	github.com/artmexbet/raibecas/libs/natsw v0.0.0-00010101000000-000000000000
 	github.com/go-playground/validator/v10 v10.22.1
 	github.com/gofiber/contrib/otelfiber/v2 v2.2.3
@@ -18,6 +19,8 @@ require (
 )
 
 replace github.com/artmexbet/raibecas/libs/natsw => ../../libs/natsw
+
+replace github.com/artmexbet/raibecas/libs/dto => ../../libs/dto
 
 require (
 	github.com/andybalholm/brotli v1.2.0 // indirect

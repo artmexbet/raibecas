@@ -8,4 +8,5 @@ use (
 	./services/chat
 	./services/gateway
 	./services/users
+	libs/dto
 )

@@ -16,8 +16,8 @@ const (
 )
 
 type Additional struct {
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Admin struct {
@@ -32,10 +32,10 @@ type User struct {
 	ID           uuid.UUID `json:"id" validate:"required,uuid"`
 	Email        string    `json:"email" validate:"required,email"`
 	Username     string    `json:"username" validate:"required"`
-	FullName     string    `json:"fullName" validate:"required"`
-	RegisteredAt time.Time `json:"registeredAt" validate:"required"`
-	LastLoginAt  time.Time `json:"lastLoginAt" validate:"required"`
-	IsActive     bool      `json:"isActive"`
+	FullName     string    `json:"full_name" validate:"required"`
+	RegisteredAt time.Time `json:"registered_at" validate:"required"`
+	LastLoginAt  time.Time `json:"last_login_at" validate:"required"`
+	IsActive     bool      `json:"is_active"`
 }
 
 type Author struct {
@@ -60,7 +60,7 @@ type Document struct {
 	Author      Author    `json:"author" validate:"dive"`
 
 	Category        Category  `json:"category" validate:"dive"`
-	PublicationDate time.Time `json:"publicationDate" validate:"required"`
+	PublicationDate time.Time `json:"publication_date" validate:"required"`
 	Tags            []Tag     `json:"tags" validate:"dive"`
 	Additional
 }

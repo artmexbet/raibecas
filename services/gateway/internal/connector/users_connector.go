@@ -2,12 +2,13 @@ package connector
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/mailru/easyjson"
 	"github.com/nats-io/nats.go"
 
+	"github.com/artmexbet/raibecas/libs/dto"
 	"github.com/artmexbet/raibecas/libs/natsw"
 
 	"github.com/artmexbet/raibecas/services/gateway/internal/domain"
@@ -21,7 +22,6 @@ const (
 	SubjectUsersDelete = "users.delete"
 
 	// Registration requests
-
 	SubjectRegistrationRequestCreate  = "users.registration.create"
 	SubjectRegistrationRequestList    = "users.registration.list"
 	SubjectRegistrationRequestApprove = "users.registration.approve"
@@ -40,16 +40,17 @@ func NewNATSUserConnector(client *natsw.Client) *NATSUserConnector {
 	}
 }
 
-// usersResponse represents a generic NATS response from users service
-type usersResponse struct {
-	Success bool            `json:"success"`
-	Data    json.RawMessage `json:"data,omitempty"`
-	Error   string          `json:"error,omitempty"`
-}
-
 // ListUsers retrieves a list of users based on query parameters
 func (c *NATSUserConnector) ListUsers(ctx context.Context, query domain.ListUsersQuery) (*domain.ListUsersResponse, error) {
-	reqData, err := query.MarshalJSON()
+	// Convert domain query to dto request
+	req := &dto.ListUsersRequest{
+		Page:     query.Page,
+		PageSize: query.PageSize,
+		Search:   query.Search,
+		IsActive: query.IsActive,
+	}
+
+	reqData, err := easyjson.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal list users request: %w", err)
 	}
@@ -62,27 +63,37 @@ func (c *NATSUserConnector) ListUsers(ctx context.Context, query domain.ListUser
 		return nil, fmt.Errorf("failed to send list users request: %w", err)
 	}
 
-	var response usersResponse
-	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
+	var listResp dto.ListUsersResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &listResp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal list users response: %w", err)
 	}
 
-	if !response.Success {
-		return nil, fmt.Errorf("list users failed: %s", response.Error)
+	// Convert dto response to domain response
+	users := make([]domain.User, len(listResp.Users))
+	for i, u := range listResp.Users {
+		users[i] = domain.User{
+			ID:           u.ID,
+			Email:        u.Email,
+			Username:     u.Username,
+			FullName:     u.FullName,
+			RegisteredAt: u.CreatedAt,
+			LastLoginAt:  u.LastLoginAt,
+			IsActive:     u.IsActive,
+		}
 	}
 
-	var listResp domain.ListUsersResponse
-	if err := json.Unmarshal(response.Data, &listResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal list users data: %w", err)
-	}
-
-	return &listResp, nil
+	return &domain.ListUsersResponse{
+		Users:      users,
+		TotalCount: listResp.TotalCount,
+		Page:       listResp.Page,
+		PageSize:   listResp.PageSize,
+	}, nil
 }
 
 // GetUser retrieves a single user by ID
 func (c *NATSUserConnector) GetUser(ctx context.Context, id uuid.UUID) (*domain.GetUserResponse, error) {
-	req := domain.GetUserRequest{ID: id}
-	reqData, err := req.MarshalJSON()
+	req := &dto.GetUserRequest{ID: id}
+	reqData, err := easyjson.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal get user request: %w", err)
 	}
@@ -95,28 +106,30 @@ func (c *NATSUserConnector) GetUser(ctx context.Context, id uuid.UUID) (*domain.
 		return nil, fmt.Errorf("failed to send get user request: %w", err)
 	}
 
-	var response usersResponse
-	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
+	var getResp dto.GetUserResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &getResp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal get user response: %w", err)
 	}
 
-	if !response.Success {
-		return nil, fmt.Errorf("get user failed: %s", response.Error)
-	}
-
-	var getResp domain.GetUserResponse
-	if err := json.Unmarshal(response.Data, &getResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal get user data: %w", err)
-	}
-
-	return &getResp, nil
+	// Convert dto to domain
+	return &domain.GetUserResponse{
+		User: domain.User{
+			ID:           getResp.User.ID,
+			Email:        getResp.User.Email,
+			Username:     getResp.User.Username,
+			FullName:     getResp.User.FullName,
+			RegisteredAt: getResp.User.CreatedAt,
+			LastLoginAt:  getResp.User.LastLoginAt,
+			IsActive:     getResp.User.IsActive,
+		},
+	}, nil
 }
 
 // UpdateUser updates an existing user
 func (c *NATSUserConnector) UpdateUser(ctx context.Context, id uuid.UUID, req domain.UpdateUserRequest) (*domain.UpdateUserResponse, error) {
-	reqPayload := UpdateUserRequestWrapper{
+	dtoReq := &dto.UpdateUserRequest{
 		ID: id,
-		Updates: UpdateUserUpdates{
+		Updates: dto.UpdateUserPayload{
 			Email:    req.Email,
 			Username: req.Username,
 			FullName: req.FullName,
@@ -124,7 +137,7 @@ func (c *NATSUserConnector) UpdateUser(ctx context.Context, id uuid.UUID, req do
 		},
 	}
 
-	reqData, err := reqPayload.MarshalJSON()
+	reqData, err := easyjson.Marshal(dtoReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal update user request: %w", err)
 	}
@@ -137,27 +150,29 @@ func (c *NATSUserConnector) UpdateUser(ctx context.Context, id uuid.UUID, req do
 		return nil, fmt.Errorf("failed to send update user request: %w", err)
 	}
 
-	var response usersResponse
-	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
+	var updateResp dto.UpdateUserResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &updateResp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal update user response: %w", err)
 	}
 
-	if !response.Success {
-		return nil, fmt.Errorf("update user failed: %s", response.Error)
-	}
-
-	var updateResp domain.UpdateUserResponse
-	if err := json.Unmarshal(response.Data, &updateResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal update user data: %w", err)
-	}
-
-	return &updateResp, nil
+	// Convert dto to domain
+	return &domain.UpdateUserResponse{
+		User: domain.User{
+			ID:           updateResp.User.ID,
+			Email:        updateResp.User.Email,
+			Username:     updateResp.User.Username,
+			FullName:     updateResp.User.FullName,
+			RegisteredAt: updateResp.User.CreatedAt,
+			LastLoginAt:  updateResp.User.LastLoginAt,
+			IsActive:     updateResp.User.IsActive,
+		},
+	}, nil
 }
 
 // DeleteUser deletes a user by ID
 func (c *NATSUserConnector) DeleteUser(ctx context.Context, id uuid.UUID) error {
-	req := DeleteUserRequest{ID: id}
-	reqData, err := req.MarshalJSON()
+	req := &dto.DeleteUserRequest{ID: id}
+	reqData, err := easyjson.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("failed to marshal delete user request: %w", err)
 	}
@@ -170,13 +185,13 @@ func (c *NATSUserConnector) DeleteUser(ctx context.Context, id uuid.UUID) error 
 		return fmt.Errorf("failed to send delete user request: %w", err)
 	}
 
-	var response usersResponse
-	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
+	var delResp dto.DeleteUserResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &delResp); err != nil {
 		return fmt.Errorf("failed to unmarshal delete user response: %w", err)
 	}
 
-	if !response.Success {
-		return fmt.Errorf("delete user failed: %s", response.Error)
+	if !delResp.Success {
+		return fmt.Errorf("delete user failed")
 	}
 
 	return nil
@@ -184,7 +199,14 @@ func (c *NATSUserConnector) DeleteUser(ctx context.Context, id uuid.UUID) error 
 
 // CreateRegistrationRequest creates a new registration request
 func (c *NATSUserConnector) CreateRegistrationRequest(ctx context.Context, req domain.CreateRegistrationRequestRequest) (*domain.CreateRegistrationRequestResponse, error) {
-	reqData, err := req.MarshalJSON()
+	dtoReq := &dto.CreateRegistrationRequest{
+		Username: req.Username,
+		Email:    req.Email,
+		Password: req.Password,
+		Metadata: req.Metadata,
+	}
+
+	reqData, err := easyjson.Marshal(dtoReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal create registration request: %w", err)
 	}
@@ -197,26 +219,27 @@ func (c *NATSUserConnector) CreateRegistrationRequest(ctx context.Context, req d
 		return nil, fmt.Errorf("failed to send create registration request: %w", err)
 	}
 
-	var response usersResponse
-	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
+	var createResp dto.CreateRegistrationResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &createResp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal create registration response: %w", err)
 	}
 
-	if !response.Success {
-		return nil, fmt.Errorf("create registration request failed: %s", response.Error)
-	}
-
-	var createResp domain.CreateRegistrationRequestResponse
-	if err := json.Unmarshal(response.Data, &createResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal create registration data: %w", err)
-	}
-
-	return &createResp, nil
+	return &domain.CreateRegistrationRequestResponse{
+		RequestID: createResp.RequestID,
+		Status:    createResp.Status,
+		Message:   createResp.Message,
+	}, nil
 }
 
 // ListRegistrationRequests retrieves a list of registration requests
 func (c *NATSUserConnector) ListRegistrationRequests(ctx context.Context, query domain.ListRegistrationRequestsQuery) (*domain.ListRegistrationRequestsResponse, error) {
-	reqData, err := query.MarshalJSON()
+	dtoReq := &dto.ListRegistrationsRequest{
+		Page:     query.Page,
+		PageSize: query.PageSize,
+		Status:   dto.RegistrationStatus(query.Status),
+	}
+
+	reqData, err := easyjson.Marshal(dtoReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal list registration requests: %w", err)
 	}
@@ -229,31 +252,43 @@ func (c *NATSUserConnector) ListRegistrationRequests(ctx context.Context, query 
 		return nil, fmt.Errorf("failed to send list registration requests: %w", err)
 	}
 
-	var response usersResponse
-	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
+	var listResp dto.ListRegistrationsResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &listResp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal list registration response: %w", err)
 	}
 
-	if !response.Success {
-		return nil, fmt.Errorf("list registration requests failed: %s", response.Error)
+	// Convert dto to domain
+	requests := make([]domain.RegistrationRequest, len(listResp.Requests))
+	for i, r := range listResp.Requests {
+		requests[i] = domain.RegistrationRequest{
+			ID:         r.ID,
+			Username:   r.Username,
+			Email:      r.Email,
+			Status:     domain.RegistrationStatus(r.Status),
+			Metadata:   r.Metadata,
+			CreatedAt:  r.CreatedAt,
+			UpdatedAt:  r.UpdatedAt,
+			ApprovedBy: r.ApprovedBy,
+			ApprovedAt: r.ApprovedAt,
+		}
 	}
 
-	var listResp domain.ListRegistrationRequestsResponse
-	if err := json.Unmarshal(response.Data, &listResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal list registration data: %w", err)
-	}
-
-	return &listResp, nil
+	return &domain.ListRegistrationRequestsResponse{
+		Requests:   requests,
+		TotalCount: listResp.TotalCount,
+		Page:       listResp.Page,
+		PageSize:   listResp.PageSize,
+	}, nil
 }
 
 // ApproveRegistrationRequest approves a registration request
 func (c *NATSUserConnector) ApproveRegistrationRequest(ctx context.Context, requestID, approverID uuid.UUID) (*domain.ApproveRegistrationRequestResponse, error) {
-	req := ApproveRegistrationRequest{
+	dtoReq := &dto.ApproveRegistrationRequest{
 		RequestID:  requestID,
 		ApproverID: approverID,
 	}
 
-	reqData, err := req.MarshalJSON()
+	reqData, err := easyjson.Marshal(dtoReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal approve request: %w", err)
 	}
@@ -266,32 +301,41 @@ func (c *NATSUserConnector) ApproveRegistrationRequest(ctx context.Context, requ
 		return nil, fmt.Errorf("failed to send approve request: %w", err)
 	}
 
-	var response usersResponse
-	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
+	var approveResp dto.ApproveRegistrationResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &approveResp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal approve response: %w", err)
 	}
 
-	if !response.Success {
-		return nil, fmt.Errorf("approve registration request failed: %s", response.Error)
+	// Convert user if present
+	var user *domain.User
+	if approveResp.User != nil {
+		user = &domain.User{
+			ID:           approveResp.User.ID,
+			Email:        approveResp.User.Email,
+			Username:     approveResp.User.Username,
+			FullName:     approveResp.User.FullName,
+			RegisteredAt: approveResp.User.CreatedAt,
+			LastLoginAt:  approveResp.User.LastLoginAt,
+			IsActive:     approveResp.User.IsActive,
+		}
 	}
 
-	var approveResp domain.ApproveRegistrationRequestResponse
-	if err := json.Unmarshal(response.Data, &approveResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal approve data: %w", err)
-	}
-
-	return &approveResp, nil
+	return &domain.ApproveRegistrationRequestResponse{
+		Success: approveResp.Success,
+		Message: approveResp.Message,
+		User:    user,
+	}, nil
 }
 
 // RejectRegistrationRequest rejects a registration request
 func (c *NATSUserConnector) RejectRegistrationRequest(ctx context.Context, requestID, approverID uuid.UUID, reason string) (*domain.RejectRegistrationRequestResponse, error) {
-	req := RejectRegistrationRequest{
+	dtoReq := &dto.RejectRegistrationRequest{
 		RequestID:  requestID,
 		ApproverID: approverID,
 		Reason:     reason,
 	}
 
-	reqData, err := req.MarshalJSON()
+	reqData, err := easyjson.Marshal(dtoReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal reject request: %w", err)
 	}
@@ -304,19 +348,13 @@ func (c *NATSUserConnector) RejectRegistrationRequest(ctx context.Context, reque
 		return nil, fmt.Errorf("failed to send reject request: %w", err)
 	}
 
-	var response usersResponse
-	if err := json.Unmarshal(respMsg.Data, &response); err != nil {
+	var rejectResp dto.RejectRegistrationResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &rejectResp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal reject response: %w", err)
 	}
 
-	if !response.Success {
-		return nil, fmt.Errorf("reject registration request failed: %s", response.Error)
-	}
-
-	var rejectResp domain.RejectRegistrationRequestResponse
-	if err := json.Unmarshal(response.Data, &rejectResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal reject data: %w", err)
-	}
-
-	return &rejectResp, nil
+	return &domain.RejectRegistrationRequestResponse{
+		Success: rejectResp.Success,
+		Message: rejectResp.Message,
+	}, nil
 }

@@ -67,6 +67,7 @@ func New(cfg *config.HTTPConfig, documentConnector DocumentServiceConnector, aut
 
 	// Setup routes
 	s.setupPublicRoutes()
+	s.setupCookieAuthRoutes()
 	s.setupProtectedRoutes()
 
 	return s
@@ -83,15 +84,25 @@ func (s *Server) setupPublicRoutes() {
 	registrationRequests.Post("/", s.createRegistrationRequest)
 }
 
+// setupCookieAuthRoutes sets up routes that work with cookie-based refresh flow
+// These endpoints allow authentication via refresh token in cookies
+func (s *Server) setupCookieAuthRoutes() {
+	// Apply cookie auth middleware - allows both access token headers and refresh token cookies
+	cookieProtected := s.router.Group("", s.cookieAuthMiddleware())
+
+	// Auth refresh endpoint - works with cookies when access token is expired
+	auth := cookieProtected.Group("/api/v1/auth")
+	auth.Post("/refresh", s.refreshToken)
+	auth.Post("/validate", s.validateToken)
+}
+
 // setupProtectedRoutes sets up protected routes that require authentication
 func (s *Server) setupProtectedRoutes() {
 	// Apply auth middleware to all protected routes
 	protected := s.router.Group("", s.authMiddleware())
 
-	// Auth routes (except login)
+	// Auth routes (except login and refresh)
 	auth := protected.Group("/api/v1/auth")
-	auth.Post("/refresh", s.refreshToken)
-	auth.Post("/validate", s.validateToken)
 	auth.Post("/logout", s.logout)
 	auth.Post("/logout-all", s.logoutAll)
 	auth.Post("/change-password", s.changePassword)
