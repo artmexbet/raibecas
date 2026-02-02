@@ -52,7 +52,16 @@ type ListUsersRequest struct {
 func (h *Handler) HandleListUsers(msg *natsw.Message) error {
 	var req ListUsersRequest
 	if err := msg.UnmarshalData(&req); err != nil {
+		slog.ErrorContext(msg.Ctx, "invalid list users request", "error", err)
 		return h.respondError(msg, "invalid_request")
+	}
+
+	// Validate pagination
+	if req.Page < 1 {
+		req.Page = 1
+	}
+	if req.PageSize <= 0 || req.PageSize > 100 {
+		req.PageSize = 10
 	}
 
 	limit := req.PageSize
@@ -65,7 +74,7 @@ func (h *Handler) HandleListUsers(msg *natsw.Message) error {
 		IsActive: req.IsActive,
 	})
 	if err != nil {
-		slog.Error("failed to list users", "error", err)
+		slog.ErrorContext(msg.Ctx, "failed to list users", "error", err)
 		return h.respondError(msg, "internal_error")
 	}
 
@@ -85,15 +94,17 @@ type GetUserRequest struct {
 func (h *Handler) HandleGetUser(msg *natsw.Message) error {
 	var req GetUserRequest
 	if err := msg.UnmarshalData(&req); err != nil {
+		slog.ErrorContext(msg.Ctx, "invalid get user request", "error", err)
 		return h.respondError(msg, "invalid_request")
 	}
 
 	user, err := h.service.GetUserByID(msg.Ctx, req.ID)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
+			slog.DebugContext(msg.Ctx, "user not found", "user_id", req.ID)
 			return h.respondError(msg, "not_found")
 		}
-		slog.Error("failed to get user", "error", err)
+		slog.ErrorContext(msg.Ctx, "failed to get user", "user_id", req.ID, "error", err)
 		return h.respondError(msg, "internal_error")
 	}
 
@@ -119,6 +130,7 @@ type UpdateUserRequest struct {
 func (h *Handler) HandleUpdateUser(msg *natsw.Message) error {
 	var req UpdateUserRequest
 	if err := msg.UnmarshalData(&req); err != nil {
+		slog.ErrorContext(msg.Ctx, "invalid update user request", "error", err)
 		return h.respondError(msg, "invalid_request")
 	}
 
@@ -131,9 +143,10 @@ func (h *Handler) HandleUpdateUser(msg *natsw.Message) error {
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
+			slog.DebugContext(msg.Ctx, "user not found", "user_id", req.ID)
 			return h.respondError(msg, "not_found")
 		}
-		slog.Error("failed to update user", "error", err)
+		slog.ErrorContext(msg.Ctx, "failed to update user", "user_id", req.ID, "error", err)
 		return h.respondError(msg, "internal_error")
 	}
 
@@ -150,14 +163,13 @@ type DeleteUserRequest struct {
 func (h *Handler) HandleDeleteUser(msg *natsw.Message) error {
 	var req DeleteUserRequest
 	if err := msg.UnmarshalData(&req); err != nil {
+		slog.ErrorContext(msg.Ctx, "invalid delete user request", "error", err)
 		return h.respondError(msg, "invalid_request")
 	}
 
 	err := h.service.DeleteUser(msg.Ctx, req.ID)
 	if err != nil {
-		// If using postgres error checking for row not found, might need to wrap in service
-		// But delete usually returns nil if deleted or error.
-		slog.Error("failed to delete user", "error", err)
+		slog.ErrorContext(msg.Ctx, "failed to delete user", "user_id", req.ID, "error", err)
 		return h.respondError(msg, "internal_error")
 	}
 
@@ -177,6 +189,13 @@ type CreateRegistrationRequest struct {
 func (h *Handler) HandleCreateRegistration(msg *natsw.Message) error {
 	var req CreateRegistrationRequest
 	if err := msg.UnmarshalData(&req); err != nil {
+		slog.ErrorContext(msg.Ctx, "invalid create registration request", "error", err)
+		return h.respondError(msg, "invalid_request")
+	}
+
+	// Validate required fields
+	if req.Email == "" || req.Username == "" || req.Password == "" {
+		slog.DebugContext(msg.Ctx, "missing required registration fields")
 		return h.respondError(msg, "invalid_request")
 	}
 
@@ -189,7 +208,7 @@ func (h *Handler) HandleCreateRegistration(msg *natsw.Message) error {
 
 	createdReq, err := h.service.CreateRegistrationRequest(msg.Ctx, newReq)
 	if err != nil {
-		slog.Error("failed to create registration request", "error", err)
+		slog.ErrorContext(msg.Ctx, "failed to create registration request", "email", req.Email, "error", err)
 		return h.respondError(msg, "internal_error")
 	}
 
@@ -210,7 +229,16 @@ type ListRegistrationsRequest struct {
 func (h *Handler) HandleListRegistrations(msg *natsw.Message) error {
 	var req ListRegistrationsRequest
 	if err := msg.UnmarshalData(&req); err != nil {
+		slog.ErrorContext(msg.Ctx, "invalid list registrations request", "error", err)
 		return h.respondError(msg, "invalid_request")
+	}
+
+	// Validate pagination
+	if req.Page < 1 {
+		req.Page = 1
+	}
+	if req.PageSize <= 0 || req.PageSize > 100 {
+		req.PageSize = 10
 	}
 
 	limit := req.PageSize
@@ -218,7 +246,7 @@ func (h *Handler) HandleListRegistrations(msg *natsw.Message) error {
 
 	reqs, total, err := h.service.ListRegistrationRequests(msg.Ctx, req.Status, limit, offset)
 	if err != nil {
-		slog.Error("failed to list registration requests", "error", err)
+		slog.ErrorContext(msg.Ctx, "failed to list registration requests", "error", err)
 		return h.respondError(msg, "internal_error")
 	}
 
@@ -239,15 +267,17 @@ type ApproveRegistrationRequest struct {
 func (h *Handler) HandleApproveRegistration(msg *natsw.Message) error {
 	var req ApproveRegistrationRequest
 	if err := msg.UnmarshalData(&req); err != nil {
+		slog.ErrorContext(msg.Ctx, "invalid approve registration request", "error", err)
 		return h.respondError(msg, "invalid_request")
 	}
 
 	user, err := h.service.ApproveRegistrationRequest(msg.Ctx, req.RequestID, req.ApproverID)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
+			slog.DebugContext(msg.Ctx, "registration request not found", "request_id", req.RequestID)
 			return h.respondError(msg, "not_found")
 		}
-		slog.Error("failed to approve registration request", "error", err)
+		slog.ErrorContext(msg.Ctx, "failed to approve registration request", "request_id", req.RequestID, "error", err)
 		return h.respondError(msg, "internal_error")
 	}
 
@@ -266,12 +296,13 @@ type RejectRegistrationRequest struct {
 func (h *Handler) HandleRejectRegistration(msg *natsw.Message) error {
 	var req RejectRegistrationRequest
 	if err := msg.UnmarshalData(&req); err != nil {
+		slog.ErrorContext(msg.Ctx, "invalid reject registration request", "error", err)
 		return h.respondError(msg, "invalid_request")
 	}
 
 	err := h.service.RejectRegistrationRequest(msg.Ctx, req.RequestID, req.ApproverID, req.Reason)
 	if err != nil {
-		slog.Error("failed to reject registration request", "error", err)
+		slog.ErrorContext(msg.Ctx, "failed to reject registration request", "request_id", req.RequestID, "error", err)
 		return h.respondError(msg, "internal_error")
 	}
 

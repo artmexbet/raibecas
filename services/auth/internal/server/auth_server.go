@@ -70,6 +70,12 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}
 
+	// Validate database connection
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
 	// Initialize Redis client
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     cfg.GetRedisAddr(),
@@ -81,7 +87,8 @@ func New(cfg *config.Config) (*App, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := redisClient.Ping(ctx).Err(); err != nil {
-		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
+		pool.Close()
+		return nil, fmt.Errorf("failed to connect to redis: %w", err)
 	}
 
 	// Initialize App connection
@@ -92,10 +99,12 @@ func New(cfg *config.Config) (*App, error) {
 		natsgo.ReconnectWait(cfg.NATS.ReconnectWait),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to App: %w", err)
+		pool.Close()
+		redisClient.Close()
+		return nil, fmt.Errorf("failed to connect to nats: %w", err)
 	}
 
-	// Create App wrapper client with middleware
+	// Create nats wrapper client with middleware
 	natsClient := natsw.NewClient(natsConn,
 		natsw.WithLogger(slog.Default()),
 		natsw.WithRecover(),
@@ -120,7 +129,7 @@ func New(cfg *config.Config) (*App, error) {
 	authService := service.NewAuthService(pgs, jwtManager)
 	regService := service.NewRegistrationService(pgs, pgs)
 
-	// Initialize App publisher and subscriber
+	// Initialize nats publisher and subscriber
 	publisher := nats.NewPublisher(natsConn)
 	subscriber := nats.NewSubscriber(natsConn, regService, publisher)
 

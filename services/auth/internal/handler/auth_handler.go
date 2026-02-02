@@ -49,6 +49,7 @@ func NewAuthHandler(authService AuthService, publisher EventPublisher) *AuthHand
 func (h *AuthHandler) HandleLogin(msg *natsw.Message) error {
 	var req LoginRequest
 	if err := msg.UnmarshalData(&req); err != nil {
+		slog.ErrorContext(msg.Ctx, "invalid login request format", "error", err)
 		return h.respondError(msg, "Invalid request format")
 	}
 
@@ -57,17 +58,22 @@ func (h *AuthHandler) HandleLogin(msg *natsw.Message) error {
 
 	result, err := h.authService.Login(ctx, loginReq)
 	if err != nil {
+		slog.ErrorContext(ctx, "login failed", "email", req.Email, "error", err)
 		return h.respondError(msg, fmt.Sprintf("cannot login: %v", err))
 	}
 
-	// Publish login event
-	_ = h.publisher.PublishUserLogin(ctx, domain.UserLoginEvent{
-		User:      result.User,
-		DeviceID:  req.DeviceID,
-		UserAgent: req.UserAgent,
-		IPAddress: req.IPAddress,
-		Timestamp: time.Now(),
-	})
+	// Publish login event asynchronously
+	go func() {
+		if err := h.publisher.PublishUserLogin(ctx, domain.UserLoginEvent{
+			User:      result.User,
+			DeviceID:  req.DeviceID,
+			UserAgent: req.UserAgent,
+			IPAddress: req.IPAddress,
+			Timestamp: time.Now(),
+		}); err != nil {
+			slog.ErrorContext(ctx, "failed to publish login event", "user_id", result.User.ID, "error", err)
+		}
+	}()
 
 	response := LoginResponse{
 		AccessToken:  result.AccessToken,
@@ -147,20 +153,26 @@ func (h *AuthHandler) HandleRefresh(msg *natsw.Message) error {
 func (h *AuthHandler) HandleLogout(msg *natsw.Message) error {
 	var req LogoutRequest
 	if err := msg.UnmarshalData(&req); err != nil {
+		slog.ErrorContext(msg.Ctx, "invalid logout request format", "error", err)
 		return h.respondError(msg, "Invalid request format")
 	}
 
 	ctx := msg.Ctx
 
 	if err := h.authService.Logout(ctx, req.TokenID, req.AccessTokenJTI); err != nil {
+		slog.ErrorContext(ctx, "logout failed", "user_id", req.UserID, "error", err)
 		return h.respondError(msg, fmt.Sprintf("Failed to logout: %v", err))
 	}
 
-	// Publish logout event
-	_ = h.publisher.PublishUserLogout(ctx, domain.UserLogoutEvent{
-		UserID:    req.UserID,
-		Timestamp: time.Now(),
-	})
+	// Publish logout event asynchronously
+	go func() {
+		if err := h.publisher.PublishUserLogout(ctx, domain.UserLogoutEvent{
+			UserID:    req.UserID,
+			Timestamp: time.Now(),
+		}); err != nil {
+			slog.ErrorContext(ctx, "failed to publish logout event", "user_id", req.UserID, "error", err)
+		}
+	}()
 
 	response := SuccessResponse{Message: "Logged out successfully"}
 	return h.respond(msg, response)
@@ -170,20 +182,26 @@ func (h *AuthHandler) HandleLogout(msg *natsw.Message) error {
 func (h *AuthHandler) HandleLogoutAll(msg *natsw.Message) error {
 	var req LogoutAllRequest
 	if err := msg.UnmarshalData(&req); err != nil {
+		slog.ErrorContext(msg.Ctx, "invalid logout_all request format", "error", err)
 		return h.respondError(msg, "Invalid request format")
 	}
 
 	ctx := msg.Ctx
 
 	if err := h.authService.LogoutAll(ctx, req.UserID); err != nil {
+		slog.ErrorContext(ctx, "logout_all failed", "user_id", req.UserID, "error", err)
 		return h.respondError(msg, "Failed to logout from all devices")
 	}
 
-	// Publish logout event
-	_ = h.publisher.PublishUserLogout(ctx, domain.UserLogoutEvent{
-		UserID:    req.UserID,
-		Timestamp: time.Now(),
-	})
+	// Publish logout event asynchronously
+	go func() {
+		if err := h.publisher.PublishUserLogout(ctx, domain.UserLogoutEvent{
+			UserID:    req.UserID,
+			Timestamp: time.Now(),
+		}); err != nil {
+			slog.ErrorContext(ctx, "failed to publish logout event", "user_id", req.UserID, "error", err)
+		}
+	}()
 
 	response := SuccessResponse{Message: "Logged out from all devices successfully"}
 	return h.respond(msg, response)
@@ -193,6 +211,7 @@ func (h *AuthHandler) HandleLogoutAll(msg *natsw.Message) error {
 func (h *AuthHandler) HandleChangePassword(msg *natsw.Message) error {
 	var req ChangePasswordRequest
 	if err := msg.UnmarshalData(&req); err != nil {
+		slog.ErrorContext(msg.Ctx, "invalid change password request format", "error", err)
 		return h.respondError(msg, "Invalid request format")
 	}
 
@@ -200,15 +219,20 @@ func (h *AuthHandler) HandleChangePassword(msg *natsw.Message) error {
 	changeReq := req.ToDomain()
 
 	if err := h.authService.ChangePassword(ctx, changeReq); err != nil {
+		slog.ErrorContext(ctx, "change password failed", "user_id", req.UserID, "error", err)
 		return h.respondError(msg, err.Error())
 	}
 
-	// Publish password reset event
-	_ = h.publisher.PublishPasswordReset(ctx, domain.PasswordResetEvent{
-		UserID:    req.UserID,
-		Method:    "self-service",
-		Timestamp: time.Now(),
-	})
+	// Publish password reset event asynchronously
+	go func() {
+		if err := h.publisher.PublishPasswordReset(ctx, domain.PasswordResetEvent{
+			UserID:    req.UserID,
+			Method:    "self-service",
+			Timestamp: time.Now(),
+		}); err != nil {
+			slog.ErrorContext(ctx, "failed to publish password reset event", "user_id", req.UserID, "error", err)
+		}
+	}()
 
 	response := SuccessResponse{Message: "Password changed successfully"}
 	return h.respond(msg, response)

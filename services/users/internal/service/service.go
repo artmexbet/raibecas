@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -11,10 +11,7 @@ import (
 	"github.com/artmexbet/raibecas/services/users/internal/postgres"
 )
 
-var (
-	ErrNotFound      = errors.New("not found")
-	ErrInvalidStatus = errors.New("invalid status")
-)
+// Errors are defined in errors.go
 
 // Metrics defines the interface for business metrics collection
 type Metrics interface {
@@ -36,19 +33,33 @@ func New(repo *postgres.Postgres, metrics Metrics) *Service {
 // User methods
 
 func (s *Service) ListUsers(ctx context.Context, params postgres.ListUsersParams) ([]domain.User, int, error) {
+	// Validate and normalize parameters
 	if params.Limit > 100 {
 		params.Limit = 100
 	}
 	if params.Limit <= 0 {
 		params.Limit = 10
 	}
-	return s.repo.ListUsers(ctx, params)
+	if params.Offset < 0 {
+		params.Offset = 0
+	}
+
+	users, total, err := s.repo.ListUsers(ctx, params)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list users: %w", err)
+	}
+
+	return users, total, nil
 }
 
 func (s *Service) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
+	if id == uuid.Nil {
+		return nil, ErrInvalidUserID
+	}
+
 	u, err := s.repo.GetUserByID(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 	if u == nil {
 		return nil, ErrNotFound
@@ -57,9 +68,13 @@ func (s *Service) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, 
 }
 
 func (s *Service) UpdateUser(ctx context.Context, params postgres.UpdateUserParams) (*domain.User, error) {
+	if params.ID == uuid.Nil {
+		return nil, ErrInvalidUserID
+	}
+
 	u, err := s.repo.UpdateUser(ctx, params)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
 	if u == nil {
 		return nil, ErrNotFound
@@ -68,45 +83,84 @@ func (s *Service) UpdateUser(ctx context.Context, params postgres.UpdateUserPara
 }
 
 func (s *Service) DeleteUser(ctx context.Context, id uuid.UUID) error {
-	return s.repo.DeleteUser(ctx, id)
+	if id == uuid.Nil {
+		return ErrInvalidUserID
+	}
+
+	if err := s.repo.DeleteUser(ctx, id); err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+	return nil
 }
 
 // Registration Request methods
 
 func (s *Service) CreateRegistrationRequest(ctx context.Context, req *domain.RegistrationRequest) (*domain.RegistrationRequest, error) {
+	if req == nil {
+		return nil, ErrRegistrationRequestNil
+	}
+	if req.Email == "" || req.Username == "" || req.PasswordHash == "" {
+		return nil, ErrMissingRequiredFields
+	}
+
 	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.PasswordHash), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 	req.PasswordHash = string(hash)
 	req.Status = domain.RegistrationStatusPending
 
 	if err := s.repo.CreateRegistrationRequest(ctx, req); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create registration request: %w", err)
 	}
 	return req, nil
 }
 
 func (s *Service) ListRegistrationRequests(ctx context.Context, status domain.RegistrationStatus, limit, offset int) ([]domain.RegistrationRequest, int, error) {
+	// Validate and normalize parameters
 	if limit > 100 {
 		limit = 100
 	}
 	if limit <= 0 {
 		limit = 10
 	}
-	return s.repo.ListRegistrationRequests(ctx, status, limit, offset)
+	if offset < 0 {
+		offset = 0
+	}
+
+	reqs, total, err := s.repo.ListRegistrationRequests(ctx, status, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list registration requests: %w", err)
+	}
+
+	return reqs, total, nil
 }
 
 func (s *Service) ApproveRegistrationRequest(ctx context.Context, requestID uuid.UUID, approverID uuid.UUID) (*domain.User, error) {
+	if requestID == uuid.Nil || approverID == uuid.Nil {
+		return nil, ErrInvalidRequestOrApproverID
+	}
+
 	u, err := s.repo.ApproveRegistrationRequest(ctx, requestID, approverID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to approve registration request: %w", err)
 	}
+	if u == nil {
+		return nil, ErrNotFound
+	}
+
 	s.metrics.IncRegisteredUsers()
 	return u, nil
 }
 
 func (s *Service) RejectRegistrationRequest(ctx context.Context, requestID uuid.UUID, approverID uuid.UUID, reason string) error {
-	return s.repo.RejectRegistrationRequest(ctx, requestID, approverID, reason)
+	if requestID == uuid.Nil || approverID == uuid.Nil {
+		return ErrInvalidRequestOrApproverID
+	}
+
+	if err := s.repo.RejectRegistrationRequest(ctx, requestID, approverID, reason); err != nil {
+		return fmt.Errorf("failed to reject registration request: %w", err)
+	}
+	return nil
 }

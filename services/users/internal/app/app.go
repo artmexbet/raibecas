@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -42,23 +43,28 @@ type App struct {
 func New() (*App, error) {
 	cfg, err := config.Load()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
 	// Create tracer
 	tracer, err := initTracer()
 	if err != nil {
-		return nil, fmt.Errorf("failed to init tracer: %w", err)
+		return nil, fmt.Errorf("failed to initialize tracer: %w", err)
 	}
 
 	natsConn, err := nats.Connect(cfg.NATS.GetURL())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to nats: %w", err)
 	}
 
-	pg, err := postgres.New(context.Background(), cfg.Database)
+	// Create context for database initialization
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	pg, err := postgres.New(ctx, cfg.Database)
 	if err != nil {
-		return nil, err
+		natsConn.Close()
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
 	metrics := middleware.NewMetrics(prometheus.DefaultRegisterer)
@@ -87,7 +93,7 @@ func New() (*App, error) {
 func (a *App) Run() error {
 	err := a.server.Start()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to start server: %w", err)
 	}
 
 	metricsSrv := a.startMetricsServer()
@@ -127,7 +133,7 @@ func (a *App) startMetricsServer() *http.Server {
 
 	go func() {
 		slog.Info("starting metrics server", "addr", srv.Addr)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("metrics server failed", "error", err)
 		}
 	}()

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -201,7 +202,7 @@ func (s *AuthService) ChangePassword(ctx context.Context, req domain.ChangePassw
 	// Get user
 	user, err := s.userRepo.GetUserByID(ctx, req.UserID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get user: %w", err)
 	}
 
 	// Verify old password
@@ -220,8 +221,11 @@ func (s *AuthService) ChangePassword(ctx context.Context, req domain.ChangePassw
 		return fmt.Errorf("failed to update password: %w", err)
 	}
 
-	// Logout from all devices for security
-	_ = s.LogoutAll(ctx, req.UserID)
+	// Logout from all devices for security (don't block on error)
+	if err := s.LogoutAll(ctx, req.UserID); err != nil {
+		// Log but continue - password was successfully updated
+		slog.Warn("failed to logout all sessions after password change", "user_id", req.UserID, "error", err)
+	}
 
 	return nil
 }
