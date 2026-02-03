@@ -4,6 +4,13 @@ INSERT INTO users (username, email, password_hash
     $1, $2, $3
 ) RETURNING *;
 
+-- name: CreateUserWithID :one
+INSERT INTO users (id, username, email, password_hash
+) VALUES (
+    $1, $2, $3, $4
+) ON CONFLICT (id) DO NOTHING
+RETURNING *;
+
 -- name: GetUserByID :one
 SELECT * FROM users WHERE id = $1 LIMIT 1;
 

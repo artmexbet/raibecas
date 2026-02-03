@@ -19,14 +19,36 @@ func (p *Postgres) CreateUser(ctx context.Context, user *domain.User) error {
 	defer tx.Rollback(ctx) //nolint:errcheck // safe to ignore
 
 	q := p.q.WithTx(tx)
-	_, err = q.CreateUser(ctx, queries.CreateUserParams{
-		Username:     user.Username,
-		Email:        user.Email,
-		PasswordHash: user.PasswordHash,
-	})
-	if err != nil {
-		return err
+
+	// If user.ID is provided, use CreateUserWithID for idempotency
+	if user.ID != uuid.Nil {
+		// Check if user already exists
+		exists, err := q.UserExistsByEmail(ctx, user.Email)
+		if err != nil || exists {
+			return err
+		}
+
+		_, err = q.CreateUserWithID(ctx, queries.CreateUserWithIDParams{
+			ID:           user.ID,
+			Username:     user.Username,
+			Email:        user.Email,
+			PasswordHash: user.PasswordHash,
+		})
+		if err != nil {
+			return err
+		}
+	} else {
+		// Generate new ID
+		_, err = q.CreateUser(ctx, queries.CreateUserParams{
+			Username:     user.Username,
+			Email:        user.Email,
+			PasswordHash: user.PasswordHash,
+		})
+		if err != nil {
+			return err
+		}
 	}
+
 	tx.Commit(ctx) //nolint:errcheck // safe to ignore
 	return nil
 }

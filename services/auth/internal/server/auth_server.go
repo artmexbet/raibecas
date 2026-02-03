@@ -19,6 +19,7 @@ import (
 	"github.com/artmexbet/raibecas/libs/telemetry"
 
 	"github.com/artmexbet/raibecas/services/auth/internal/config"
+	"github.com/artmexbet/raibecas/services/auth/internal/consumer"
 	"github.com/artmexbet/raibecas/services/auth/internal/handler"
 	natspkg "github.com/artmexbet/raibecas/services/auth/internal/nats"
 	"github.com/artmexbet/raibecas/services/auth/internal/postgres"
@@ -34,6 +35,7 @@ type App struct {
 	redis          *redis.Client
 	natsClient     *natsw.Client
 	subscriber     *natspkg.Subscriber
+	userConsumer   *consumer.UserConsumer
 	subscriptions  []*natsgo.Subscription
 	tracerProvider *sdktrace.TracerProvider
 }
@@ -146,6 +148,9 @@ func New(cfg *config.Config) (*App, error) {
 	publisher := natspkg.NewPublisher(natsConn)
 	subscriber := natspkg.NewSubscriber(natsConn, regService, publisher)
 
+	// Initialize user consumer for outbox events
+	userConsumer := consumer.NewUserConsumer(pgs, slog.Default())
+
 	// Initialize App handlers
 	authHandler := handler.NewAuthHandler(authService, publisher)
 	regHandler := handler.NewRegistrationHandler(regService, publisher)
@@ -157,6 +162,7 @@ func New(cfg *config.Config) (*App, error) {
 		redis:          redisClient,
 		natsClient:     natsClient,
 		subscriber:     subscriber,
+		userConsumer:   userConsumer,
 		subscriptions:  make([]*natsgo.Subscription, 0),
 		tracerProvider: tracerProvider,
 	}
@@ -164,6 +170,11 @@ func New(cfg *config.Config) (*App, error) {
 	// Subscribe to request/reply topics
 	if err := server.setupSubscriptions(authHandler, regHandler); err != nil {
 		return nil, fmt.Errorf("failed to setup subscriptions: %w", err)
+	}
+
+	// Subscribe to user registration events from users service
+	if err := userConsumer.Subscribe(natsClient); err != nil {
+		return nil, fmt.Errorf("failed to subscribe user consumer: %w", err)
 	}
 
 	// Start event subscriber (for admin approval/rejection events)

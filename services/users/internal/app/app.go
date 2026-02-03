@@ -22,18 +22,21 @@ import (
 	"github.com/artmexbet/raibecas/services/users/internal/config"
 	"github.com/artmexbet/raibecas/services/users/internal/handler"
 	"github.com/artmexbet/raibecas/services/users/internal/middleware"
+	natspublisher "github.com/artmexbet/raibecas/services/users/internal/nats"
+	"github.com/artmexbet/raibecas/services/users/internal/outbox"
 	"github.com/artmexbet/raibecas/services/users/internal/postgres"
 	"github.com/artmexbet/raibecas/services/users/internal/server"
 	"github.com/artmexbet/raibecas/services/users/internal/service"
 )
 
 type App struct {
-	server  server.Server
-	cfg     config.Config
-	pg      *postgres.Postgres
-	client  *natsw.Client
-	tracer  *trace.TracerProvider
-	metrics *middleware.Metrics
+	server          server.Server
+	cfg             config.Config
+	pg              *postgres.Postgres
+	client          *natsw.Client
+	tracer          *trace.TracerProvider
+	metrics         *middleware.Metrics
+	outboxProcessor *outbox.Processor
 }
 
 func New() (*App, error) {
@@ -88,13 +91,18 @@ func New() (*App, error) {
 
 	srv := server.New(client, h)
 
+	// Create outbox processor
+	publisher := natspublisher.NewPublisher(client)
+	outboxProcessor := outbox.NewProcessor(pg, publisher, slog.Default())
+
 	return &App{
-		server:  srv,
-		cfg:     cfg,
-		pg:      pg,
-		client:  client,
-		tracer:  tracer,
-		metrics: metrics,
+		server:          srv,
+		cfg:             cfg,
+		pg:              pg,
+		client:          client,
+		tracer:          tracer,
+		metrics:         metrics,
+		outboxProcessor: outboxProcessor,
 	}, nil
 }
 
@@ -109,10 +117,19 @@ func (a *App) Run() error {
 	metricsCtx, cancelMetrics := context.WithCancel(context.Background())
 	go a.runMetricCollectors(metricsCtx)
 
+	// Start outbox processor
+	outboxCtx, cancelOutbox := context.WithCancel(context.Background())
+	go func() {
+		if err := a.outboxProcessor.Start(outboxCtx); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("outbox processor error", "error", err)
+		}
+	}()
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 	cancelMetrics()
+	cancelOutbox()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

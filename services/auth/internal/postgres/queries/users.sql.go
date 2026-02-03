@@ -46,6 +46,49 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const createUserWithID = `-- name: CreateUserWithID :one
+INSERT INTO users (id, username, email, password_hash
+) VALUES (
+    $1, $2, $3, $4
+) ON CONFLICT (id) DO NOTHING
+RETURNING id, username, email, password_hash, role, is_active, created_at, updated_at
+`
+
+type CreateUserWithIDParams struct {
+	ID           uuid.UUID
+	Username     string
+	Email        string
+	PasswordHash string
+}
+
+// CreateUserWithID
+//
+//	INSERT INTO users (id, username, email, password_hash
+//	) VALUES (
+//	    $1, $2, $3, $4
+//	) ON CONFLICT (id) DO NOTHING
+//	RETURNING id, username, email, password_hash, role, is_active, created_at, updated_at
+func (q *Queries) CreateUserWithID(ctx context.Context, arg CreateUserWithIDParams) (User, error) {
+	row := q.db.QueryRow(ctx, createUserWithID,
+		arg.ID,
+		arg.Username,
+		arg.Email,
+		arg.PasswordHash,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, username, email, password_hash, role, is_active, created_at, updated_at FROM users WHERE email = $1 LIMIT 1
 `

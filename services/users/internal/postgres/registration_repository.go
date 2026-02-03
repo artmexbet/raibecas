@@ -149,6 +149,28 @@ func (p *Postgres) ApproveRegistrationRequest(ctx context.Context, requestID uui
 		return nil, fmt.Errorf("failed to update registration request status")
 	}
 
+	// Create outbox event for user registration
+	outboxEvent := &domain.OutboxEvent{
+		ID:            uuid.New(),
+		AggregateID:   u.ID,
+		AggregateType: domain.AggregateTypeUser,
+		EventType:     domain.EventTypeUserRegistered,
+		Payload: map[string]interface{}{
+			"user_id":       u.ID.String(),
+			"username":      req.Username,
+			"email":         req.Email,
+			"password_hash": req.PasswordHash,
+			"role":          "user",
+			"is_active":     true,
+		},
+		CreatedAt:  u.CreatedAt,
+		RetryCount: 0,
+	}
+
+	if err := p.CreateOutboxEvent(ctx, tx, outboxEvent); err != nil {
+		return nil, fmt.Errorf("failed to create outbox event: %w", err)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
