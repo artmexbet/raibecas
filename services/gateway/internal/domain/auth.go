@@ -94,7 +94,7 @@ type AuthServiceValidateRequest struct {
 // ValidateTokenResponse represents a token validation response
 type ValidateTokenResponse struct {
 	Valid  bool      `json:"valid"`
-	UserID uuid.UUID `json:"userId,omitempty"`
+	UserID uuid.UUID `json:"user_id,omitempty"`
 	Role   string    `json:"role,omitempty"`
 	JTI    string    `json:"jti,omitempty"`
 }

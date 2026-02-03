@@ -38,7 +38,7 @@ func New(cfg *config.HTTPConfig, documentConnector DocumentServiceConnector, aut
 		AllowOrigins:     "http://localhost:3000", // TODO: Configure specific origins in production
 		AllowCredentials: true,                    // Required for cookies
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Device-ID",
-		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
+		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS, PATCH",
 	}))
 
 	router.Use(requestid.New())
