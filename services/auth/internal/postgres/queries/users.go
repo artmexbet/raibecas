@@ -23,7 +23,7 @@ func FromDomainUser(user domain.User) User {
 		Username:     user.Username,
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
-		Role:         user.Role.String(),
+		Role:         RoleEnum(user.Role),
 		IsActive:     user.IsActive,
 		CreatedAt:    user.CreatedAt,
 		UpdatedAt:    user.UpdatedAt,

@@ -14,10 +14,10 @@ import (
 )
 
 type Handler struct {
-	service *service.Service
+	service ServiceInterface
 }
 
-func New(service *service.Service) *Handler {
+func New(service ServiceInterface) *Handler {
 	return &Handler{
 		service: service,
 	}
@@ -104,11 +104,20 @@ func (h *Handler) HandleUpdateUser(msg *natsw.Message) error {
 		return h.respondError(msg, dto.ErrCodeInvalidRequest)
 	}
 
+	// Validate role if provided
+	if req.Updates.Role != nil && *req.Updates.Role != "" {
+		if !domain.IsValidRole(*req.Updates.Role) {
+			slog.DebugContext(msg.Ctx, "invalid role", "role", req.Updates.Role)
+			return h.respondError(msg, dto.ErrCodeInvalidRequest)
+		}
+	}
+
 	user, err := h.service.UpdateUser(msg.Ctx, postgres.UpdateUserParams{
 		ID:       req.ID,
 		Email:    req.Updates.Email,
 		Username: req.Updates.Username,
 		FullName: req.Updates.FullName,
+		Role:     req.Updates.Role,
 		IsActive: req.Updates.IsActive,
 	})
 	if err != nil {
@@ -238,7 +247,13 @@ func (h *Handler) HandleApproveRegistration(msg *natsw.Message) error {
 		return h.respondError(msg, dto.ErrCodeInvalidRequest)
 	}
 
-	user, err := h.service.ApproveRegistrationRequest(msg.Ctx, req.RequestID, req.ApproverID)
+	// Validate role if provided
+	if req.Role != "" && !domain.IsValidRole(req.Role) {
+		slog.DebugContext(msg.Ctx, "invalid role", "role", req.Role)
+		return h.respondError(msg, dto.ErrCodeInvalidRequest)
+	}
+
+	user, err := h.service.ApproveRegistrationRequest(msg.Ctx, req.RequestID, req.ApproverID, req.Role)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			slog.DebugContext(msg.Ctx, "registration request not found", "request_id", req.RequestID)

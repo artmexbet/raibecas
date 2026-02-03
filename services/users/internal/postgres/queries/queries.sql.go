@@ -113,7 +113,7 @@ type CreateUserParams struct {
 	Email        string
 	PasswordHash string
 	FullName     *string
-	Role         string
+	Role         RoleEnum
 	IsActive     bool
 }
 
@@ -197,7 +197,7 @@ type GetUserByEmailRow struct {
 	Username    string
 	Email       string
 	FullName    *string
-	Role        string
+	Role        RoleEnum
 	IsActive    bool
 	CreatedAt   time.Time
 	LastLoginAt time.Time
@@ -237,7 +237,7 @@ type GetUserByIDRow struct {
 	Username    string
 	Email       string
 	FullName    *string
-	Role        string
+	Role        RoleEnum
 	IsActive    bool
 	CreatedAt   time.Time
 	LastLoginAt time.Time
@@ -355,7 +355,7 @@ type ListUsersRow struct {
 	Username    string
 	Email       string
 	FullName    *string
-	Role        string
+	Role        RoleEnum
 	IsActive    bool
 	CreatedAt   time.Time
 	LastLoginAt time.Time
@@ -456,7 +456,8 @@ SET
     email = COALESCE($2, email),
     username = COALESCE($3, username),
     full_name = COALESCE($4, full_name),
-    is_active = COALESCE($5, is_active),
+    role = COALESCE($5, role),
+    is_active = COALESCE($6, is_active),
     updated_at = NOW()
 WHERE id = $1
 RETURNING id, username, email, full_name, role, is_active, created_at, last_login_at, updated_at
@@ -467,6 +468,7 @@ type UpdateUserParams struct {
 	Email    *string
 	Username *string
 	FullName *string
+	Role     NullRoleEnum
 	IsActive *bool
 }
 
@@ -475,7 +477,7 @@ type UpdateUserRow struct {
 	Username    string
 	Email       string
 	FullName    *string
-	Role        string
+	Role        RoleEnum
 	IsActive    bool
 	CreatedAt   time.Time
 	LastLoginAt time.Time
@@ -489,7 +491,8 @@ type UpdateUserRow struct {
 //	    email = COALESCE($2, email),
 //	    username = COALESCE($3, username),
 //	    full_name = COALESCE($4, full_name),
-//	    is_active = COALESCE($5, is_active),
+//	    role = COALESCE($5, role),
+//	    is_active = COALESCE($6, is_active),
 //	    updated_at = NOW()
 //	WHERE id = $1
 //	RETURNING id, username, email, full_name, role, is_active, created_at, last_login_at, updated_at
@@ -499,6 +502,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (UpdateU
 		arg.Email,
 		arg.Username,
 		arg.FullName,
+		arg.Role,
 		arg.IsActive,
 	)
 	var i UpdateUserRow

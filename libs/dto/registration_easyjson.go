@@ -883,7 +883,11 @@ func easyjsonCec9433bDecodeGithubComArtmexbetRaibecasLibsDto7(in *jlexer.Lexer, 
 				if out.User == nil {
 					out.User = new(User)
 				}
-				easyjsonCec9433bDecodeGithubComArtmexbetRaibecasLibsDto8(in, out.User)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.User).UnmarshalEasyJSON(in)
+				}
 			}
 		default:
 			in.SkipRecursive()
@@ -912,7 +916,7 @@ func easyjsonCec9433bEncodeGithubComArtmexbetRaibecasLibsDto7(out *jwriter.Write
 	if in.User != nil {
 		const prefix string = ",\"user\":"
 		out.RawString(prefix)
-		easyjsonCec9433bEncodeGithubComArtmexbetRaibecasLibsDto8(out, *in.User)
+		(*in.User).MarshalEasyJSON(out)
 	}
 	out.RawByte('}')
 }
@@ -940,144 +944,7 @@ func (v *ApproveRegistrationResponse) UnmarshalJSON(data []byte) error {
 func (v *ApproveRegistrationResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjsonCec9433bDecodeGithubComArtmexbetRaibecasLibsDto7(l, v)
 }
-func easyjsonCec9433bDecodeGithubComArtmexbetRaibecasLibsDto8(in *jlexer.Lexer, out *User) {
-	isTopLevel := in.IsStart()
-	if in.IsNull() {
-		if isTopLevel {
-			in.Consumed()
-		}
-		in.Skip()
-		return
-	}
-	in.Delim('{')
-	for !in.IsDelim('}') {
-		key := in.UnsafeFieldName(false)
-		in.WantColon()
-		switch key {
-		case "id":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				if data := in.UnsafeBytes(); in.Ok() {
-					in.AddError((out.ID).UnmarshalText(data))
-				}
-			}
-		case "email":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				out.Email = string(in.String())
-			}
-		case "username":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				out.Username = string(in.String())
-			}
-		case "fullName":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				out.FullName = string(in.String())
-			}
-		case "role":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				out.Role = string(in.String())
-			}
-		case "isActive":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				out.IsActive = bool(in.Bool())
-			}
-		case "createdAt":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				if data := in.Raw(); in.Ok() {
-					in.AddError((out.CreatedAt).UnmarshalJSON(data))
-				}
-			}
-		case "lastLoginAt":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				if data := in.Raw(); in.Ok() {
-					in.AddError((out.LastLoginAt).UnmarshalJSON(data))
-				}
-			}
-		case "updatedAt":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				if data := in.Raw(); in.Ok() {
-					in.AddError((out.UpdatedAt).UnmarshalJSON(data))
-				}
-			}
-		default:
-			in.SkipRecursive()
-		}
-		in.WantComma()
-	}
-	in.Delim('}')
-	if isTopLevel {
-		in.Consumed()
-	}
-}
-func easyjsonCec9433bEncodeGithubComArtmexbetRaibecasLibsDto8(out *jwriter.Writer, in User) {
-	out.RawByte('{')
-	first := true
-	_ = first
-	{
-		const prefix string = ",\"id\":"
-		out.RawString(prefix[1:])
-		out.RawText((in.ID).MarshalText())
-	}
-	{
-		const prefix string = ",\"email\":"
-		out.RawString(prefix)
-		out.String(string(in.Email))
-	}
-	{
-		const prefix string = ",\"username\":"
-		out.RawString(prefix)
-		out.String(string(in.Username))
-	}
-	{
-		const prefix string = ",\"fullName\":"
-		out.RawString(prefix)
-		out.String(string(in.FullName))
-	}
-	{
-		const prefix string = ",\"role\":"
-		out.RawString(prefix)
-		out.String(string(in.Role))
-	}
-	{
-		const prefix string = ",\"isActive\":"
-		out.RawString(prefix)
-		out.Bool(bool(in.IsActive))
-	}
-	{
-		const prefix string = ",\"createdAt\":"
-		out.RawString(prefix)
-		out.Raw((in.CreatedAt).MarshalJSON())
-	}
-	{
-		const prefix string = ",\"lastLoginAt\":"
-		out.RawString(prefix)
-		out.Raw((in.LastLoginAt).MarshalJSON())
-	}
-	{
-		const prefix string = ",\"updatedAt\":"
-		out.RawString(prefix)
-		out.Raw((in.UpdatedAt).MarshalJSON())
-	}
-	out.RawByte('}')
-}
-func easyjsonCec9433bDecodeGithubComArtmexbetRaibecasLibsDto9(in *jlexer.Lexer, out *ApproveRegistrationRequest) {
+func easyjsonCec9433bDecodeGithubComArtmexbetRaibecasLibsDto8(in *jlexer.Lexer, out *ApproveRegistrationRequest) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1107,6 +974,12 @@ func easyjsonCec9433bDecodeGithubComArtmexbetRaibecasLibsDto9(in *jlexer.Lexer, 
 					in.AddError((out.ApproverID).UnmarshalText(data))
 				}
 			}
+		case "role":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Role = string(in.String())
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -1117,7 +990,7 @@ func easyjsonCec9433bDecodeGithubComArtmexbetRaibecasLibsDto9(in *jlexer.Lexer, 
 		in.Consumed()
 	}
 }
-func easyjsonCec9433bEncodeGithubComArtmexbetRaibecasLibsDto9(out *jwriter.Writer, in ApproveRegistrationRequest) {
+func easyjsonCec9433bEncodeGithubComArtmexbetRaibecasLibsDto8(out *jwriter.Writer, in ApproveRegistrationRequest) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1131,29 +1004,34 @@ func easyjsonCec9433bEncodeGithubComArtmexbetRaibecasLibsDto9(out *jwriter.Write
 		out.RawString(prefix)
 		out.RawText((in.ApproverID).MarshalText())
 	}
+	{
+		const prefix string = ",\"role\":"
+		out.RawString(prefix)
+		out.String(string(in.Role))
+	}
 	out.RawByte('}')
 }
 
 // MarshalJSON supports json.Marshaler interface
 func (v ApproveRegistrationRequest) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonCec9433bEncodeGithubComArtmexbetRaibecasLibsDto9(&w, v)
+	easyjsonCec9433bEncodeGithubComArtmexbetRaibecasLibsDto8(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v ApproveRegistrationRequest) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonCec9433bEncodeGithubComArtmexbetRaibecasLibsDto9(w, v)
+	easyjsonCec9433bEncodeGithubComArtmexbetRaibecasLibsDto8(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *ApproveRegistrationRequest) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonCec9433bDecodeGithubComArtmexbetRaibecasLibsDto9(&r, v)
+	easyjsonCec9433bDecodeGithubComArtmexbetRaibecasLibsDto8(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *ApproveRegistrationRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonCec9433bDecodeGithubComArtmexbetRaibecasLibsDto9(l, v)
+	easyjsonCec9433bDecodeGithubComArtmexbetRaibecasLibsDto8(l, v)
 }

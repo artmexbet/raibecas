@@ -106,7 +106,15 @@ func (p *Postgres) RejectRegistrationRequest(ctx context.Context, id uuid.UUID, 
 	return nil
 }
 
-func (p *Postgres) ApproveRegistrationRequest(ctx context.Context, requestID uuid.UUID, approverID uuid.UUID) (*domain.User, error) {
+func (p *Postgres) ApproveRegistrationRequest(ctx context.Context, requestID uuid.UUID, approverID uuid.UUID, role string) (*domain.User, error) {
+	// Validate role
+	if role == "" {
+		role = domain.RoleUser // Default role
+	}
+	if !domain.IsValidRole(role) {
+		return nil, fmt.Errorf("invalid role: %s", role)
+	}
+
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -129,7 +137,7 @@ func (p *Postgres) ApproveRegistrationRequest(ctx context.Context, requestID uui
 		Username:     req.Username,
 		Email:        req.Email,
 		PasswordHash: req.PasswordHash,
-		Role:         "user",
+		Role:         queries.RoleEnum(role),
 		IsActive:     true,
 		FullName:     &fullName,
 	})
@@ -160,7 +168,7 @@ func (p *Postgres) ApproveRegistrationRequest(ctx context.Context, requestID uui
 			"username":      req.Username,
 			"email":         req.Email,
 			"password_hash": req.PasswordHash,
-			"role":          "user",
+			"role":          role,
 			"is_active":     true,
 		},
 		CreatedAt:  u.CreatedAt,
@@ -180,11 +188,10 @@ func (p *Postgres) ApproveRegistrationRequest(ctx context.Context, requestID uui
 		Username:  req.Username,
 		Email:     req.Email,
 		FullName:  fullName,
-		Role:      "user",
+		Role:      role,
 		IsActive:  true,
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
-		// LastLoginAt is not checked here, maybe default or same as created?
 	}, nil
 }
 

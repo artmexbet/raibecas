@@ -72,6 +72,7 @@ type UpdateUserPayload struct {
 	Email    *string `json:"email,omitempty"`
 	Username *string `json:"username,omitempty"`
 	FullName *string `json:"fullName,omitempty"`
+	Role     *string `json:"role,omitempty"`
 	IsActive *bool   `json:"isActive,omitempty"`
 }
 

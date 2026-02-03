@@ -39,6 +39,7 @@ SET
     email = COALESCE(sqlc.narg('email'), email),
     username = COALESCE(sqlc.narg('username'), username),
     full_name = COALESCE(sqlc.narg('full_name'), full_name),
+    role = COALESCE(sqlc.narg('role'), role),
     is_active = COALESCE(sqlc.narg('is_active'), is_active),
     updated_at = NOW()
 WHERE id = $1

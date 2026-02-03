@@ -76,6 +76,7 @@ type ListRegistrationsResponse struct {
 type ApproveRegistrationRequest struct {
 	RequestID  uuid.UUID `json:"requestId"`
 	ApproverID uuid.UUID `json:"approverId"`
+	Role       string    `json:"role"`
 }
 
 // ApproveRegistrationResponse represents a response after approving

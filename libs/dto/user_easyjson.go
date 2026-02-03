@@ -377,6 +377,20 @@ func easyjson9e1087fdDecodeGithubComArtmexbetRaibecasLibsDto3(in *jlexer.Lexer, 
 					*out.FullName = string(in.String())
 				}
 			}
+		case "role":
+			if in.IsNull() {
+				in.Skip()
+				out.Role = nil
+			} else {
+				if out.Role == nil {
+					out.Role = new(string)
+				}
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					*out.Role = string(in.String())
+				}
+			}
 		case "isActive":
 			if in.IsNull() {
 				in.Skip()
@@ -430,6 +444,16 @@ func easyjson9e1087fdEncodeGithubComArtmexbetRaibecasLibsDto3(out *jwriter.Write
 			out.RawString(prefix)
 		}
 		out.String(string(*in.FullName))
+	}
+	if in.Role != nil {
+		const prefix string = ",\"role\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(*in.Role))
 	}
 	if in.IsActive != nil {
 		const prefix string = ",\"isActive\":"

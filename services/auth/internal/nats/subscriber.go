@@ -15,7 +15,7 @@ import (
 )
 
 type IRegistrationService interface {
-	ApproveRegistration(context.Context, uuid.UUID, uuid.UUID) (*domain.User, error)
+	ApproveRegistration(context.Context, uuid.UUID, uuid.UUID, string) (*domain.User, error)
 	RejectRegistration(context.Context, uuid.UUID, uuid.UUID) error
 }
 
@@ -46,6 +46,7 @@ func NewSubscriber(conn *nats.Conn, regService IRegistrationService, publisher E
 type RegistrationApprovedEvent struct {
 	RequestID  uuid.UUID `json:"request_id"`
 	ApproverID uuid.UUID `json:"approver_id"`
+	Role       string    `json:"role"`
 }
 
 // RegistrationRejectedEvent represents a registration rejection event from admin service
@@ -96,15 +97,16 @@ func (s *Subscriber) handleRegistrationApproved(msg *natsw.Message) error {
 	// Используем контекст из сообщения (содержит trace context)
 	ctx := msg.Ctx
 
-	// Approve registration and create user
-	user, err := s.regService.ApproveRegistration(ctx, event.RequestID, event.ApproverID)
+	// Approve registration and create user with specified role
+	user, err := s.regService.ApproveRegistration(ctx, event.RequestID, event.ApproverID, event.Role)
 	if err != nil {
 		return fmt.Errorf("failed to approve registration: %w", err)
 	}
 
 	slog.InfoContext(ctx, "Registration approved, user created",
 		"request_id", event.RequestID,
-		"user_id", user.ID)
+		"user_id", user.ID,
+		"role", user.Role)
 
 	// Publish user registered event with complete user data
 	if err := s.publisher.PublishUserRegistered(ctx, domain.UserRegisteredEvent{

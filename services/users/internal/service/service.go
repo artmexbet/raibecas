@@ -13,20 +13,24 @@ import (
 
 // Errors are defined in errors.go
 
-// Metrics defines the interface for business metrics collection
-type Metrics interface {
-	IncRegisteredUsers()
-}
-
 type Service struct {
-	repo    *postgres.Postgres
-	metrics Metrics
+	userRepo   UserRepository
+	regRepo    RegistrationRepository
+	outboxRepo OutboxRepository
+	metrics    Metrics
 }
 
-func New(repo *postgres.Postgres, metrics Metrics) *Service {
+func New(
+	userRepo UserRepository,
+	regRepo RegistrationRepository,
+	outboxRepo OutboxRepository,
+	metrics Metrics,
+) *Service {
 	return &Service{
-		repo:    repo,
-		metrics: metrics,
+		userRepo:   userRepo,
+		regRepo:    regRepo,
+		outboxRepo: outboxRepo,
+		metrics:    metrics,
 	}
 }
 
@@ -44,7 +48,7 @@ func (s *Service) ListUsers(ctx context.Context, params postgres.ListUsersParams
 		params.Offset = 0
 	}
 
-	users, total, err := s.repo.ListUsers(ctx, params)
+	users, total, err := s.userRepo.ListUsers(ctx, params)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list users: %w", err)
 	}
@@ -57,7 +61,7 @@ func (s *Service) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, 
 		return nil, ErrInvalidUserID
 	}
 
-	u, err := s.repo.GetUserByID(ctx, id)
+	u, err := s.userRepo.GetUserByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
@@ -72,7 +76,14 @@ func (s *Service) UpdateUser(ctx context.Context, params postgres.UpdateUserPara
 		return nil, ErrInvalidUserID
 	}
 
-	u, err := s.repo.UpdateUser(ctx, params)
+	// Validate role if provided
+	if params.Role != nil && *params.Role != "" {
+		if !domain.IsValidRole(*params.Role) {
+			return nil, fmt.Errorf("invalid role: %s", *params.Role)
+		}
+	}
+
+	u, err := s.userRepo.UpdateUser(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
@@ -87,7 +98,7 @@ func (s *Service) DeleteUser(ctx context.Context, id uuid.UUID) error {
 		return ErrInvalidUserID
 	}
 
-	if err := s.repo.DeleteUser(ctx, id); err != nil {
+	if err := s.userRepo.DeleteUser(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
 	return nil
@@ -111,7 +122,7 @@ func (s *Service) CreateRegistrationRequest(ctx context.Context, req *domain.Reg
 	req.PasswordHash = string(hash)
 	req.Status = domain.RegistrationStatusPending
 
-	if err := s.repo.CreateRegistrationRequest(ctx, req); err != nil {
+	if err := s.regRepo.CreateRegistrationRequest(ctx, req); err != nil {
 		return nil, fmt.Errorf("failed to create registration request: %w", err)
 	}
 	return req, nil
@@ -129,7 +140,7 @@ func (s *Service) ListRegistrationRequests(ctx context.Context, status domain.Re
 		offset = 0
 	}
 
-	reqs, total, err := s.repo.ListRegistrationRequests(ctx, status, limit, offset)
+	reqs, total, err := s.regRepo.ListRegistrationRequests(ctx, status, limit, offset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list registration requests: %w", err)
 	}
@@ -137,12 +148,12 @@ func (s *Service) ListRegistrationRequests(ctx context.Context, status domain.Re
 	return reqs, total, nil
 }
 
-func (s *Service) ApproveRegistrationRequest(ctx context.Context, requestID uuid.UUID, approverID uuid.UUID) (*domain.User, error) {
+func (s *Service) ApproveRegistrationRequest(ctx context.Context, requestID uuid.UUID, approverID uuid.UUID, role string) (*domain.User, error) {
 	if requestID == uuid.Nil || approverID == uuid.Nil {
 		return nil, ErrInvalidRequestOrApproverID
 	}
 
-	u, err := s.repo.ApproveRegistrationRequest(ctx, requestID, approverID)
+	u, err := s.regRepo.ApproveRegistrationRequest(ctx, requestID, approverID, role)
 	if err != nil {
 		return nil, fmt.Errorf("failed to approve registration request: %w", err)
 	}
@@ -159,7 +170,7 @@ func (s *Service) RejectRegistrationRequest(ctx context.Context, requestID uuid.
 		return ErrInvalidRequestOrApproverID
 	}
 
-	if err := s.repo.RejectRegistrationRequest(ctx, requestID, approverID, reason); err != nil {
+	if err := s.regRepo.RejectRegistrationRequest(ctx, requestID, approverID, reason); err != nil {
 		return fmt.Errorf("failed to reject registration request: %w", err)
 	}
 	return nil

@@ -233,6 +233,23 @@ func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPassword
 	return err
 }
 
+const updateUserRole = `-- name: UpdateUserRole :exec
+UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2
+`
+
+type UpdateUserRoleParams struct {
+	Role RoleEnum
+	ID   uuid.UUID
+}
+
+// UpdateUserRole
+//
+//	UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2
+func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error {
+	_, err := q.db.Exec(ctx, updateUserRole, arg.Role, arg.ID)
+	return err
+}
+
 const userExistsByEmail = `-- name: UserExistsByEmail :one
 SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)
 `

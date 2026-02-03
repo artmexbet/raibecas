@@ -86,7 +86,7 @@ func New() (*App, error) {
 		natsw.WithMiddleware(natsw.TraceHandlerMiddleware(natsTracer)),
 	)
 
-	svc := service.New(pg, metrics)
+	svc := service.New(pg, pg, pg, metrics)
 	h := handler.New(svc)
 
 	srv := server.New(client, h)

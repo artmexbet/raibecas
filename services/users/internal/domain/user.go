@@ -21,3 +21,20 @@ type User struct {
 	LastLoginAt  time.Time `json:"last_login_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
+
+// Role constants
+const (
+	RoleUser       = "user"
+	RoleAdmin      = "admin"
+	RoleSuperAdmin = "super_admin"
+)
+
+// IsValidRole checks if role is valid
+func IsValidRole(role string) bool {
+	switch role {
+	case RoleUser, RoleAdmin, RoleSuperAdmin:
+		return true
+	default:
+		return false
+	}
+}

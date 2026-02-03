@@ -21,7 +21,8 @@ type OutboxEvent struct {
 
 // Event types
 const (
-	EventTypeUserRegistered = "user.registered"
+	EventTypeUserRegistered    = "user.registered"
+	EventTypeUserStatusChanged = "user.status_changed"
 )
 
 // Aggregate types
@@ -37,4 +38,11 @@ type UserRegisteredPayload struct {
 	PasswordHash string    `json:"password_hash"`
 	Role         string    `json:"role"`
 	IsActive     bool      `json:"is_active"`
+}
+
+// UserStatusChangedPayload represents the payload for user.status_changed event
+type UserStatusChangedPayload struct {
+	UserID   uuid.UUID `json:"user_id"`
+	Role     *string   `json:"role,omitempty"`
+	IsActive *bool     `json:"is_active,omitempty"`
 }

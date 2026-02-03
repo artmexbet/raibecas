@@ -51,7 +51,7 @@ func (p *Postgres) ListUsers(ctx context.Context, params ListUsersParams) ([]dom
 			Email:       u.Email,
 			Username:    u.Username,
 			FullName:    fullName,
-			Role:        u.Role,
+			Role:        string(u.Role),
 			IsActive:    u.IsActive,
 			CreatedAt:   u.CreatedAt,
 			LastLoginAt: u.LastLoginAt,
@@ -87,7 +87,7 @@ func (p *Postgres) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User,
 		Email:       u.Email,
 		Username:    u.Username,
 		FullName:    fullName,
-		Role:        u.Role,
+		Role:        string(u.Role),
 		IsActive:    u.IsActive,
 		CreatedAt:   u.CreatedAt,
 		LastLoginAt: u.LastLoginAt,
@@ -100,15 +100,26 @@ type UpdateUserParams struct {
 	Email    *string
 	Username *string
 	FullName *string
+	Role     *string
 	IsActive *bool
 }
 
 func (p *Postgres) UpdateUser(ctx context.Context, params UpdateUserParams) (*domain.User, error) {
+	// Convert string role to NullRoleEnum if provided
+	var roleEnum queries.NullRoleEnum
+	if params.Role != nil && *params.Role != "" {
+		roleEnum = queries.NullRoleEnum{
+			RoleEnum: queries.RoleEnum(*params.Role),
+			Valid:    true,
+		}
+	}
+
 	u, err := p.q.UpdateUser(ctx, queries.UpdateUserParams{
 		ID:       params.ID,
 		Email:    params.Email,
 		Username: params.Username,
 		FullName: params.FullName,
+		Role:     roleEnum,
 		IsActive: params.IsActive,
 	})
 	if err != nil {
@@ -126,7 +137,7 @@ func (p *Postgres) UpdateUser(ctx context.Context, params UpdateUserParams) (*do
 		Email:       u.Email,
 		Username:    u.Username,
 		FullName:    fullName,
-		Role:        u.Role,
+		Role:        string(u.Role),
 		IsActive:    u.IsActive,
 		CreatedAt:   u.CreatedAt,
 		LastLoginAt: u.LastLoginAt,
@@ -151,7 +162,7 @@ func (p *Postgres) CreateUser(ctx context.Context, user *domain.User) error {
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
 		FullName:     &user.FullName,
-		Role:         user.Role,
+		Role:         queries.RoleEnum(user.Role),
 		IsActive:     user.IsActive,
 	})
 	if err != nil {
