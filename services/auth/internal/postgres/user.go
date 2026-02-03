@@ -33,6 +33,8 @@ func (p *Postgres) CreateUser(ctx context.Context, user *domain.User) error {
 			Username:     user.Username,
 			Email:        user.Email,
 			PasswordHash: user.PasswordHash,
+			Role:         queries.RoleEnum(user.Role),
+			IsActive:     user.IsActive,
 		})
 		if err != nil {
 			return err
@@ -43,6 +45,8 @@ func (p *Postgres) CreateUser(ctx context.Context, user *domain.User) error {
 			Username:     user.Username,
 			Email:        user.Email,
 			PasswordHash: user.PasswordHash,
+			Role:         queries.RoleEnum(user.Role),
+			IsActive:     user.IsActive,
 		})
 		if err != nil {
 			return err

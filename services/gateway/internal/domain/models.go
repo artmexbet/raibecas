@@ -11,8 +11,9 @@ import (
 type Role string
 
 const (
-	RoleSuperAdmin Role = "super_admin"
-	RoleAdmin      Role = "admin"
+	RoleSuperAdmin Role = "SuperAdmin"
+	RoleAdmin      Role = "Admin"
+	RoleUser       Role = "User"
 )
 
 type Additional struct {

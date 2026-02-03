@@ -71,6 +71,7 @@ func (c *UserConsumer) handleUserRegistered(msg *natsw.Message) error {
 		"user_id", event.UserID,
 		"email", event.Email,
 		"username", event.Username,
+		"role", event.Role,
 	)
 
 	// Parse user ID

@@ -132,7 +132,7 @@ func (p *Postgres) ApproveRegistrationRequest(ctx context.Context, requestID uui
 		return nil, fmt.Errorf("request not found or not pending")
 	}
 
-	fullName := "" // Default empty
+	fullName := "" // Default empty  //todo: extract from metadata if available
 	u, err := qtx.CreateUser(ctx, queries.CreateUserParams{
 		Username:     req.Username,
 		Email:        req.Email,

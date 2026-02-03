@@ -15,9 +15,9 @@ import (
 type RoleEnum string
 
 const (
-	RoleEnumUser       RoleEnum = "user"
-	RoleEnumAdmin      RoleEnum = "admin"
-	RoleEnumSuperAdmin RoleEnum = "super_admin"
+	RoleEnumUser       RoleEnum = "User"
+	RoleEnumAdmin      RoleEnum = "Admin"
+	RoleEnumSuperAdmin RoleEnum = "SuperAdmin"
 )
 
 func (e *RoleEnum) Scan(src interface{}) error {
@@ -53,19 +53,6 @@ func (ns NullRoleEnum) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.RoleEnum), nil
-}
-
-type Outbox struct {
-	ID                  uuid.UUID
-	AggregateID         uuid.UUID
-	AggregateType       string
-	EventType           string
-	Payload             []byte
-	CreatedAt           time.Time
-	ProcessedAt         *time.Time
-	ProcessingStartedAt *time.Time
-	RetryCount          int32
-	LastError           *string
 }
 
 type RegistrationRequest struct {

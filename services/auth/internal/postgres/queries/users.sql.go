@@ -12,9 +12,9 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (username, email, password_hash
+INSERT INTO users (username, email, password_hash, role, is_active
 ) VALUES (
-    $1, $2, $3
+    $1, $2, $3, $4, $5
 ) RETURNING id, username, email, password_hash, role, is_active, created_at, updated_at
 `
 
@@ -22,16 +22,24 @@ type CreateUserParams struct {
 	Username     string
 	Email        string
 	PasswordHash string
+	Role         RoleEnum
+	IsActive     bool
 }
 
 // CreateUser
 //
-//	INSERT INTO users (username, email, password_hash
+//	INSERT INTO users (username, email, password_hash, role, is_active
 //	) VALUES (
-//	    $1, $2, $3
+//	    $1, $2, $3, $4, $5
 //	) RETURNING id, username, email, password_hash, role, is_active, created_at, updated_at
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Username, arg.Email, arg.PasswordHash)
+	row := q.db.QueryRow(ctx, createUser,
+		arg.Username,
+		arg.Email,
+		arg.PasswordHash,
+		arg.Role,
+		arg.IsActive,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -47,9 +55,9 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const createUserWithID = `-- name: CreateUserWithID :one
-INSERT INTO users (id, username, email, password_hash
+INSERT INTO users (id, username, email, password_hash, role, is_active
 ) VALUES (
-    $1, $2, $3, $4
+    $1, $2, $3, $4, $5, $6
 ) ON CONFLICT (id) DO NOTHING
 RETURNING id, username, email, password_hash, role, is_active, created_at, updated_at
 `
@@ -59,13 +67,15 @@ type CreateUserWithIDParams struct {
 	Username     string
 	Email        string
 	PasswordHash string
+	Role         RoleEnum
+	IsActive     bool
 }
 
 // CreateUserWithID
 //
-//	INSERT INTO users (id, username, email, password_hash
+//	INSERT INTO users (id, username, email, password_hash, role, is_active
 //	) VALUES (
-//	    $1, $2, $3, $4
+//	    $1, $2, $3, $4, $5, $6
 //	) ON CONFLICT (id) DO NOTHING
 //	RETURNING id, username, email, password_hash, role, is_active, created_at, updated_at
 func (q *Queries) CreateUserWithID(ctx context.Context, arg CreateUserWithIDParams) (User, error) {
@@ -74,6 +84,8 @@ func (q *Queries) CreateUserWithID(ctx context.Context, arg CreateUserWithIDPara
 		arg.Username,
 		arg.Email,
 		arg.PasswordHash,
+		arg.Role,
+		arg.IsActive,
 	)
 	var i User
 	err := row.Scan(

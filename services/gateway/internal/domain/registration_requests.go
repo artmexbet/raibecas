@@ -63,6 +63,7 @@ type ListRegistrationRequestsResponse struct {
 // ApproveRegistrationRequestRequest represents a request to approve a registration request
 type ApproveRegistrationRequestRequest struct {
 	RequestID uuid.UUID `json:"request_id" validate:"required,uuid"`
+	Role      string    `json:"role" validate:"omitempty,oneof=Admin SuperAdmin User"`
 }
 
 // ApproveRegistrationRequestResponse represents the response after approving a registration request

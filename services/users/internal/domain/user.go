@@ -24,9 +24,9 @@ type User struct {
 
 // Role constants
 const (
-	RoleUser       = "user"
-	RoleAdmin      = "admin"
-	RoleSuperAdmin = "super_admin"
+	RoleUser       = "User"
+	RoleAdmin      = "Admin"
+	RoleSuperAdmin = "SuperAdmin"
 )
 
 // IsValidRole checks if role is valid

@@ -282,10 +282,11 @@ func (c *NATSUserConnector) ListRegistrationRequests(ctx context.Context, query 
 }
 
 // ApproveRegistrationRequest approves a registration request
-func (c *NATSUserConnector) ApproveRegistrationRequest(ctx context.Context, requestID, approverID uuid.UUID) (*domain.ApproveRegistrationRequestResponse, error) {
+func (c *NATSUserConnector) ApproveRegistrationRequest(ctx context.Context, requestID, approverID uuid.UUID, role string) (*domain.ApproveRegistrationRequestResponse, error) {
 	dtoReq := &dto.ApproveRegistrationRequest{
 		RequestID:  requestID,
 		ApproverID: approverID,
+		Role:       role,
 	}
 
 	reqData, err := easyjson.Marshal(dtoReq)

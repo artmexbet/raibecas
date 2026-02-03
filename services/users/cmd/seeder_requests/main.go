@@ -39,25 +39,11 @@ func main() {
 		Metadata map[string]interface{}
 	}{
 		{
-			Username: "new_candidate_1",
-			Email:    "candidate1@example.com",
+			Username: "baza",
+			Email:    "bazoviy2@example.com",
 			Password: "password123",
 			Status:   domain.RegistrationStatusPending,
 			Metadata: map[string]interface{}{"note": "First candidate"},
-		},
-		{
-			Username: "new_candidate_2",
-			Email:    "candidate2@example.com",
-			Password: "password123",
-			Status:   domain.RegistrationStatusPending,
-			Metadata: map[string]interface{}{"note": "Second candidate", "department": "IT"},
-		},
-		{
-			Username: "rejected_candidate",
-			Email:    "rejected@example.com",
-			Password: "password123",
-			Status:   domain.RegistrationStatusRejected,
-			Metadata: map[string]interface{}{"reason": "Spam"},
 		},
 	}
 

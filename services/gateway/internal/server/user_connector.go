@@ -29,7 +29,7 @@ type UserServiceConnector interface {
 	ListRegistrationRequests(ctx context.Context, query domain.ListRegistrationRequestsQuery) (*domain.ListRegistrationRequestsResponse, error)
 
 	// ApproveRegistrationRequest approves a registration request
-	ApproveRegistrationRequest(ctx context.Context, requestID, approverID uuid.UUID) (*domain.ApproveRegistrationRequestResponse, error)
+	ApproveRegistrationRequest(ctx context.Context, requestID, approverID uuid.UUID, role string) (*domain.ApproveRegistrationRequestResponse, error)
 
 	// RejectRegistrationRequest rejects a registration request
 	RejectRegistrationRequest(ctx context.Context, requestID, approverID uuid.UUID, reason string) (*domain.RejectRegistrationRequestResponse, error)

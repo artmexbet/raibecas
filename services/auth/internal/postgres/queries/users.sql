@@ -1,13 +1,13 @@
 -- name: CreateUser :one
-INSERT INTO users (username, email, password_hash
+INSERT INTO users (username, email, password_hash, role, is_active
 ) VALUES (
-    $1, $2, $3
+    $1, $2, $3, $4, $5
 ) RETURNING *;
 
 -- name: CreateUserWithID :one
-INSERT INTO users (id, username, email, password_hash
+INSERT INTO users (id, username, email, password_hash, role, is_active
 ) VALUES (
-    $1, $2, $3, $4
+    $1, $2, $3, $4, $5, $6
 ) ON CONFLICT (id) DO NOTHING
 RETURNING *;
 
