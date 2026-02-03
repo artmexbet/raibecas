@@ -14,14 +14,10 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 
 	"github.com/artmexbet/raibecas/libs/natsw"
+	"github.com/artmexbet/raibecas/libs/telemetry"
 
 	"github.com/artmexbet/raibecas/services/users/internal/config"
 	"github.com/artmexbet/raibecas/services/users/internal/handler"
@@ -46,8 +42,17 @@ func New() (*App, error) {
 		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Create tracer
-	tracer, err := initTracer()
+	// Create tracer using unified telemetry package
+	tracer, err := telemetry.InitTracer(telemetry.TracerConfig{
+		ServiceName:    "users",
+		ServiceVersion: "1.0.0",
+		OTLPEndpoint:   "localhost:4318",
+		Enabled:        true,
+		ExportTimeout:  30 * time.Second,
+		BatchTimeout:   5 * time.Second,
+		MaxQueueSize:   2048,
+		MaxExportBatch: 512,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize tracer: %w", err)
 	}
@@ -69,10 +74,13 @@ func New() (*App, error) {
 
 	metrics := middleware.NewMetrics(prometheus.DefaultRegisterer)
 
+	natsTracer := tracer.Tracer("nats-client")
 	client := natsw.NewClient(natsConn,
 		natsw.WithLogger(slog.Default()),
 		natsw.WithRecover(),
 		natsw.WithMiddleware(metrics.Middleware),
+		natsw.WithTracer(natsTracer),
+		natsw.WithMiddleware(natsw.TraceHandlerMiddleware(natsTracer)),
 	)
 
 	svc := service.New(pg, metrics)
@@ -113,7 +121,7 @@ func (a *App) Run() error {
 		slog.Error("failed to shutdown metrics server", "error", err)
 	}
 
-	if err := a.tracer.Shutdown(ctx); err != nil {
+	if err := telemetry.Shutdown(ctx, a.tracer); err != nil {
 		slog.Error("failed to shutdown tracer", "error", err)
 	}
 
@@ -164,35 +172,4 @@ func (a *App) updateUserCountMetrics(ctx context.Context) {
 		return
 	}
 	a.metrics.UsersTotal.Set(float64(count))
-}
-
-func initTracer() (*trace.TracerProvider, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	exporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)
-	}
-
-	res, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("users"),
-		),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create resource: %w", err)
-	}
-
-	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exporter),
-		trace.WithResource(res),
-	)
-
-	otel.SetTracerProvider(tp)
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
-
-	return tp, nil
 }

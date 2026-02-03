@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"runtime/debug"
 	"time"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 // LoggingMiddleware логирует все входящие и исходящие сообщения
@@ -180,5 +182,21 @@ func ChainMiddleware(middlewares ...Middleware) Middleware {
 			next = middlewares[i](next)
 		}
 		return next
+	}
+}
+
+// TraceHandlerMiddleware добавляет OpenTelemetry трассировку для обработчиков
+func TraceHandlerMiddleware(tracer trace.Tracer) Middleware {
+	return func(next HandlerFunc) HandlerFunc {
+		return func(msg *Message) error {
+			// Создаем span для обработки сообщения
+			//ctx, span := tracer.Start(msg.Ctx, fmt.Sprintf("nats.handle %s", msg.Subject))
+			//defer span.End()
+			//
+			//// Обновляем контекст в сообщении
+			//msg.Ctx = ctx
+
+			return next(msg)
+		}
 	}
 }

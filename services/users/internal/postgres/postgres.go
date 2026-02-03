@@ -7,6 +7,7 @@ import (
 
 	"github.com/exaring/otelpgx"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/otel"
 
 	"github.com/artmexbet/raibecas/services/users/internal/config"
 	"github.com/artmexbet/raibecas/services/users/internal/postgres/queries"
@@ -30,7 +31,9 @@ func New(ctx context.Context, cfg config.DatabaseConfig) (*Postgres, error) {
 	poolConfig.MinConns = int32(cfg.MinConns)
 	poolConfig.MaxConnLifetime = time.Hour
 	poolConfig.MaxConnIdleTime = 30 * time.Minute
-	poolConfig.ConnConfig.Tracer = otelpgx.NewTracer()
+	poolConfig.ConnConfig.Tracer = otelpgx.NewTracer(
+		otelpgx.WithTracerProvider(otel.GetTracerProvider()),
+	)
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {

@@ -126,6 +126,9 @@ func (c *Client) Subscribe(subject string, handler HandlerFunc) (*nats.Subscript
 		// Извлекаем контекст с trace информацией
 		ctx := c.extractContext(msg)
 
+		ctx, span := c.tracer.Start(ctx, fmt.Sprintf("nats.handle %s", msg.Subject))
+		defer span.End()
+
 		// Создаём обёртку с контекстом
 		message := &Message{
 			Msg: msg,
@@ -168,10 +171,6 @@ func (c *Client) QueueSubscribe(subject, queue string, handler HandlerFunc) (*na
 
 // Publish публикует сообщение с автоматической пропагацией trace context
 func (c *Client) Publish(ctx context.Context, subject string, data []byte) error {
-	// Создаём span для публикации
-	ctx, span := c.tracer.Start(ctx, fmt.Sprintf("nats.publish %s", subject))
-	defer span.End()
-
 	msg := nats.NewMsg(subject)
 	msg.Data = data
 
@@ -183,9 +182,6 @@ func (c *Client) Publish(ctx context.Context, subject string, data []byte) error
 
 // PublishMsg публикует готовое сообщение с пропагацией trace context
 func (c *Client) PublishMsg(ctx context.Context, msg *nats.Msg) error {
-	ctx, span := c.tracer.Start(ctx, fmt.Sprintf("nats.publish %s", msg.Subject))
-	defer span.End()
-
 	// Инжектируем trace context в headers
 	c.propagator.Inject(ctx, &headerCarrier{header: msg.Header})
 

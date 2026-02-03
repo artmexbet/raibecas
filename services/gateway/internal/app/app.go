@@ -9,13 +9,10 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 
 	"github.com/artmexbet/raibecas/libs/natsw"
+	"github.com/artmexbet/raibecas/libs/telemetry"
 
 	"github.com/artmexbet/raibecas/services/gateway/internal/config"
 	"github.com/artmexbet/raibecas/services/gateway/internal/connector"
@@ -64,10 +61,33 @@ func (a *App) Run() error {
 	a.natsConn = natsConn
 	slog.Info("connected to NATS", "url", a.cfg.NATS.URL)
 
-	a.createTracer()
+	// Initialize tracer
+	tp, err := telemetry.InitTracer(telemetry.TracerConfig{
+		ServiceName:    "gateway",
+		ServiceVersion: "1.0.0",
+		OTLPEndpoint:   "localhost:4318",
+		Enabled:        true,
+		ExportTimeout:  30 * time.Second,
+		BatchTimeout:   5 * time.Second,
+		MaxQueueSize:   2048,
+		MaxExportBatch: 512,
+	})
+	if err != nil {
+		slog.Error("failed to initialize tracer", "error", err)
+		return err
+	}
+	a.tracer = tp
+
+	natsTracer := a.tracer.Tracer("nats-client")
 
 	// Create single NATS wrapper client for trace propagation
-	natsClient := natsw.NewClient(natsConn)
+	natsClient := natsw.NewClient(
+		natsConn,
+		natsw.WithRecover(),
+		natsw.WithLogger(slog.Default()),
+		natsw.WithTracer(natsTracer),
+		natsw.WithMiddleware(natsw.TraceHandlerMiddleware(natsTracer)),
+	)
 
 	// Create connectors with shared NATS client
 	documentConnector := connector.NewNATSDocumentConnector(natsClient, a.cfg.NATS.RequestTimeout)
@@ -103,38 +123,13 @@ func (a *App) Run() error {
 	a.natsConn.Close()
 	slog.Info("NATS connection closed")
 
-	if err := a.tracer.Shutdown(shContext); err != nil {
+	if err := telemetry.Shutdown(shContext, a.tracer); err != nil {
 		slog.Error("tracer shutdown error", "error", err)
 	}
 
 	slog.Info("application shutdown complete")
 
 	return nil
-}
-
-func (a *App) createTracer() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	exporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure())
-	if err != nil {
-		slog.Error("failed to create OTLP trace exporter", "error", err)
-	}
-
-	res, _ := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceName("Gateway"),
-		),
-	)
-
-	tracerProvider := trace.NewTracerProvider(
-		trace.WithBatcher(exporter),
-		trace.WithResource(res),
-	)
-	otel.SetTracerProvider(tracerProvider)
-	a.tracer = tracerProvider
 }
 
 func getEnvOrDefault(key, defaultValue string) string {
