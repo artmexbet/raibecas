@@ -128,3 +128,27 @@ func (p *Postgres) UpdatePassword(ctx context.Context, userID uuid.UUID, passwor
 	tx.Commit(ctx) //nolint:errcheck // safe to ignore
 	return nil
 }
+
+func (p *Postgres) UpdateUser(ctx context.Context, userID uuid.UUID, username, email string, role domain.UserRole, isActive bool) error {
+	tx, err := p.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("error starting transaction: %v", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // safe to ignore
+
+	q := p.q.WithTx(tx)
+
+	err = q.UpdateUser(ctx, queries.UpdateUserParams{
+		ID:       userID,
+		Username: username,
+		Email:    email,
+		Role:     queries.RoleEnum(role),
+		IsActive: isActive,
+	})
+	if err != nil {
+		return fmt.Errorf("error updating user: %v", err)
+	}
+
+	tx.Commit(ctx) //nolint:errcheck // safe to ignore
+	return nil
+}

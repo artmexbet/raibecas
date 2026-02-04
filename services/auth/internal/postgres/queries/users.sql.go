@@ -211,6 +211,44 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 	return items, nil
 }
 
+const updateUser = `-- name: UpdateUser :exec
+UPDATE users
+SET username = $2,
+    email = $3,
+    role = $4,
+    is_active = $5,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateUserParams struct {
+	ID       uuid.UUID
+	Username string
+	Email    string
+	Role     RoleEnum
+	IsActive bool
+}
+
+// UpdateUser
+//
+//	UPDATE users
+//	SET username = $2,
+//	    email = $3,
+//	    role = $4,
+//	    is_active = $5,
+//	    updated_at = NOW()
+//	WHERE id = $1
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
+	_, err := q.db.Exec(ctx, updateUser,
+		arg.ID,
+		arg.Username,
+		arg.Email,
+		arg.Role,
+		arg.IsActive,
+	)
+	return err
+}
+
 const updateUserIsActive = `-- name: UpdateUserIsActive :exec
 UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2
 `

@@ -105,6 +105,15 @@ type UpdateUserParams struct {
 }
 
 func (p *Postgres) UpdateUser(ctx context.Context, params UpdateUserParams) (*domain.User, error) {
+	// Start transaction
+	tx, err := p.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	qtx := p.q.WithTx(tx)
+
 	// Convert string role to NullRoleEnum if provided
 	var roleEnum queries.NullRoleEnum
 	if params.Role != nil && *params.Role != "" {
@@ -114,7 +123,7 @@ func (p *Postgres) UpdateUser(ctx context.Context, params UpdateUserParams) (*do
 		}
 	}
 
-	u, err := p.q.UpdateUser(ctx, queries.UpdateUserParams{
+	u, err := qtx.UpdateUser(ctx, queries.UpdateUserParams{
 		ID:       params.ID,
 		Email:    params.Email,
 		Username: params.Username,
@@ -128,6 +137,32 @@ func (p *Postgres) UpdateUser(ctx context.Context, params UpdateUserParams) (*do
 		}
 		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
+
+	// Create outbox event for user update
+	outboxEvent := &domain.OutboxEvent{
+		ID:            uuid.New(),
+		AggregateID:   u.ID,
+		AggregateType: domain.AggregateTypeUser,
+		EventType:     domain.EventTypeUserUpdated,
+		Payload: map[string]interface{}{
+			"user_id":   u.ID.String(),
+			"username":  u.Username,
+			"email":     u.Email,
+			"role":      string(u.Role),
+			"is_active": u.IsActive,
+		},
+		CreatedAt:  u.UpdatedAt,
+		RetryCount: 0,
+	}
+
+	if err := p.CreateOutboxEvent(ctx, tx, outboxEvent); err != nil {
+		return nil, fmt.Errorf("failed to create outbox event: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
 	var fullName string
 	if u.FullName != nil {
 		fullName = *u.FullName

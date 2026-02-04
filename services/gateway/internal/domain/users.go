@@ -28,6 +28,7 @@ type UpdateUserRequest struct {
 	Username *string `json:"username,omitempty" validate:"omitempty,min=3,max=50"`
 	FullName *string `json:"full_name,omitempty" validate:"omitempty,min=1,max=100"`
 	IsActive *bool   `json:"is_active,omitempty"`
+	Role     Role    `json:"role"`
 }
 
 // UpdateUserResponse represents the response after updating a user

@@ -35,5 +35,14 @@ UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2;
 -- name: UpdateUserIsActive :exec
 UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2;
 
+-- name: UpdateUser :exec
+UPDATE users
+SET username = $2,
+    email = $3,
+    role = $4,
+    is_active = $5,
+    updated_at = NOW()
+WHERE id = $1;
+
 -- name: ListUsers :many
 SELECT * FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2;

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/artmexbet/raibecas/libs/utils/pointer"
 	"github.com/google/uuid"
 	"github.com/mailru/easyjson"
 	"github.com/nats-io/nats.go"
@@ -134,6 +135,7 @@ func (c *NATSUserConnector) UpdateUser(ctx context.Context, id uuid.UUID, req do
 			Username: req.Username,
 			FullName: req.FullName,
 			IsActive: req.IsActive,
+			Role:     pointer.To(string(req.Role)),
 		},
 	}
 

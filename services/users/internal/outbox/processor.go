@@ -184,6 +184,8 @@ func (p *Processor) getSubjectForEvent(eventType string) string {
 	switch eventType {
 	case domain.EventTypeUserRegistered:
 		return "users.user.registered"
+	case domain.EventTypeUserUpdated:
+		return "users.user.updated"
 	case domain.EventTypeUserStatusChanged:
 		return "users.user.status_changed"
 	default:

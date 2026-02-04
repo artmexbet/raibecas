@@ -152,6 +152,12 @@ func easyjson84c0690eDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 					*out.IsActive = bool(in.Bool())
 				}
 			}
+		case "role":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Role = Role(in.String())
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -201,6 +207,16 @@ func easyjson84c0690eEncodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 			out.RawString(prefix)
 		}
 		out.Bool(bool(*in.IsActive))
+	}
+	{
+		const prefix string = ",\"role\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Role))
 	}
 	out.RawByte('}')
 }
