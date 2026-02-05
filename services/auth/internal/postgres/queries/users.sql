@@ -1,8 +1,15 @@
 -- name: CreateUser :one
-INSERT INTO users (username, email, password_hash
+INSERT INTO users (username, email, password_hash, role, is_active
 ) VALUES (
-    $1, $2, $3
+    $1, $2, $3, $4, $5
 ) RETURNING *;
+
+-- name: CreateUserWithID :one
+INSERT INTO users (id, username, email, password_hash, role, is_active
+) VALUES (
+    $1, $2, $3, $4, $5, $6
+) ON CONFLICT (id) DO NOTHING
+RETURNING *;
 
 -- name: GetUserByID :one
 SELECT * FROM users WHERE id = $1 LIMIT 1;
@@ -22,8 +29,20 @@ SELECT EXISTS(SELECT 1 FROM users WHERE username = $1);
 -- name: UpdateUserPassword :exec
 UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2;
 
+-- name: UpdateUserRole :exec
+UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2;
+
 -- name: UpdateUserIsActive :exec
 UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2;
+
+-- name: UpdateUser :exec
+UPDATE users
+SET username = $2,
+    email = $3,
+    role = $4,
+    is_active = $5,
+    updated_at = NOW()
+WHERE id = $1;
 
 -- name: ListUsers :many
 SELECT * FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2;

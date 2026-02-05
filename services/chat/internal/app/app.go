@@ -11,6 +11,9 @@ import (
 
 	"github.com/qdrant/go-client/qdrant"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/artmexbet/raibecas/libs/telemetry"
 
 	"github.com/artmexbet/raibecas/services/chat/internal/config"
 	"github.com/artmexbet/raibecas/services/chat/internal/handler/http"
@@ -22,6 +25,7 @@ import (
 
 // App represents the main entry point for the chat service application.
 type App struct {
+	tracerProvider *trace.TracerProvider
 }
 
 // New creates and returns a new App instance.
@@ -39,6 +43,23 @@ func (a *App) Run() error {
 		Level:     slog.LevelDebug,
 	}))
 	slog.SetDefault(logger)
+
+	// Initialize tracer
+	tp, err := telemetry.InitTracer(telemetry.TracerConfig{
+		ServiceName:    "chat",
+		ServiceVersion: "1.0.0",
+		OTLPEndpoint:   "localhost:4317",
+		Enabled:        true,
+		ExportTimeout:  30 * time.Second,
+		BatchTimeout:   5 * time.Second,
+		MaxQueueSize:   2048,
+		MaxExportBatch: 512,
+	})
+	if err != nil {
+		slog.Error("failed to initialize tracer", "error", err)
+		// Continue without tracer rather than failing startup
+	}
+	a.tracerProvider = tp
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -106,6 +127,11 @@ func (a *App) Run() error {
 		if err := api.Shutdown(ctx); err != nil {
 			slog.Error("Error during HTTP server shutdown", "err", err)
 		}
+	}
+
+	// Shutdown tracer provider (flush all pending spans)
+	if err := telemetry.Shutdown(ctx, a.tracerProvider); err != nil {
+		slog.Error("Error shutting down tracer provider", "error", err)
 	}
 
 	//redisClient.Shutdown(ctx)

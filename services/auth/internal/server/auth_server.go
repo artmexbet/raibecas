@@ -11,18 +11,20 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	natsgo "github.com/nats-io/nats.go"
+	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/artmexbet/raibecas/libs/natsw"
+	"github.com/artmexbet/raibecas/libs/telemetry"
 
 	"github.com/artmexbet/raibecas/services/auth/internal/config"
+	"github.com/artmexbet/raibecas/services/auth/internal/consumer"
 	"github.com/artmexbet/raibecas/services/auth/internal/handler"
-	"github.com/artmexbet/raibecas/services/auth/internal/nats"
+	natspkg "github.com/artmexbet/raibecas/services/auth/internal/nats"
 	"github.com/artmexbet/raibecas/services/auth/internal/postgres"
 	"github.com/artmexbet/raibecas/services/auth/internal/service"
 	"github.com/artmexbet/raibecas/services/auth/internal/storeredis"
-	"github.com/artmexbet/raibecas/services/auth/internal/telemetry"
 	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
 )
 
@@ -32,7 +34,8 @@ type App struct {
 	pool           *pgxpool.Pool
 	redis          *redis.Client
 	natsClient     *natsw.Client
-	subscriber     *nats.Subscriber
+	subscriber     *natspkg.Subscriber
+	userConsumer   *consumer.UserConsumer
 	subscriptions  []*natsgo.Subscription
 	tracerProvider *sdktrace.TracerProvider
 }
@@ -70,6 +73,12 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}
 
+	// Validate database connection
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
 	// Initialize Redis client
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     cfg.GetRedisAddr(),
@@ -81,7 +90,17 @@ func New(cfg *config.Config) (*App, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := redisClient.Ping(ctx).Err(); err != nil {
-		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
+		pool.Close()
+		return nil, fmt.Errorf("failed to connect to redis: %w", err)
+	}
+
+	if err := redisotel.InstrumentTracing(
+		redisClient,
+		redisotel.WithTracerProvider(tracerProvider),
+	); err != nil {
+		pool.Close()
+		redisClient.Close()
+		return nil, fmt.Errorf("failed to instrument redis client: %w", err)
 	}
 
 	// Initialize App connection
@@ -92,13 +111,18 @@ func New(cfg *config.Config) (*App, error) {
 		natsgo.ReconnectWait(cfg.NATS.ReconnectWait),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to App: %w", err)
+		pool.Close()
+		redisClient.Close()
+		return nil, fmt.Errorf("failed to connect to nats: %w", err)
 	}
 
-	// Create App wrapper client with middleware
+	natsTracer := tracerProvider.Tracer("nats-client")
+	// Create nats wrapper client with middleware
 	natsClient := natsw.NewClient(natsConn,
 		natsw.WithLogger(slog.Default()),
 		natsw.WithRecover(),
+		natsw.WithTracer(natsTracer),
+		natsw.WithMiddleware(natsw.TraceHandlerMiddleware(natsTracer)),
 	)
 
 	pgs := postgres.New(pool)
@@ -120,9 +144,12 @@ func New(cfg *config.Config) (*App, error) {
 	authService := service.NewAuthService(pgs, jwtManager)
 	regService := service.NewRegistrationService(pgs, pgs)
 
-	// Initialize App publisher and subscriber
-	publisher := nats.NewPublisher(natsConn)
-	subscriber := nats.NewSubscriber(natsConn, regService, publisher)
+	// Initialize nats publisher and subscriber
+	publisher := natspkg.NewPublisher(natsConn)
+	subscriber := natspkg.NewSubscriber(natsConn, regService, publisher)
+
+	// Initialize user consumer for outbox events
+	userConsumer := consumer.NewUserConsumer(pgs, slog.Default())
 
 	// Initialize App handlers
 	authHandler := handler.NewAuthHandler(authService, publisher)
@@ -135,6 +162,7 @@ func New(cfg *config.Config) (*App, error) {
 		redis:          redisClient,
 		natsClient:     natsClient,
 		subscriber:     subscriber,
+		userConsumer:   userConsumer,
 		subscriptions:  make([]*natsgo.Subscription, 0),
 		tracerProvider: tracerProvider,
 	}
@@ -142,6 +170,11 @@ func New(cfg *config.Config) (*App, error) {
 	// Subscribe to request/reply topics
 	if err := server.setupSubscriptions(authHandler, regHandler); err != nil {
 		return nil, fmt.Errorf("failed to setup subscriptions: %w", err)
+	}
+
+	// Subscribe to user registration events from users service
+	if err := userConsumer.Subscribe(natsClient); err != nil {
+		return nil, fmt.Errorf("failed to subscribe user consumer: %w", err)
 	}
 
 	// Start event subscriber (for admin approval/rejection events)
@@ -155,57 +188,57 @@ func New(cfg *config.Config) (*App, error) {
 // setupSubscriptions sets up App request/reply subscriptions
 func (s *App) setupSubscriptions(authHandler *handler.AuthHandler, regHandler *handler.RegistrationHandler) error {
 	// Auth service subscriptions using natsw.Client
-	sub, err := s.natsClient.Subscribe(nats.SubjectAuthRegister, regHandler.HandleRegister)
+	sub, err := s.natsClient.Subscribe(natspkg.SubjectAuthRegister, regHandler.HandleRegister)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthRegister, err)
+		return fmt.Errorf("failed to subscribe to %s: %w", natspkg.SubjectAuthRegister, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsClient.Subscribe(nats.SubjectAuthLogin, authHandler.HandleLogin)
+	sub, err = s.natsClient.Subscribe(natspkg.SubjectAuthLogin, authHandler.HandleLogin)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthLogin, err)
+		return fmt.Errorf("failed to subscribe to %s: %w", natspkg.SubjectAuthLogin, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsClient.Subscribe(nats.SubjectAuthRefresh, authHandler.HandleRefresh)
+	sub, err = s.natsClient.Subscribe(natspkg.SubjectAuthRefresh, authHandler.HandleRefresh)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthRefresh, err)
+		return fmt.Errorf("failed to subscribe to %s: %w", natspkg.SubjectAuthRefresh, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsClient.Subscribe(nats.SubjectAuthValidate, authHandler.HandleValidate)
+	sub, err = s.natsClient.Subscribe(natspkg.SubjectAuthValidate, authHandler.HandleValidate)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthValidate, err)
+		return fmt.Errorf("failed to subscribe to %s: %w", natspkg.SubjectAuthValidate, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsClient.Subscribe(nats.SubjectAuthLogout, authHandler.HandleLogout)
+	sub, err = s.natsClient.Subscribe(natspkg.SubjectAuthLogout, authHandler.HandleLogout)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthLogout, err)
+		return fmt.Errorf("failed to subscribe to %s: %w", natspkg.SubjectAuthLogout, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsClient.Subscribe(nats.SubjectAuthLogoutAll, authHandler.HandleLogoutAll)
+	sub, err = s.natsClient.Subscribe(natspkg.SubjectAuthLogoutAll, authHandler.HandleLogoutAll)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthLogoutAll, err)
+		return fmt.Errorf("failed to subscribe to %s: %w", natspkg.SubjectAuthLogoutAll, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
-	sub, err = s.natsClient.Subscribe(nats.SubjectAuthChangePassword, authHandler.HandleChangePassword)
+	sub, err = s.natsClient.Subscribe(natspkg.SubjectAuthChangePassword, authHandler.HandleChangePassword)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to %s: %w", nats.SubjectAuthChangePassword, err)
+		return fmt.Errorf("failed to subscribe to %s: %w", natspkg.SubjectAuthChangePassword, err)
 	}
 	s.subscriptions = append(s.subscriptions, sub)
 
 	slog.Info("App subscriptions setup complete",
 		"topics", []string{
-			nats.SubjectAuthRegister,
-			nats.SubjectAuthLogin,
-			nats.SubjectAuthRefresh,
-			nats.SubjectAuthValidate,
-			nats.SubjectAuthLogout,
-			nats.SubjectAuthLogoutAll,
-			nats.SubjectAuthChangePassword,
+			natspkg.SubjectAuthRegister,
+			natspkg.SubjectAuthLogin,
+			natspkg.SubjectAuthRefresh,
+			natspkg.SubjectAuthValidate,
+			natspkg.SubjectAuthLogout,
+			natspkg.SubjectAuthLogoutAll,
+			natspkg.SubjectAuthChangePassword,
 		})
 
 	return nil

@@ -110,7 +110,7 @@ func (s *RegistrationService) CreateRegistrationRequest(ctx context.Context, req
 }
 
 // ApproveRegistration approves a registration request and creates a user
-func (s *RegistrationService) ApproveRegistration(ctx context.Context, requestID, approverID uuid.UUID) (*domain.User, error) {
+func (s *RegistrationService) ApproveRegistration(ctx context.Context, requestID, approverID uuid.UUID, role string) (*domain.User, error) {
 	// Get registration request
 	regReq, err := s.regRepo.GetRegistrationRequestByID(ctx, requestID)
 	if err != nil {
@@ -122,11 +122,17 @@ func (s *RegistrationService) ApproveRegistration(ctx context.Context, requestID
 		return nil, domain.ErrRegistrationNotPending
 	}
 
-	// CreateUser user
+	// Default role if not specified
+	if role == "" {
+		role = "user"
+	}
+
+	// Create user with specified role
 	user := &domain.User{
 		Username:     regReq.Username,
 		Email:        regReq.Email,
 		PasswordHash: regReq.Password, // Already hashed
+		Role:         domain.UserRole(role),
 	}
 
 	if err := s.userRepo.CreateUser(ctx, user); err != nil {

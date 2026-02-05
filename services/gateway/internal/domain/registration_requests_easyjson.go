@@ -1018,6 +1018,12 @@ func easyjson9387ee9aDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 					in.AddError((out.RequestID).UnmarshalText(data))
 				}
 			}
+		case "role":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Role = string(in.String())
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -1036,6 +1042,11 @@ func easyjson9387ee9aEncodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 		const prefix string = ",\"request_id\":"
 		out.RawString(prefix[1:])
 		out.RawText((in.RequestID).MarshalText())
+	}
+	{
+		const prefix string = ",\"role\":"
+		out.RawString(prefix)
+		out.String(string(in.Role))
 	}
 	out.RawByte('}')
 }

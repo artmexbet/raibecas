@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 )
 
 // TracerConfig содержит конфигурацию для tracer
@@ -27,7 +26,7 @@ type TracerConfig struct {
 	MaxExportBatch int
 }
 
-// InitTracer инициализирует OpenTelemetry tracer provider
+// InitTracer инициализирует OpenTelemetry tracer provider и устанавливает глобальные пропагаторы
 func InitTracer(cfg TracerConfig) (*sdktrace.TracerProvider, error) {
 	if !cfg.Enabled {
 		slog.Info("OpenTelemetry tracing is disabled")
@@ -39,13 +38,13 @@ func InitTracer(cfg TracerConfig) (*sdktrace.TracerProvider, error) {
 	defer cancel()
 
 	// Настраиваем OTLP exporter
-	exporterOpts := []otlptracegrpc.Option{
-		otlptracegrpc.WithEndpoint(cfg.OTLPEndpoint),
-		otlptracegrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-		otlptracegrpc.WithTimeout(cfg.ExportTimeout),
+	exporterOpts := []otlptracehttp.Option{
+		otlptracehttp.WithEndpoint(cfg.OTLPEndpoint),
+		otlptracehttp.WithInsecure(), // Используем insecure connection для локальной разработки
+		otlptracehttp.WithTimeout(cfg.ExportTimeout),
 	}
 
-	exporter, err := otlptracegrpc.New(ctx, exporterOpts...)
+	exporter, err := otlptracehttp.New(ctx, exporterOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)
 	}
@@ -64,24 +63,30 @@ func InitTracer(cfg TracerConfig) (*sdktrace.TracerProvider, error) {
 	}
 
 	// Создаем BatchSpanProcessor с настройками для длительного экспорта
-	// ВАЖНО: Используем отдельные таймауты, чтобы экспорт не зависел от контекста запроса
 	batchProcessor := sdktrace.NewBatchSpanProcessor(
 		exporter,
-		sdktrace.WithBatchTimeout(cfg.BatchTimeout),         // Время между экспортами
-		sdktrace.WithExportTimeout(cfg.ExportTimeout),       // Таймаут для одного экспорта
-		sdktrace.WithMaxQueueSize(cfg.MaxQueueSize),         // Размер очереди
-		sdktrace.WithMaxExportBatchSize(cfg.MaxExportBatch), // Размер батча
+		sdktrace.WithBatchTimeout(cfg.BatchTimeout),
+		sdktrace.WithExportTimeout(cfg.ExportTimeout),
+		sdktrace.WithMaxQueueSize(cfg.MaxQueueSize),
+		sdktrace.WithMaxExportBatchSize(cfg.MaxExportBatch),
 	)
 
 	// Создаем TracerProvider с batch processor
 	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 		sdktrace.WithResource(res),
 		sdktrace.WithSpanProcessor(batchProcessor),
 	)
 
 	// Устанавливаем глобальный tracer provider
 	otel.SetTracerProvider(tp)
+
+	// Устанавливаем глобальный text map propagator для trace context propagation
+	otel.SetTextMapPropagator(
+		propagation.NewCompositeTextMapPropagator(
+			propagation.TraceContext{},
+			propagation.Baggage{},
+		),
+	)
 
 	slog.Info("OpenTelemetry tracer initialized",
 		"service", cfg.ServiceName,
@@ -99,17 +104,5 @@ func Shutdown(ctx context.Context, tp *sdktrace.TracerProvider) error {
 		return nil
 	}
 
-	slog.Info("Shutting down tracer provider...")
-
-	// Форсируем экспорт всех оставшихся спанов перед завершением
-	if err := tp.ForceFlush(ctx); err != nil {
-		slog.Error("Failed to flush tracer provider", "error", err)
-	}
-
-	if err := tp.Shutdown(ctx); err != nil {
-		return fmt.Errorf("failed to shutdown tracer provider: %w", err)
-	}
-
-	slog.Info("Tracer provider shut down successfully")
-	return nil
+	return tp.Shutdown(ctx)
 }

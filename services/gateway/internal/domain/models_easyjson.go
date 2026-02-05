@@ -51,13 +51,13 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 			} else {
 				out.Username = string(in.String())
 			}
-		case "fullName":
+		case "full_name":
 			if in.IsNull() {
 				in.Skip()
 			} else {
 				out.FullName = string(in.String())
 			}
-		case "registeredAt":
+		case "registered_at":
 			if in.IsNull() {
 				in.Skip()
 			} else {
@@ -65,7 +65,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 					in.AddError((out.RegisteredAt).UnmarshalJSON(data))
 				}
 			}
-		case "lastLoginAt":
+		case "last_login_at":
 			if in.IsNull() {
 				in.Skip()
 			} else {
@@ -73,7 +73,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 					in.AddError((out.LastLoginAt).UnmarshalJSON(data))
 				}
 			}
-		case "isActive":
+		case "is_active":
 			if in.IsNull() {
 				in.Skip()
 			} else {
@@ -109,22 +109,22 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 		out.String(string(in.Username))
 	}
 	{
-		const prefix string = ",\"fullName\":"
+		const prefix string = ",\"full_name\":"
 		out.RawString(prefix)
 		out.String(string(in.FullName))
 	}
 	{
-		const prefix string = ",\"registeredAt\":"
+		const prefix string = ",\"registered_at\":"
 		out.RawString(prefix)
 		out.Raw((in.RegisteredAt).MarshalJSON())
 	}
 	{
-		const prefix string = ",\"lastLoginAt\":"
+		const prefix string = ",\"last_login_at\":"
 		out.RawString(prefix)
 		out.Raw((in.LastLoginAt).MarshalJSON())
 	}
 	{
-		const prefix string = ",\"isActive\":"
+		const prefix string = ",\"is_active\":"
 		out.RawString(prefix)
 		out.Bool(bool(in.IsActive))
 	}
@@ -403,7 +403,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 			} else {
 				(out.Category).UnmarshalEasyJSON(in)
 			}
-		case "publicationDate":
+		case "publication_date":
 			if in.IsNull() {
 				in.Skip()
 			} else {
@@ -438,7 +438,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 				}
 				in.Delim(']')
 			}
-		case "createdAt":
+		case "created_at":
 			if in.IsNull() {
 				in.Skip()
 			} else {
@@ -446,7 +446,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 					in.AddError((out.CreatedAt).UnmarshalJSON(data))
 				}
 			}
-		case "updatedAt":
+		case "updated_at":
 			if in.IsNull() {
 				in.Skip()
 			} else {
@@ -498,7 +498,7 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 		(in.Category).MarshalEasyJSON(out)
 	}
 	{
-		const prefix string = ",\"publicationDate\":"
+		const prefix string = ",\"publication_date\":"
 		out.RawString(prefix)
 		out.Raw((in.PublicationDate).MarshalJSON())
 	}
@@ -519,12 +519,12 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 		}
 	}
 	{
-		const prefix string = ",\"createdAt\":"
+		const prefix string = ",\"created_at\":"
 		out.RawString(prefix)
 		out.Raw((in.CreatedAt).MarshalJSON())
 	}
 	{
-		const prefix string = ",\"updatedAt\":"
+		const prefix string = ",\"updated_at\":"
 		out.RawString(prefix)
 		out.Raw((in.UpdatedAt).MarshalJSON())
 	}
@@ -748,7 +748,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 			} else {
 				out.Role = Role(in.String())
 			}
-		case "createdAt":
+		case "created_at":
 			if in.IsNull() {
 				in.Skip()
 			} else {
@@ -756,7 +756,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 					in.AddError((out.CreatedAt).UnmarshalJSON(data))
 				}
 			}
-		case "updatedAt":
+		case "updated_at":
 			if in.IsNull() {
 				in.Skip()
 			} else {
@@ -799,12 +799,12 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 		out.String(string(in.Role))
 	}
 	{
-		const prefix string = ",\"createdAt\":"
+		const prefix string = ",\"created_at\":"
 		out.RawString(prefix)
 		out.Raw((in.CreatedAt).MarshalJSON())
 	}
 	{
-		const prefix string = ",\"updatedAt\":"
+		const prefix string = ",\"updated_at\":"
 		out.RawString(prefix)
 		out.Raw((in.UpdatedAt).MarshalJSON())
 	}
@@ -848,7 +848,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
 		switch key {
-		case "createdAt":
+		case "created_at":
 			if in.IsNull() {
 				in.Skip()
 			} else {
@@ -856,7 +856,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 					in.AddError((out.CreatedAt).UnmarshalJSON(data))
 				}
 			}
-		case "updatedAt":
+		case "updated_at":
 			if in.IsNull() {
 				in.Skip()
 			} else {
@@ -879,12 +879,12 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 	first := true
 	_ = first
 	{
-		const prefix string = ",\"createdAt\":"
+		const prefix string = ",\"created_at\":"
 		out.RawString(prefix[1:])
 		out.Raw((in.CreatedAt).MarshalJSON())
 	}
 	{
-		const prefix string = ",\"updatedAt\":"
+		const prefix string = ",\"updated_at\":"
 		out.RawString(prefix)
 		out.Raw((in.UpdatedAt).MarshalJSON())
 	}

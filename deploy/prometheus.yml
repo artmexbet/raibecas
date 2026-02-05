@@ -8,3 +8,9 @@ scrape_configs:
       - targets: ['host.docker.internal:8080']
     metrics_path: '/metrics'
     scrape_interval: 10s
+
+  - job_name: 'users'
+    static_configs:
+      - targets: ['host.docker.internal:9091']
+    metrics_path: '/metrics'
+    scrape_interval: 10s

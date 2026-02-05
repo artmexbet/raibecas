@@ -37,7 +37,7 @@ func easyjson4a0f95aaDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 			} else {
 				out.Valid = bool(in.Bool())
 			}
-		case "userId":
+		case "user_id":
 			if in.IsNull() {
 				in.Skip()
 			} else {
@@ -77,7 +77,7 @@ func easyjson4a0f95aaEncodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 		out.Bool(bool(in.Valid))
 	}
 	if true {
-		const prefix string = ",\"userId\":"
+		const prefix string = ",\"user_id\":"
 		out.RawString(prefix)
 		out.RawText((in.UserID).MarshalText())
 	}
@@ -222,7 +222,7 @@ func easyjson4a0f95aaDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 			} else {
 				out.Role = string(in.String())
 			}
-		case "createdAt":
+		case "created_at":
 			if in.IsNull() {
 				in.Skip()
 			} else {
@@ -265,7 +265,7 @@ func easyjson4a0f95aaEncodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 		out.String(string(in.Role))
 	}
 	{
-		const prefix string = ",\"createdAt\":"
+		const prefix string = ",\"created_at\":"
 		out.RawString(prefix)
 		out.Raw((in.CreatedAt).MarshalJSON())
 	}

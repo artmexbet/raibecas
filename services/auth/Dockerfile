@@ -12,9 +12,12 @@ COPY go.work go.work.sum* ./
 # Copy all go.mod files for workspace modules
 COPY libs/natsw/go.mod libs/natsw/go.sum* ./libs/natsw/
 COPY libs/utils/go.mod libs/utils/go.sum* ./libs/utils/
+COPY libs/dto/go.mod libs/dto/go.sum* ./libs/dto/
+COPY libs/telemetry/go.mod libs/telemetry/go.sum* ./libs/telemetry/
 COPY services/auth/go.mod services/auth/go.sum* ./services/auth/
 COPY services/gateway/go.mod services/gateway/go.sum* ./services/gateway/
 COPY services/chat/go.mod services/chat/go.sum* ./services/chat/
+COPY services/users/go.mod services/users/go.sum* ./services/users/
 
 # Download dependencies
 RUN go work sync && go mod download

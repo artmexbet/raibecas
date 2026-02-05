@@ -99,8 +99,14 @@ func (s *Server) approveRegistrationRequest(c *fiber.Ctx) error {
 		})
 	}
 
+	// Parse optional role from body
+	var body struct {
+		Role string `json:"role"`
+	}
+	_ = c.BodyParser(&body)
+
 	// Call users service via NATS
-	resp, err := s.userConnector.ApproveRegistrationRequest(c.UserContext(), requestID, authUser.ID)
+	resp, err := s.userConnector.ApproveRegistrationRequest(c.UserContext(), requestID, authUser.ID, body.Role)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error":   "service_error",

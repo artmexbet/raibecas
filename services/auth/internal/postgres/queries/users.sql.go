@@ -12,9 +12,9 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (username, email, password_hash
+INSERT INTO users (username, email, password_hash, role, is_active
 ) VALUES (
-    $1, $2, $3
+    $1, $2, $3, $4, $5
 ) RETURNING id, username, email, password_hash, role, is_active, created_at, updated_at
 `
 
@@ -22,16 +22,71 @@ type CreateUserParams struct {
 	Username     string
 	Email        string
 	PasswordHash string
+	Role         RoleEnum
+	IsActive     bool
 }
 
 // CreateUser
 //
-//	INSERT INTO users (username, email, password_hash
+//	INSERT INTO users (username, email, password_hash, role, is_active
 //	) VALUES (
-//	    $1, $2, $3
+//	    $1, $2, $3, $4, $5
 //	) RETURNING id, username, email, password_hash, role, is_active, created_at, updated_at
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Username, arg.Email, arg.PasswordHash)
+	row := q.db.QueryRow(ctx, createUser,
+		arg.Username,
+		arg.Email,
+		arg.PasswordHash,
+		arg.Role,
+		arg.IsActive,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createUserWithID = `-- name: CreateUserWithID :one
+INSERT INTO users (id, username, email, password_hash, role, is_active
+) VALUES (
+    $1, $2, $3, $4, $5, $6
+) ON CONFLICT (id) DO NOTHING
+RETURNING id, username, email, password_hash, role, is_active, created_at, updated_at
+`
+
+type CreateUserWithIDParams struct {
+	ID           uuid.UUID
+	Username     string
+	Email        string
+	PasswordHash string
+	Role         RoleEnum
+	IsActive     bool
+}
+
+// CreateUserWithID
+//
+//	INSERT INTO users (id, username, email, password_hash, role, is_active
+//	) VALUES (
+//	    $1, $2, $3, $4, $5, $6
+//	) ON CONFLICT (id) DO NOTHING
+//	RETURNING id, username, email, password_hash, role, is_active, created_at, updated_at
+func (q *Queries) CreateUserWithID(ctx context.Context, arg CreateUserWithIDParams) (User, error) {
+	row := q.db.QueryRow(ctx, createUserWithID,
+		arg.ID,
+		arg.Username,
+		arg.Email,
+		arg.PasswordHash,
+		arg.Role,
+		arg.IsActive,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -156,6 +211,44 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 	return items, nil
 }
 
+const updateUser = `-- name: UpdateUser :exec
+UPDATE users
+SET username = $2,
+    email = $3,
+    role = $4,
+    is_active = $5,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateUserParams struct {
+	ID       uuid.UUID
+	Username string
+	Email    string
+	Role     RoleEnum
+	IsActive bool
+}
+
+// UpdateUser
+//
+//	UPDATE users
+//	SET username = $2,
+//	    email = $3,
+//	    role = $4,
+//	    is_active = $5,
+//	    updated_at = NOW()
+//	WHERE id = $1
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
+	_, err := q.db.Exec(ctx, updateUser,
+		arg.ID,
+		arg.Username,
+		arg.Email,
+		arg.Role,
+		arg.IsActive,
+	)
+	return err
+}
+
 const updateUserIsActive = `-- name: UpdateUserIsActive :exec
 UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2
 `
@@ -187,6 +280,23 @@ type UpdateUserPasswordParams struct {
 //	UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2
 func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
 	_, err := q.db.Exec(ctx, updateUserPassword, arg.PasswordHash, arg.ID)
+	return err
+}
+
+const updateUserRole = `-- name: UpdateUserRole :exec
+UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2
+`
+
+type UpdateUserRoleParams struct {
+	Role RoleEnum
+	ID   uuid.UUID
+}
+
+// UpdateUserRole
+//
+//	UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2
+func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error {
+	_, err := q.db.Exec(ctx, updateUserRole, arg.Role, arg.ID)
 	return err
 }
 

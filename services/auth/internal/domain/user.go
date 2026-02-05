@@ -14,8 +14,9 @@ func (u UserRole) String() string {
 }
 
 const (
-	RoleUser  UserRole = "user"
-	RoleAdmin UserRole = "admin"
+	RoleUser       UserRole = "User"
+	RoleAdmin      UserRole = "Admin"
+	RoleSuperAdmin UserRole = "SuperAdmin"
 )
 
 // User represents a registered user in the system

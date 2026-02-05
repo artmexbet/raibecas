@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/mailru/easyjson"
 	"github.com/nats-io/nats.go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -18,14 +19,30 @@ type Message struct {
 	Ctx context.Context
 }
 
-// UnmarshalData десериализует данные сообщения в структуру
+// UnmarshalData десериализует данные сообщения в структуру (legacy, использует encoding/json)
+// Deprecated: Use UnmarshalEasyJSON for better performance
 func (m *Message) UnmarshalData(v interface{}) error {
 	return json.Unmarshal(m.Data, v)
 }
 
-// RespondJSON отправляет ответ на запрос с JSON-сериализацией
+// UnmarshalEasyJSON десериализует данные с помощью easyjson (рекомендуется)
+func (m *Message) UnmarshalEasyJSON(v easyjson.Unmarshaler) error {
+	return easyjson.Unmarshal(m.Data, v)
+}
+
+// RespondJSON отправляет ответ на запрос с JSON-сериализацией (legacy)
+// Deprecated: Use RespondEasyJSON for better performance
 func (m *Message) RespondJSON(v interface{}) error {
 	data, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Errorf("failed to marshal response: %w", err)
+	}
+	return m.Respond(data)
+}
+
+// RespondEasyJSON отправляет ответ с easyjson сериализацией (рекомендуется)
+func (m *Message) RespondEasyJSON(v easyjson.Marshaler) error {
+	data, err := easyjson.Marshal(v)
 	if err != nil {
 		return fmt.Errorf("failed to marshal response: %w", err)
 	}
@@ -109,6 +126,9 @@ func (c *Client) Subscribe(subject string, handler HandlerFunc) (*nats.Subscript
 		// Извлекаем контекст с trace информацией
 		ctx := c.extractContext(msg)
 
+		ctx, span := c.tracer.Start(ctx, fmt.Sprintf("nats.handle %s", msg.Subject))
+		defer span.End()
+
 		// Создаём обёртку с контекстом
 		message := &Message{
 			Msg: msg,
@@ -151,10 +171,6 @@ func (c *Client) QueueSubscribe(subject, queue string, handler HandlerFunc) (*na
 
 // Publish публикует сообщение с автоматической пропагацией trace context
 func (c *Client) Publish(ctx context.Context, subject string, data []byte) error {
-	// Создаём span для публикации
-	ctx, span := c.tracer.Start(ctx, fmt.Sprintf("nats.publish %s", subject))
-	defer span.End()
-
 	msg := nats.NewMsg(subject)
 	msg.Data = data
 
@@ -166,9 +182,6 @@ func (c *Client) Publish(ctx context.Context, subject string, data []byte) error
 
 // PublishMsg публикует готовое сообщение с пропагацией trace context
 func (c *Client) PublishMsg(ctx context.Context, msg *nats.Msg) error {
-	ctx, span := c.tracer.Start(ctx, fmt.Sprintf("nats.publish %s", msg.Subject))
-	defer span.End()
-
 	// Инжектируем trace context в headers
 	c.propagator.Inject(ctx, &headerCarrier{header: msg.Header})
 

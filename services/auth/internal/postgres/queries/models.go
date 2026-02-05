@@ -5,10 +5,55 @@
 package queries
 
 import (
+	"database/sql/driver"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+type RoleEnum string
+
+const (
+	RoleEnumUser       RoleEnum = "User"
+	RoleEnumAdmin      RoleEnum = "Admin"
+	RoleEnumSuperAdmin RoleEnum = "SuperAdmin"
+)
+
+func (e *RoleEnum) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RoleEnum(s)
+	case string:
+		*e = RoleEnum(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RoleEnum: %T", src)
+	}
+	return nil
+}
+
+type NullRoleEnum struct {
+	RoleEnum RoleEnum
+	Valid    bool // Valid is true if RoleEnum is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRoleEnum) Scan(value interface{}) error {
+	if value == nil {
+		ns.RoleEnum, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RoleEnum.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRoleEnum) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RoleEnum), nil
+}
 
 type RegistrationRequest struct {
 	ID         uuid.UUID
@@ -28,7 +73,7 @@ type User struct {
 	Username     string
 	Email        string
 	PasswordHash string
-	Role         string
+	Role         RoleEnum
 	IsActive     bool
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
