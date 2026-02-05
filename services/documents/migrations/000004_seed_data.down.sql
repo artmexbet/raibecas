@@ -1,0 +1,3 @@
+-- Seed data rollback is optional
+-- Categories, tags, and authors may have been used by documents
+-- For safety, we don't delete seed data in down migration
