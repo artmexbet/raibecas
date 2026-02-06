@@ -196,3 +196,68 @@ type DocumentVersion struct {
 	CreatedBy   *uuid.UUID `json:"created_by,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 }
+
+// Metadata DTOs
+
+// CreateAuthorRequest represents an author creation request
+//
+//easyjson:json
+type CreateAuthorRequest struct {
+	Name string `json:"name"`
+}
+
+// CreateAuthorResponse represents an author creation response
+//
+//easyjson:json
+type CreateAuthorResponse struct {
+	Author Author `json:"author"`
+}
+
+// ListAuthorsResponse represents the response for listing authors
+//
+//easyjson:json
+type ListAuthorsResponse struct {
+	Authors []Author `json:"authors"`
+}
+
+// CreateCategoryRequest represents a category creation request
+//
+//easyjson:json
+type CreateCategoryRequest struct {
+	Title string `json:"title"`
+}
+
+// CreateCategoryResponse represents a category creation response
+//
+//easyjson:json
+type CreateCategoryResponse struct {
+	Category Category `json:"category"`
+}
+
+// ListCategoriesResponse represents the response for listing categories
+//
+//easyjson:json
+type ListCategoriesResponse struct {
+	Categories []Category `json:"categories"`
+}
+
+// CreateTagRequest represents a tag creation request
+//
+//easyjson:json
+type CreateTagRequest struct {
+	Title string `json:"title"`
+}
+
+// CreateTagResponse represents a tag creation response
+//
+//easyjson:json
+type CreateTagResponse struct {
+	Tag Tag `json:"tag"`
+}
+
+// ListTagsResponse represents the response for listing tags
+//
+//easyjson:json
+type ListTagsResponse struct {
+	Tags []Tag `json:"tags"`
+}

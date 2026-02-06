@@ -156,3 +156,11 @@ func getAuthUser(c *fiber.Ctx) (*AuthUser, bool) {
 	user, ok := c.Locals(UserContextKey).(*AuthUser)
 	return user, ok
 }
+
+// getUserRole extracts user role from fiber context and returns it
+func getUserRole(c *fiber.Ctx) string {
+	if user, ok := getAuthUser(c); ok {
+		return user.Role
+	}
+	return ""
+}

@@ -45,3 +45,21 @@ type TagRepository interface {
 	AddToDocument(ctx context.Context, documentID uuid.UUID, tagID int) error
 	ClearDocument(ctx context.Context, documentID uuid.UUID) error
 }
+
+// MetadataRepository defines the interface for metadata operations
+type MetadataRepository interface {
+	// Authors
+	ListAuthors(ctx context.Context) ([]domain.Author, error)
+	CreateAuthor(ctx context.Context, name string) (*domain.Author, error)
+	GetAuthorByID(ctx context.Context, id uuid.UUID) (*domain.Author, error)
+
+	// Categories
+	ListCategories(ctx context.Context) ([]domain.Category, error)
+	CreateCategory(ctx context.Context, title string) (*domain.Category, error)
+	GetCategoryByID(ctx context.Context, id int) (*domain.Category, error)
+
+	// Tags
+	ListTags(ctx context.Context) ([]domain.Tag, error)
+	CreateTag(ctx context.Context, title string) (*domain.Tag, error)
+	GetTagByID(ctx context.Context, id int) (*domain.Tag, error)
+}

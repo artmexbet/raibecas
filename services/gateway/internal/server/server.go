@@ -115,6 +115,21 @@ func (s *Server) setupProtectedRoutes() {
 	docs.Patch("/:id", s.updateDocument)
 	docs.Delete("/:id", s.deleteDocument)
 
+	// Authors routes
+	authors := protected.Group("/api/v1/authors")
+	authors.Get("/", s.listAuthors)
+	authors.Post("/", s.createAuthor)
+
+	// Categories routes
+	categories := protected.Group("/api/v1/categories")
+	categories.Get("/", s.listCategories)
+	categories.Post("/", s.createCategory)
+
+	// Tags routes
+	tags := protected.Group("/api/v1/tags")
+	tags.Get("/", s.listTags)
+	tags.Post("/", s.createTag)
+
 	// Users routes
 	users := protected.Group("/api/v1/users")
 	users.Get("/", s.listUsers)

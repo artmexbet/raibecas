@@ -13,12 +13,13 @@ import (
 
 // DocumentService handles business logic for documents
 type DocumentService struct {
-	docRepo     DocumentRepository
-	versionRepo VersionRepository
-	tagRepo     TagRepository
-	storage     Storage
-	publisher   EventPublisher
-	logger      *slog.Logger
+	docRepo      DocumentRepository
+	versionRepo  VersionRepository
+	tagRepo      TagRepository
+	metadataRepo MetadataRepository
+	storage      Storage
+	publisher    EventPublisher
+	logger       *slog.Logger
 }
 
 // NewDocumentService creates a new document service
@@ -26,17 +27,19 @@ func NewDocumentService(
 	docRepo DocumentRepository,
 	versionRepo VersionRepository,
 	tagRepo TagRepository,
+	metadataRepo MetadataRepository,
 	storage Storage,
 	publisher EventPublisher,
 	logger *slog.Logger,
 ) *DocumentService {
 	return &DocumentService{
-		docRepo:     docRepo,
-		versionRepo: versionRepo,
-		tagRepo:     tagRepo,
-		storage:     storage,
-		publisher:   publisher,
-		logger:      logger,
+		docRepo:      docRepo,
+		versionRepo:  versionRepo,
+		tagRepo:      tagRepo,
+		metadataRepo: metadataRepo,
+		storage:      storage,
+		publisher:    publisher,
+		logger:       logger,
 	}
 }
 
@@ -268,4 +271,45 @@ func (s *DocumentService) MarkDocumentIndexed(ctx context.Context, id uuid.UUID,
 // ListDocumentVersions retrieves document versions
 func (s *DocumentService) ListDocumentVersions(ctx context.Context, id uuid.UUID) ([]domain.DocumentVersion, error) {
 	return s.versionRepo.ListByDocumentID(ctx, id)
+}
+
+// Metadata methods
+
+// ListAuthors retrieves all authors
+func (s *DocumentService) ListAuthors(ctx context.Context) ([]domain.Author, error) {
+	return s.metadataRepo.ListAuthors(ctx)
+}
+
+// CreateAuthor creates a new author
+func (s *DocumentService) CreateAuthor(ctx context.Context, name string) (*domain.Author, error) {
+	if name == "" {
+		return nil, fmt.Errorf("%w: name is required", ErrInvalidInput)
+	}
+	return s.metadataRepo.CreateAuthor(ctx, name)
+}
+
+// ListCategories retrieves all categories
+func (s *DocumentService) ListCategories(ctx context.Context) ([]domain.Category, error) {
+	return s.metadataRepo.ListCategories(ctx)
+}
+
+// CreateCategory creates a new category
+func (s *DocumentService) CreateCategory(ctx context.Context, title string) (*domain.Category, error) {
+	if title == "" {
+		return nil, fmt.Errorf("%w: title is required", ErrInvalidInput)
+	}
+	return s.metadataRepo.CreateCategory(ctx, title)
+}
+
+// ListTags retrieves all tags
+func (s *DocumentService) ListTags(ctx context.Context) ([]domain.Tag, error) {
+	return s.metadataRepo.ListTags(ctx)
+}
+
+// CreateTag creates a new tag
+func (s *DocumentService) CreateTag(ctx context.Context, title string) (*domain.Tag, error) {
+	if title == "" {
+		return nil, fmt.Errorf("%w: title is required", ErrInvalidInput)
+	}
+	return s.metadataRepo.CreateTag(ctx, title)
 }

@@ -18,6 +18,7 @@ func New(client *natsw.Client, handler *handler.Handler) Server {
 	}
 }
 
+//nolint:errcheck // Subscriptions are fire-and-forget, errors are logged in the client
 func (s *Server) Start() error {
 	s.client.Subscribe("users.list", s.handler.HandleListUsers)
 	s.client.Subscribe("users.get", s.handler.HandleGetUser)

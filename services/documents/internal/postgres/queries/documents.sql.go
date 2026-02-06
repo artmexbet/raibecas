@@ -7,6 +7,7 @@ package queries
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -102,23 +103,30 @@ func (q *Queries) CountDocuments(ctx context.Context, arg CountDocumentsParams) 
 }
 
 const createAuthor = `-- name: CreateAuthor :one
-INSERT INTO authors (name, bio)
-VALUES ($1, $2)
+INSERT INTO authors (id, name, created_at, updated_at)
+VALUES ($1, $2, $3, $4)
 RETURNING id, name, bio, created_at, updated_at
 `
 
 type CreateAuthorParams struct {
-	Name string
-	Bio  *string
+	ID        uuid.UUID
+	Name      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // CreateAuthor
 //
-//	INSERT INTO authors (name, bio)
-//	VALUES ($1, $2)
+//	INSERT INTO authors (id, name, created_at, updated_at)
+//	VALUES ($1, $2, $3, $4)
 //	RETURNING id, name, bio, created_at, updated_at
 func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (Author, error) {
-	row := q.db.QueryRow(ctx, createAuthor, arg.Name, arg.Bio)
+	row := q.db.QueryRow(ctx, createAuthor,
+		arg.ID,
+		arg.Name,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
 	var i Author
 	err := row.Scan(
 		&i.ID,
@@ -131,23 +139,23 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (Aut
 }
 
 const createCategory = `-- name: CreateCategory :one
-INSERT INTO categories (title, description)
+INSERT INTO categories (title, created_at)
 VALUES ($1, $2)
 RETURNING id, title, description, created_at
 `
 
 type CreateCategoryParams struct {
-	Title       string
-	Description *string
+	Title     string
+	CreatedAt time.Time
 }
 
 // CreateCategory
 //
-//	INSERT INTO categories (title, description)
+//	INSERT INTO categories (title, created_at)
 //	VALUES ($1, $2)
 //	RETURNING id, title, description, created_at
 func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error) {
-	row := q.db.QueryRow(ctx, createCategory, arg.Title, arg.Description)
+	row := q.db.QueryRow(ctx, createCategory, arg.Title, arg.CreatedAt)
 	var i Category
 	err := row.Scan(
 		&i.ID,
@@ -271,18 +279,23 @@ func (q *Queries) CreateDocumentVersion(ctx context.Context, arg CreateDocumentV
 }
 
 const createTag = `-- name: CreateTag :one
-INSERT INTO tags (title)
-VALUES ($1)
+INSERT INTO tags (title, created_at)
+VALUES ($1, $2)
 RETURNING id, title, created_at
 `
 
+type CreateTagParams struct {
+	Title     string
+	CreatedAt time.Time
+}
+
 // CreateTag
 //
-//	INSERT INTO tags (title)
-//	VALUES ($1)
+//	INSERT INTO tags (title, created_at)
+//	VALUES ($1, $2)
 //	RETURNING id, title, created_at
-func (q *Queries) CreateTag(ctx context.Context, title string) (Tag, error) {
-	row := q.db.QueryRow(ctx, createTag, title)
+func (q *Queries) CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error) {
+	row := q.db.QueryRow(ctx, createTag, arg.Title, arg.CreatedAt)
 	var i Tag
 	err := row.Scan(&i.ID, &i.Title, &i.CreatedAt)
 	return i, err
@@ -454,21 +467,14 @@ func (q *Queries) GetTagByID(ctx context.Context, id int32) (Tag, error) {
 const listAuthors = `-- name: ListAuthors :many
 SELECT id, name, bio, created_at, updated_at FROM authors
 ORDER BY name
-LIMIT $1 OFFSET $2
 `
-
-type ListAuthorsParams struct {
-	Limit  int32
-	Offset int32
-}
 
 // ListAuthors
 //
 //	SELECT id, name, bio, created_at, updated_at FROM authors
 //	ORDER BY name
-//	LIMIT $1 OFFSET $2
-func (q *Queries) ListAuthors(ctx context.Context, arg ListAuthorsParams) ([]Author, error) {
-	rows, err := q.db.Query(ctx, listAuthors, arg.Limit, arg.Offset)
+func (q *Queries) ListAuthors(ctx context.Context) ([]Author, error) {
+	rows, err := q.db.Query(ctx, listAuthors)
 	if err != nil {
 		return nil, err
 	}

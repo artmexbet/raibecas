@@ -99,8 +99,8 @@ SELECT * FROM document_versions
 WHERE document_id = $1 AND version = $2;
 
 -- name: CreateAuthor :one
-INSERT INTO authors (name, bio)
-VALUES ($1, $2)
+INSERT INTO authors (id, name, created_at, updated_at)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: GetAuthorByID :one
@@ -109,11 +109,10 @@ WHERE id = $1;
 
 -- name: ListAuthors :many
 SELECT * FROM authors
-ORDER BY name
-LIMIT $1 OFFSET $2;
+ORDER BY name;
 
 -- name: CreateCategory :one
-INSERT INTO categories (title, description)
+INSERT INTO categories (title, created_at)
 VALUES ($1, $2)
 RETURNING *;
 
@@ -126,8 +125,8 @@ SELECT * FROM categories
 ORDER BY title;
 
 -- name: CreateTag :one
-INSERT INTO tags (title)
-VALUES ($1)
+INSERT INTO tags (title, created_at)
+VALUES ($1, $2)
 RETURNING *;
 
 -- name: GetTagByID :one

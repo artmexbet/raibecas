@@ -14,14 +14,34 @@ type DocumentServiceConnector interface {
 	ListDocuments(ctx context.Context, query domain.ListDocumentsQuery) (*domain.ListDocumentsResponse, error)
 
 	// CreateDocument creates a new document
-	CreateDocument(ctx context.Context, req domain.CreateDocumentRequest) (*domain.CreateDocumentResponse, error)
+	CreateDocument(ctx context.Context, req domain.CreateDocumentRequest, userRole string) (*domain.CreateDocumentResponse, error)
 
 	// GetDocument retrieves a single document by ID
 	GetDocument(ctx context.Context, id uuid.UUID) (*domain.GetDocumentResponse, error)
 
 	// UpdateDocument updates an existing document
-	UpdateDocument(ctx context.Context, id uuid.UUID, req domain.UpdateDocumentRequest) (*domain.UpdateDocumentResponse, error)
+	UpdateDocument(ctx context.Context, req domain.UpdateDocumentRequest, userRole string) (*domain.UpdateDocumentResponse, error)
 
 	// DeleteDocument deletes a document by ID
-	DeleteDocument(ctx context.Context, id uuid.UUID) error
+	DeleteDocument(ctx context.Context, id uuid.UUID, userRole string) error
+
+	// Metadata methods
+
+	// ListAuthors retrieves all authors
+	ListAuthors(ctx context.Context) (*domain.ListAuthorsResponse, error)
+
+	// CreateAuthor creates a new author
+	CreateAuthor(ctx context.Context, req domain.CreateAuthorRequest, userRole string) (*domain.CreateAuthorResponse, error)
+
+	// ListCategories retrieves all categories
+	ListCategories(ctx context.Context) (*domain.ListCategoriesResponse, error)
+
+	// CreateCategory creates a new category
+	CreateCategory(ctx context.Context, req domain.CreateCategoryRequest, userRole string) (*domain.CreateCategoryResponse, error)
+
+	// ListTags retrieves all tags
+	ListTags(ctx context.Context) (*domain.ListTagsResponse, error)
+
+	// CreateTag creates a new tag
+	CreateTag(ctx context.Context, req domain.CreateTagRequest, userRole string) (*domain.CreateTagResponse, error)
 }

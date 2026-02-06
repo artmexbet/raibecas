@@ -127,22 +127,25 @@ func New(ctx context.Context) (*App, error) {
 	docRepo := postgres.NewDocumentRepository(q)
 	versionRepo := postgres.NewVersionRepository(q)
 	tagRepo := postgres.NewTagRepository(q)
+	metadataRepo := postgres.NewMetadataRepository(q)
 
 	// Initialize service with repositories
 	docService := service.NewDocumentService(
 		docRepo,
 		versionRepo,
 		tagRepo,
+		metadataRepo,
 		minioStorage,
 		publisher,
 		logger,
 	)
 
-	// Initialize handler
+	// Initialize handlers
 	docHandler := server.NewDocumentHandler(docService, logger)
+	metadataHandler := server.NewMetadataHandler(docService, logger)
 
 	// Initialize server
-	srv := server.New(natsClient, docHandler)
+	srv := server.New(natsClient, docHandler, metadataHandler)
 	app.server = srv
 
 	return app, nil

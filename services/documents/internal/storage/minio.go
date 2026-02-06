@@ -87,7 +87,7 @@ func (s *MinIOStorage) GetDocument(ctx context.Context, path string) ([]byte, er
 	if err != nil {
 		return nil, fmt.Errorf("get document from minio: %w", err)
 	}
-	defer reader.Close()
+	defer reader.Close() //nolint:errcheck
 
 	content, err := io.ReadAll(reader)
 	if err != nil {

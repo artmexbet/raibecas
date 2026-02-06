@@ -73,7 +73,7 @@ func (p *Postgres) CountTotalUsers(ctx context.Context) (int64, error) {
 func (p *Postgres) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	u, err := p.q.GetUserByID(ctx, id)
 	if err != nil {
-		if errors.Is(pgx.ErrNoRows, err) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil // Not found
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
