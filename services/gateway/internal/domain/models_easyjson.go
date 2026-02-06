@@ -438,6 +438,20 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 				}
 				in.Delim(']')
 			}
+		case "content":
+			if in.IsNull() {
+				in.Skip()
+				out.Content = nil
+			} else {
+				if out.Content == nil {
+					out.Content = new(string)
+				}
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					*out.Content = string(in.String())
+				}
+			}
 		case "created_at":
 			if in.IsNull() {
 				in.Skip()
@@ -517,6 +531,11 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 			}
 			out.RawByte(']')
 		}
+	}
+	if in.Content != nil {
+		const prefix string = ",\"content\":"
+		out.RawString(prefix)
+		out.String(string(*in.Content))
 	}
 	{
 		const prefix string = ",\"created_at\":"

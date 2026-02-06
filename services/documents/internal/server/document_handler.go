@@ -1,13 +1,13 @@
-package handler
+package server
 
 import (
-	"encoding/json"
 	"errors"
 	"log/slog"
 
 	"github.com/google/uuid"
 
 	"github.com/artmexbet/raibecas/libs/dto"
+	"github.com/artmexbet/raibecas/libs/dto/documents"
 	"github.com/artmexbet/raibecas/libs/natsw"
 
 	"github.com/artmexbet/raibecas/services/documents/internal/domain"
@@ -30,8 +30,8 @@ func NewDocumentHandler(service *service.DocumentService, logger *slog.Logger) *
 
 // HandleCreateDocument handles document creation requests
 func (h *DocumentHandler) HandleCreateDocument(msg *natsw.Message) error {
-	var req domain.CreateDocumentRequest
-	if err := json.Unmarshal(msg.Data, &req); err != nil {
+	var req documents.CreateDocumentRequest
+	if err := req.UnmarshalJSON(msg.Data); err != nil {
 		h.logger.ErrorContext(msg.Ctx, "invalid create document request", "error", err)
 		return h.respondError(msg, dto.ErrCodeInvalidRequest)
 	}
@@ -42,7 +42,19 @@ func (h *DocumentHandler) HandleCreateDocument(msg *natsw.Message) error {
 		return h.respondError(msg, dto.ErrCodeUnauthorized)
 	}
 
-	doc, err := h.service.CreateDocument(msg.Ctx, req)
+	// Convert to domain type
+	domainReq := domain.CreateDocumentRequest{
+		Title:           req.Title,
+		Description:     req.Description,
+		AuthorID:        req.AuthorID,
+		CategoryID:      req.CategoryID,
+		PublicationDate: req.PublicationDate,
+		Content:         req.Content,
+		TagIDs:          req.TagIDs,
+		CreatedBy:       req.CreatedBy,
+	}
+
+	doc, err := h.service.CreateDocument(msg.Ctx, domainReq)
 	if err != nil {
 		h.logger.ErrorContext(msg.Ctx, "failed to create document", "error", err)
 		if errors.Is(err, service.ErrInvalidInput) {
@@ -51,15 +63,19 @@ func (h *DocumentHandler) HandleCreateDocument(msg *natsw.Message) error {
 		return h.respondError(msg, dto.ErrCodeInternal)
 	}
 
-	return h.respond(msg, doc)
+	// Convert domain document to dto
+	dtoDoc := convertDomainToDTO(*doc)
+	response := documents.CreateDocumentResponse{
+		Document: dtoDoc,
+	}
+
+	return msg.RespondEasyJSON(&response)
 }
 
 // HandleGetDocument handles document retrieval requests
 func (h *DocumentHandler) HandleGetDocument(msg *natsw.Message) error {
-	var req struct {
-		ID uuid.UUID `json:"id"`
-	}
-	if err := json.Unmarshal(msg.Data, &req); err != nil {
+	var req documents.GetDocumentRequest
+	if err := req.UnmarshalJSON(msg.Data); err != nil {
 		h.logger.ErrorContext(msg.Ctx, "invalid get document request", "error", err)
 		return h.respondError(msg, dto.ErrCodeInvalidRequest)
 	}
@@ -73,15 +89,19 @@ func (h *DocumentHandler) HandleGetDocument(msg *natsw.Message) error {
 		return h.respondError(msg, dto.ErrCodeInternal)
 	}
 
-	return msg.RespondEasyJSON(doc)
+	// Convert domain document to dto
+	dtoDoc := convertDomainToDTO(*doc)
+	response := documents.GetDocumentResponse{
+		Document: dtoDoc,
+	}
+
+	return msg.RespondEasyJSON(&response)
 }
 
 // HandleGetDocumentContent handles document content retrieval requests
 func (h *DocumentHandler) HandleGetDocumentContent(msg *natsw.Message) error {
-	var req struct {
-		ID uuid.UUID `json:"id"`
-	}
-	if err := json.Unmarshal(msg.Data, &req); err != nil {
+	var req documents.GetDocumentContentRequest
+	if err := req.UnmarshalJSON(msg.Data); err != nil {
 		h.logger.ErrorContext(msg.Ctx, "invalid get document content request", "error", err)
 		return h.respondError(msg, dto.ErrCodeInvalidRequest)
 	}
@@ -95,44 +115,42 @@ func (h *DocumentHandler) HandleGetDocumentContent(msg *natsw.Message) error {
 		return h.respondError(msg, dto.ErrCodeInternal)
 	}
 
-	response := struct {
-		Content string `json:"content"`
-	}{
+	response := documents.GetDocumentContentResponse{
 		Content: string(content),
 	}
 
-	return h.respond(msg, response)
+	return msg.RespondEasyJSON(&response)
 }
 
 // HandleListDocuments handles document listing requests
 func (h *DocumentHandler) HandleListDocuments(msg *natsw.Message) error {
-	var req struct {
-		Limit      int        `json:"limit"`
-		Offset     int        `json:"offset"`
-		AuthorID   *uuid.UUID `json:"author_id,omitempty"`
-		CategoryID *int       `json:"category_id,omitempty"`
-		Search     string     `json:"search,omitempty"`
-	}
-	if err := json.Unmarshal(msg.Data, &req); err != nil {
+	var req documents.ListDocumentsQuery
+	if err := req.UnmarshalJSON(msg.Data); err != nil {
 		h.logger.ErrorContext(msg.Ctx, "invalid list documents request", "error", err)
 		return h.respondError(msg, dto.ErrCodeInvalidRequest)
 	}
 
 	// Set default limit
-	if req.Limit <= 0 || req.Limit > 100 {
-		req.Limit = 20
+	limit := req.Limit
+	if limit <= 0 || limit > 100 {
+		limit = 20
 	}
 
 	var categoryID *int32
-	if req.CategoryID != nil {
-		cid := int32(*req.CategoryID)
+	if req.CategoryID != 0 {
+		cid := int32(req.CategoryID)
 		categoryID = &cid
 	}
 
+	var authorID *uuid.UUID
+	if req.AuthorID != uuid.Nil {
+		authorID = &req.AuthorID
+	}
+
 	docs, total, err := h.service.ListDocuments(msg.Ctx, domain.ListDocumentsParams{
-		Limit:      req.Limit,
+		Limit:      limit,
 		Offset:     req.Offset,
-		AuthorID:   req.AuthorID,
+		AuthorID:   authorID,
 		CategoryID: categoryID,
 		Search:     req.Search,
 	})
@@ -141,24 +159,24 @@ func (h *DocumentHandler) HandleListDocuments(msg *natsw.Message) error {
 		return h.respondError(msg, dto.ErrCodeInternal)
 	}
 
-	response := struct {
-		Documents []domain.Document `json:"documents"`
-		Total     int               `json:"total"`
-	}{
-		Documents: docs,
+	// Convert domain documents to dto
+	dtoDocs := make([]documents.Document, len(docs))
+	for i, doc := range docs {
+		dtoDocs[i] = convertDomainToDTO(doc)
+	}
+
+	response := documents.ListDocumentsResponse{
+		Documents: dtoDocs,
 		Total:     total,
 	}
 
-	return h.respond(msg, response)
+	return msg.RespondEasyJSON(&response)
 }
 
 // HandleUpdateDocument handles document update requests
 func (h *DocumentHandler) HandleUpdateDocument(msg *natsw.Message) error {
-	var req struct {
-		ID      uuid.UUID                    `json:"id"`
-		Updates domain.UpdateDocumentRequest `json:"updates"`
-	}
-	if err := json.Unmarshal(msg.Data, &req); err != nil {
+	var req documents.UpdateDocumentRequest
+	if err := req.UnmarshalJSON(msg.Data); err != nil {
 		h.logger.ErrorContext(msg.Ctx, "invalid update document request", "error", err)
 		return h.respondError(msg, dto.ErrCodeInvalidRequest)
 	}
@@ -169,7 +187,20 @@ func (h *DocumentHandler) HandleUpdateDocument(msg *natsw.Message) error {
 		return h.respondError(msg, dto.ErrCodeUnauthorized)
 	}
 
-	doc, err := h.service.UpdateDocument(msg.Ctx, req.ID, req.Updates)
+	// Convert to domain type
+	domainReq := domain.UpdateDocumentRequest{
+		Title:           req.Title,
+		Description:     req.Description,
+		AuthorID:        req.AuthorID,
+		CategoryID:      req.CategoryID,
+		PublicationDate: req.PublicationDate,
+		Content:         req.Content,
+		TagIDs:          req.TagIDs,
+		Changes:         req.Changes,
+		UpdatedBy:       req.UpdatedBy,
+	}
+
+	doc, err := h.service.UpdateDocument(msg.Ctx, req.ID, domainReq)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			return h.respondError(msg, dto.ErrCodeNotFound)
@@ -178,15 +209,19 @@ func (h *DocumentHandler) HandleUpdateDocument(msg *natsw.Message) error {
 		return h.respondError(msg, dto.ErrCodeInternal)
 	}
 
-	return msg.RespondEasyJSON(doc)
+	// Convert domain document to dto
+	dtoDoc := convertDomainToDTO(*doc)
+	response := documents.UpdateDocumentResponse{
+		Document: dtoDoc,
+	}
+
+	return msg.RespondEasyJSON(&response)
 }
 
 // HandleDeleteDocument handles document deletion requests
 func (h *DocumentHandler) HandleDeleteDocument(msg *natsw.Message) error {
-	var req struct {
-		ID uuid.UUID `json:"id"`
-	}
-	if err := json.Unmarshal(msg.Data, &req); err != nil {
+	var req documents.DeleteDocumentRequest
+	if err := req.UnmarshalJSON(msg.Data); err != nil {
 		h.logger.ErrorContext(msg.Ctx, "invalid delete document request", "error", err)
 		return h.respondError(msg, dto.ErrCodeInvalidRequest)
 	}
@@ -205,22 +240,17 @@ func (h *DocumentHandler) HandleDeleteDocument(msg *natsw.Message) error {
 		return h.respondError(msg, dto.ErrCodeInternal)
 	}
 
-	response := struct {
-		Success bool `json:"success"`
-	}{
+	response := documents.DeleteDocumentResponse{
 		Success: true,
 	}
 
-	data, _ := json.Marshal(response)
-	return msg.Respond(data)
+	return msg.RespondEasyJSON(&response)
 }
 
 // HandleListDocumentVersions handles document versions listing requests
 func (h *DocumentHandler) HandleListDocumentVersions(msg *natsw.Message) error {
-	var req struct {
-		ID uuid.UUID `json:"id"`
-	}
-	if err := json.Unmarshal(msg.Data, &req); err != nil {
+	var req documents.ListDocumentVersionsRequest
+	if err := req.UnmarshalJSON(msg.Data); err != nil {
 		h.logger.ErrorContext(msg.Ctx, "invalid list versions request", "error", err)
 		return h.respondError(msg, dto.ErrCodeInvalidRequest)
 	}
@@ -231,14 +261,31 @@ func (h *DocumentHandler) HandleListDocumentVersions(msg *natsw.Message) error {
 		return h.respondError(msg, dto.ErrCodeInternal)
 	}
 
-	data, _ := json.Marshal(versions)
-	return msg.Respond(data)
+	// Convert domain versions to dto
+	dtoVersions := make([]documents.DocumentVersion, len(versions))
+	for i, v := range versions {
+		dtoVersions[i] = documents.DocumentVersion{
+			ID:          v.ID,
+			DocumentID:  v.DocumentID,
+			Version:     v.Version,
+			ContentPath: v.ContentPath,
+			Changes:     v.Changes,
+			CreatedBy:   v.CreatedBy,
+			CreatedAt:   v.CreatedAt,
+		}
+	}
+
+	response := documents.ListDocumentVersionsResponse{
+		Versions: dtoVersions,
+	}
+
+	return msg.RespondEasyJSON(&response)
 }
 
 // HandleDocumentIndexed handles document indexed events from index-python
 func (h *DocumentHandler) HandleDocumentIndexed(msg *natsw.Message) error {
 	var event domain.DocumentIndexedEvent
-	if err := json.Unmarshal(msg.Data, &event); err != nil {
+	if err := event.UnmarshalJSON(msg.Data); err != nil {
 		h.logger.ErrorContext(msg.Ctx, "invalid document indexed event", "error", err)
 		return nil // Don't fail on event processing
 	}
@@ -275,10 +322,51 @@ func (h *DocumentHandler) respondError(msg *natsw.Message, errCode dto.ErrorCode
 	return msg.RespondEasyJSON(resp)
 }
 
-func (h *DocumentHandler) respond(msg *natsw.Message, data any) error {
-	resp := &dto.StandardResponse{
-		Success: true,
-		Data:    data,
+// convertDomainToDTO converts domain.Document to documents.Document DTO
+func convertDomainToDTO(doc domain.Document) documents.Document {
+	dtoDoc := documents.Document{
+		ID:              doc.ID,
+		Title:           doc.Title,
+		Description:     doc.Description,
+		AuthorID:        doc.AuthorID,
+		CategoryID:      doc.CategoryID,
+		PublicationDate: doc.PublicationDate,
+		ContentPath:     doc.ContentPath,
+		CurrentVersion:  doc.CurrentVersion,
+		Indexed:         doc.Indexed,
+		CreatedAt:       doc.CreatedAt,
+		UpdatedAt:       doc.UpdatedAt,
 	}
-	return msg.RespondEasyJSON(resp)
+
+	if doc.Author != nil {
+		dtoDoc.Author = &documents.Author{
+			ID:        doc.Author.ID,
+			Name:      doc.Author.Name,
+			Bio:       doc.Author.Bio,
+			CreatedAt: doc.Author.CreatedAt,
+			UpdatedAt: doc.Author.UpdatedAt,
+		}
+	}
+
+	if doc.Category != nil {
+		dtoDoc.Category = &documents.Category{
+			ID:          doc.Category.ID,
+			Title:       doc.Category.Title,
+			Description: doc.Category.Description,
+			CreatedAt:   doc.Category.CreatedAt,
+		}
+	}
+
+	if len(doc.Tags) > 0 {
+		dtoDoc.Tags = make([]documents.Tag, len(doc.Tags))
+		for i, tag := range doc.Tags {
+			dtoDoc.Tags[i] = documents.Tag{
+				ID:        tag.ID,
+				Title:     tag.Title,
+				CreatedAt: tag.CreatedAt,
+			}
+		}
+	}
+
+	return dtoDoc
 }

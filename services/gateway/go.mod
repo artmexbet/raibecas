@@ -7,6 +7,7 @@ require (
 	github.com/artmexbet/raibecas/libs/dto v0.0.0
 	github.com/artmexbet/raibecas/libs/natsw v0.0.0-20260126080331-f6cbb701e26d
 	github.com/artmexbet/raibecas/libs/telemetry v0.0.0
+	github.com/artmexbet/raibecas/libs/utils v0.0.0-20260205142418-b1bdabf86b2d
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/gofiber/contrib/otelfiber/v2 v2.2.3
 	github.com/gofiber/fiber/v2 v2.52.11
@@ -17,11 +18,14 @@ require (
 	go.opentelemetry.io/otel/sdk v1.40.0
 )
 
-replace github.com/artmexbet/raibecas/libs/natsw => ../../libs/natsw
+replace (
+	github.com/artmexbet/raibecas/libs/natsw => ../../libs/natsw
+	github.com/artmexbet/raibecas/libs/utils => ../../libs/utils
+	github.com/artmexbet/raibecas/libs/dto => ../../libs/dto
+	github.com/artmexbet/raibecas/libs/telemetry => ../../libs/telemetry
+)
 
-replace github.com/artmexbet/raibecas/libs/dto => ../../libs/dto
 
-replace github.com/artmexbet/raibecas/libs/telemetry => ../../libs/telemetry
 
 require (
 	github.com/andybalholm/brotli v1.2.0 // indirect
@@ -57,7 +61,6 @@ require (
 	go.opentelemetry.io/contrib v1.39.0 // indirect
 	go.opentelemetry.io/otel v1.40.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.40.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.39.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.40.0 // indirect
 	go.opentelemetry.io/otel/metric v1.40.0 // indirect
 	go.opentelemetry.io/otel/trace v1.40.0 // indirect

@@ -2,7 +2,6 @@ package nats
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 
@@ -33,7 +32,7 @@ func NewPublisher(client *natsw.Client, logger *slog.Logger) *Publisher {
 
 // PublishDocumentCreated publishes a document created event
 func (p *Publisher) PublishDocumentCreated(ctx context.Context, event domain.DocumentCreatedEvent) error {
-	data, err := json.Marshal(event)
+	data, err := event.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal event: %w", err)
 	}
@@ -52,7 +51,7 @@ func (p *Publisher) PublishDocumentCreated(ctx context.Context, event domain.Doc
 
 // PublishDocumentUpdated publishes a document updated event
 func (p *Publisher) PublishDocumentUpdated(ctx context.Context, event domain.DocumentUpdatedEvent) error {
-	data, err := json.Marshal(event)
+	data, err := event.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal event: %w", err)
 	}
@@ -72,7 +71,7 @@ func (p *Publisher) PublishDocumentUpdated(ctx context.Context, event domain.Doc
 
 // PublishDocumentDeleted publishes a document deleted event
 func (p *Publisher) PublishDocumentDeleted(ctx context.Context, event domain.DocumentDeletedEvent) error {
-	data, err := json.Marshal(event)
+	data, err := event.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("marshal event: %w", err)
 	}

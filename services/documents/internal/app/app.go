@@ -16,7 +16,6 @@ import (
 	"github.com/artmexbet/raibecas/libs/telemetry"
 
 	"github.com/artmexbet/raibecas/services/documents/internal/config"
-	"github.com/artmexbet/raibecas/services/documents/internal/handler"
 	natsPublisher "github.com/artmexbet/raibecas/services/documents/internal/nats"
 	"github.com/artmexbet/raibecas/services/documents/internal/postgres"
 	"github.com/artmexbet/raibecas/services/documents/internal/postgres/queries"
@@ -140,7 +139,7 @@ func New(ctx context.Context) (*App, error) {
 	)
 
 	// Initialize handler
-	docHandler := handler.NewDocumentHandler(docService, logger)
+	docHandler := server.NewDocumentHandler(docService, logger)
 
 	// Initialize server
 	srv := server.New(natsClient, docHandler)

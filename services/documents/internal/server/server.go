@@ -2,8 +2,6 @@ package server
 
 import (
 	"github.com/artmexbet/raibecas/libs/natsw"
-
-	"github.com/artmexbet/raibecas/services/documents/internal/handler"
 )
 
 const (
@@ -20,11 +18,11 @@ const (
 // Server represents the NATS server with subscriptions
 type Server struct {
 	client  *natsw.Client
-	handler *handler.DocumentHandler
+	handler *DocumentHandler
 }
 
 // New creates a new server instance
-func New(client *natsw.Client, handler *handler.DocumentHandler) *Server {
+func New(client *natsw.Client, handler *DocumentHandler) *Server {
 	return &Server{
 		client:  client,
 		handler: handler,

@@ -6,10 +6,10 @@ require (
 	github.com/artmexbet/raibecas/libs/dto v0.0.0
 	github.com/artmexbet/raibecas/libs/natsw v0.0.0
 	github.com/artmexbet/raibecas/libs/telemetry v0.0.0
-	github.com/exaring/otelpgx v0.6.2
+	github.com/exaring/otelpgx v0.10.0
 	github.com/google/uuid v1.6.0
 	github.com/ilyakaznacheev/cleanenv v1.5.0
-	github.com/jackc/pgx/v5 v5.7.2
+	github.com/jackc/pgx/v5 v5.8.0
 	github.com/mailru/easyjson v0.9.1
 	github.com/minio/minio-go/v7 v7.0.80
 	github.com/nats-io/nats.go v1.48.0
@@ -17,7 +17,7 @@ require (
 )
 
 require (
-	github.com/BurntSushi/toml v1.2.1 // indirect
+	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect

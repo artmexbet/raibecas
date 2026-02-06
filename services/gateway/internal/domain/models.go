@@ -55,14 +55,14 @@ type Tag struct {
 }
 
 type Document struct {
-	ID          uuid.UUID `json:"id" validate:"required,uuid"`
-	Title       string    `json:"title" validate:"required"`
-	Description *string   `json:"description" validate:"-"`
-	Author      Author    `json:"author" validate:"dive"`
-
+	ID              uuid.UUID `json:"id" validate:"required,uuid"`
+	Title           string    `json:"title" validate:"required"`
+	Description     *string   `json:"description" validate:"-"`
+	Author          Author    `json:"author" validate:"dive"`
 	Category        Category  `json:"category" validate:"dive"`
 	PublicationDate time.Time `json:"publication_date" validate:"required"`
 	Tags            []Tag     `json:"tags" validate:"dive"`
+	Content         *string   `json:"content,omitempty"`
 	Additional
 }
 
