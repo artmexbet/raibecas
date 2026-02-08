@@ -11,29 +11,41 @@ INSERT INTO documents (
 RETURNING *;
 
 -- name: GetDocumentByID :one
-SELECT * FROM documents
-WHERE id = $1;
+SELECT
+    documents.*,
+    sqlc.embed(authors),
+    sqlc.embed(categories)
+FROM documents
+LEFT JOIN authors ON documents.author_id = authors.id
+LEFT JOIN categories ON documents.category_id = categories.id
+WHERE documents.id = $1;
 
 -- name: ListDocuments :many
-SELECT * FROM documents
+SELECT
+    d.*,
+    sqlc.embed(a),
+    sqlc.embed(c)
+FROM documents d
+LEFT JOIN authors a ON d.author_id = a.id
+LEFT JOIN categories c ON d.category_id = c.id
 WHERE (
     CASE
-        WHEN sqlc.narg('author_id')::uuid IS NOT NULL THEN author_id = sqlc.narg('author_id')::uuid
+        WHEN sqlc.narg('author_id')::uuid IS NOT NULL THEN d.author_id = sqlc.narg('author_id')::uuid
         ELSE TRUE
     END
 ) AND (
     CASE
-        WHEN sqlc.narg('category_id')::int IS NOT NULL THEN category_id = sqlc.narg('category_id')::int
+        WHEN sqlc.narg('category_id')::int IS NOT NULL THEN d.category_id = sqlc.narg('category_id')::int
         ELSE TRUE
     END
 ) AND (
     CASE
         WHEN sqlc.narg('search')::text IS NOT NULL AND sqlc.narg('search')::text != ''
-        THEN to_tsvector('russian', title || ' ' || COALESCE(description, '')) @@ plainto_tsquery('russian', sqlc.narg('search')::text)
+        THEN to_tsvector('russian', d.title || ' ' || COALESCE(d.description, '')) @@ plainto_tsquery('russian', sqlc.narg('search')::text)
         ELSE TRUE
     END
 )
-ORDER BY created_at DESC
+ORDER BY d.created_at DESC
 LIMIT $1 OFFSET $2;
 
 -- name: CountDocuments :one

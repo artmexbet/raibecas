@@ -71,7 +71,7 @@ func (s *Service) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, 
 	return u, nil
 }
 
-func (s *Service) UpdateUser(ctx context.Context, params postgres.UpdateUserParams) (*domain.User, error) {
+func (s *Service) UpdateUser(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
 	if params.ID == uuid.Nil {
 		return nil, ErrInvalidUserID
 	}

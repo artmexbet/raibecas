@@ -47,19 +47,71 @@ func (r *DocumentRepository) Create(ctx context.Context, doc *domain.Document) e
 
 // GetByID retrieves a document by ID
 func (r *DocumentRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Document, error) {
-	doc, err := r.queries.GetDocumentByID(ctx, id)
+	row, err := r.queries.GetDocumentByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
 		return nil, fmt.Errorf("get document by id: %w", err)
 	}
-	return r.toDomain(&doc), nil
+
+	// Convert row to domain with embedded entities
+	doc := &domain.Document{
+		ID:              row.ID,
+		Title:           row.Title,
+		Description:     row.Description,
+		AuthorID:        row.AuthorID,
+		CategoryID:      int(row.CategoryID),
+		PublicationDate: row.PublicationDate.Time,
+		ContentPath:     row.ContentPath,
+		CurrentVersion:  int(row.CurrentVersion),
+		Indexed:         row.Indexed,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
+	}
+
+	// Add author if present
+	if row.Author.ID != uuid.Nil {
+		doc.Author = &domain.Author{
+			ID:        row.Author.ID,
+			Name:      row.Author.Name,
+			Bio:       row.Author.Bio,
+			CreatedAt: row.Author.CreatedAt,
+			UpdatedAt: row.Author.UpdatedAt,
+		}
+	}
+
+	// Add category if present
+	if row.Category.ID != 0 {
+		doc.Category = &domain.Category{
+			ID:          int(row.Category.ID),
+			Title:       row.Category.Title,
+			Description: row.Category.Description,
+			CreatedAt:   row.Category.CreatedAt,
+		}
+	}
+
+	// Load tags
+	tags, err := r.queries.GetDocumentTags(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get document tags: %w", err)
+	}
+
+	doc.Tags = make([]domain.Tag, len(tags))
+	for i, tag := range tags {
+		doc.Tags[i] = domain.Tag{
+			ID:        int(tag.ID),
+			Title:     tag.Title,
+			CreatedAt: tag.CreatedAt,
+		}
+	}
+
+	return doc, nil
 }
 
 // List retrieves documents with filters
 func (r *DocumentRepository) List(ctx context.Context, params domain.ListDocumentsParams) ([]domain.Document, error) {
-	docs, err := r.queries.ListDocuments(ctx, queries.ListDocumentsParams{
+	rows, err := r.queries.ListDocuments(ctx, queries.ListDocumentsParams{
 		Limit:      int32(params.Limit),
 		Offset:     int32(params.Offset),
 		AuthorID:   params.AuthorID,
@@ -70,9 +122,59 @@ func (r *DocumentRepository) List(ctx context.Context, params domain.ListDocumen
 		return nil, fmt.Errorf("list documents: %w", err)
 	}
 
-	result := make([]domain.Document, len(docs))
-	for i, doc := range docs {
-		result[i] = *r.toDomain(&doc)
+	result := make([]domain.Document, len(rows))
+	for i, row := range rows {
+		doc := domain.Document{
+			ID:              row.ID,
+			Title:           row.Title,
+			Description:     row.Description,
+			AuthorID:        row.AuthorID,
+			CategoryID:      int(row.CategoryID),
+			PublicationDate: row.PublicationDate.Time,
+			ContentPath:     row.ContentPath,
+			CurrentVersion:  int(row.CurrentVersion),
+			Indexed:         row.Indexed,
+			CreatedAt:       row.CreatedAt,
+			UpdatedAt:       row.UpdatedAt,
+		}
+
+		// Add author if present
+		if row.Author.ID != uuid.Nil {
+			doc.Author = &domain.Author{
+				ID:        row.Author.ID,
+				Name:      row.Author.Name,
+				Bio:       row.Author.Bio,
+				CreatedAt: row.Author.CreatedAt,
+				UpdatedAt: row.Author.UpdatedAt,
+			}
+		}
+
+		// Add category if present
+		if row.Category.ID != 0 {
+			doc.Category = &domain.Category{
+				ID:          int(row.Category.ID),
+				Title:       row.Category.Title,
+				Description: row.Category.Description,
+				CreatedAt:   row.Category.CreatedAt,
+			}
+		}
+
+		// Load tags for this document
+		tags, err := r.queries.GetDocumentTags(ctx, row.ID)
+		if err != nil {
+			return nil, fmt.Errorf("get document tags for %s: %w", row.ID, err)
+		}
+
+		doc.Tags = make([]domain.Tag, len(tags))
+		for j, tag := range tags {
+			doc.Tags[j] = domain.Tag{
+				ID:        int(tag.ID),
+				Title:     tag.Title,
+				CreatedAt: tag.CreatedAt,
+			}
+		}
+
+		result[i] = doc
 	}
 	return result, nil
 }

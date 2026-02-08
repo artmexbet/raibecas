@@ -15,7 +15,7 @@ type ServiceInterface interface {
 
 	ListUsers(ctx context.Context, params postgres.ListUsersParams) ([]domain.User, int, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
-	UpdateUser(ctx context.Context, params postgres.UpdateUserParams) (*domain.User, error)
+	UpdateUser(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 
 	// Registration Requests

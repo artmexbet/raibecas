@@ -112,7 +112,7 @@ func (h *Handler) HandleUpdateUser(msg *natsw.Message) error {
 		}
 	}
 
-	user, err := h.service.UpdateUser(msg.Ctx, postgres.UpdateUserParams{
+	user, err := h.service.UpdateUser(msg.Ctx, domain.UpdateUserParams{
 		ID:       req.ID,
 		Email:    req.Updates.Email,
 		Username: req.Updates.Username,

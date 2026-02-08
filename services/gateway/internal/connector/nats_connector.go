@@ -19,7 +19,7 @@ import (
 const (
 	SubjectDocumentsList       = "documents.list"
 	SubjectDocumentsGet        = "documents.get"
-	SubjectDocumentsGetContent = "documents.get_content"
+	SubjectDocumentsGetContent = "documents.get.content"
 	SubjectDocumentsCreate     = "documents.create"
 	SubjectDocumentsUpdate     = "documents.update"
 	SubjectDocumentsDelete     = "documents.delete"

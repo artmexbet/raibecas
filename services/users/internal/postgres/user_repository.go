@@ -95,16 +95,7 @@ func (p *Postgres) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User,
 	}, nil
 }
 
-type UpdateUserParams struct {
-	ID       uuid.UUID
-	Email    *string
-	Username *string
-	FullName *string
-	Role     *string
-	IsActive *bool
-}
-
-func (p *Postgres) UpdateUser(ctx context.Context, params UpdateUserParams) (*domain.User, error) {
+func (p *Postgres) UpdateUser(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
 	// Start transaction
 	tx, err := p.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {

@@ -359,17 +359,45 @@ func (q *Queries) GetCategoryByID(ctx context.Context, id int32) (Category, erro
 }
 
 const getDocumentByID = `-- name: GetDocumentByID :one
-SELECT id, title, description, author_id, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at FROM documents
-WHERE id = $1
+SELECT
+    documents.id, documents.title, documents.description, documents.author_id, documents.category_id, documents.publication_date, documents.content_path, documents.current_version, documents.indexed, documents.created_at, documents.updated_at,
+    authors.id, authors.name, authors.bio, authors.created_at, authors.updated_at,
+    categories.id, categories.title, categories.description, categories.created_at
+FROM documents
+LEFT JOIN authors ON documents.author_id = authors.id
+LEFT JOIN categories ON documents.category_id = categories.id
+WHERE documents.id = $1
 `
+
+type GetDocumentByIDRow struct {
+	ID              uuid.UUID
+	Title           string
+	Description     *string
+	AuthorID        uuid.UUID
+	CategoryID      int32
+	PublicationDate pgtype.Date
+	ContentPath     string
+	CurrentVersion  int32
+	Indexed         bool
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	Author          Author
+	Category        Category
+}
 
 // GetDocumentByID
 //
-//	SELECT id, title, description, author_id, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at FROM documents
-//	WHERE id = $1
-func (q *Queries) GetDocumentByID(ctx context.Context, id uuid.UUID) (Document, error) {
+//	SELECT
+//	    documents.id, documents.title, documents.description, documents.author_id, documents.category_id, documents.publication_date, documents.content_path, documents.current_version, documents.indexed, documents.created_at, documents.updated_at,
+//	    authors.id, authors.name, authors.bio, authors.created_at, authors.updated_at,
+//	    categories.id, categories.title, categories.description, categories.created_at
+//	FROM documents
+//	LEFT JOIN authors ON documents.author_id = authors.id
+//	LEFT JOIN categories ON documents.category_id = categories.id
+//	WHERE documents.id = $1
+func (q *Queries) GetDocumentByID(ctx context.Context, id uuid.UUID) (GetDocumentByIDRow, error) {
 	row := q.db.QueryRow(ctx, getDocumentByID, id)
-	var i Document
+	var i GetDocumentByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Title,
@@ -382,6 +410,15 @@ func (q *Queries) GetDocumentByID(ctx context.Context, id uuid.UUID) (Document, 
 		&i.Indexed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Author.ID,
+		&i.Author.Name,
+		&i.Author.Bio,
+		&i.Author.CreatedAt,
+		&i.Author.UpdatedAt,
+		&i.Category.ID,
+		&i.Category.Title,
+		&i.Category.Description,
+		&i.Category.CreatedAt,
 	)
 	return i, err
 }
@@ -573,25 +610,31 @@ func (q *Queries) ListDocumentVersions(ctx context.Context, documentID uuid.UUID
 }
 
 const listDocuments = `-- name: ListDocuments :many
-SELECT id, title, description, author_id, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at FROM documents
+SELECT
+    d.id, d.title, d.description, d.author_id, d.category_id, d.publication_date, d.content_path, d.current_version, d.indexed, d.created_at, d.updated_at,
+    a.id, a.name, a.bio, a.created_at, a.updated_at,
+    c.id, c.title, c.description, c.created_at
+FROM documents d
+LEFT JOIN authors a ON d.author_id = a.id
+LEFT JOIN categories c ON d.category_id = c.id
 WHERE (
     CASE
-        WHEN $3::uuid IS NOT NULL THEN author_id = $3::uuid
+        WHEN $3::uuid IS NOT NULL THEN d.author_id = $3::uuid
         ELSE TRUE
     END
 ) AND (
     CASE
-        WHEN $4::int IS NOT NULL THEN category_id = $4::int
+        WHEN $4::int IS NOT NULL THEN d.category_id = $4::int
         ELSE TRUE
     END
 ) AND (
     CASE
         WHEN $5::text IS NOT NULL AND $5::text != ''
-        THEN to_tsvector('russian', title || ' ' || COALESCE(description, '')) @@ plainto_tsquery('russian', $5::text)
+        THEN to_tsvector('russian', d.title || ' ' || COALESCE(d.description, '')) @@ plainto_tsquery('russian', $5::text)
         ELSE TRUE
     END
 )
-ORDER BY created_at DESC
+ORDER BY d.created_at DESC
 LIMIT $1 OFFSET $2
 `
 
@@ -603,29 +646,51 @@ type ListDocumentsParams struct {
 	Search     *string
 }
 
+type ListDocumentsRow struct {
+	ID              uuid.UUID
+	Title           string
+	Description     *string
+	AuthorID        uuid.UUID
+	CategoryID      int32
+	PublicationDate pgtype.Date
+	ContentPath     string
+	CurrentVersion  int32
+	Indexed         bool
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	Author          Author
+	Category        Category
+}
+
 // ListDocuments
 //
-//	SELECT id, title, description, author_id, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at FROM documents
+//	SELECT
+//	    d.id, d.title, d.description, d.author_id, d.category_id, d.publication_date, d.content_path, d.current_version, d.indexed, d.created_at, d.updated_at,
+//	    a.id, a.name, a.bio, a.created_at, a.updated_at,
+//	    c.id, c.title, c.description, c.created_at
+//	FROM documents d
+//	LEFT JOIN authors a ON d.author_id = a.id
+//	LEFT JOIN categories c ON d.category_id = c.id
 //	WHERE (
 //	    CASE
-//	        WHEN $3::uuid IS NOT NULL THEN author_id = $3::uuid
+//	        WHEN $3::uuid IS NOT NULL THEN d.author_id = $3::uuid
 //	        ELSE TRUE
 //	    END
 //	) AND (
 //	    CASE
-//	        WHEN $4::int IS NOT NULL THEN category_id = $4::int
+//	        WHEN $4::int IS NOT NULL THEN d.category_id = $4::int
 //	        ELSE TRUE
 //	    END
 //	) AND (
 //	    CASE
 //	        WHEN $5::text IS NOT NULL AND $5::text != ''
-//	        THEN to_tsvector('russian', title || ' ' || COALESCE(description, '')) @@ plainto_tsquery('russian', $5::text)
+//	        THEN to_tsvector('russian', d.title || ' ' || COALESCE(d.description, '')) @@ plainto_tsquery('russian', $5::text)
 //	        ELSE TRUE
 //	    END
 //	)
-//	ORDER BY created_at DESC
+//	ORDER BY d.created_at DESC
 //	LIMIT $1 OFFSET $2
-func (q *Queries) ListDocuments(ctx context.Context, arg ListDocumentsParams) ([]Document, error) {
+func (q *Queries) ListDocuments(ctx context.Context, arg ListDocumentsParams) ([]ListDocumentsRow, error) {
 	rows, err := q.db.Query(ctx, listDocuments,
 		arg.Limit,
 		arg.Offset,
@@ -637,9 +702,9 @@ func (q *Queries) ListDocuments(ctx context.Context, arg ListDocumentsParams) ([
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Document{}
+	items := []ListDocumentsRow{}
 	for rows.Next() {
-		var i Document
+		var i ListDocumentsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,
@@ -652,6 +717,15 @@ func (q *Queries) ListDocuments(ctx context.Context, arg ListDocumentsParams) ([
 			&i.Indexed,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Author.ID,
+			&i.Author.Name,
+			&i.Author.Bio,
+			&i.Author.CreatedAt,
+			&i.Author.UpdatedAt,
+			&i.Category.ID,
+			&i.Category.Title,
+			&i.Category.Description,
+			&i.Category.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
