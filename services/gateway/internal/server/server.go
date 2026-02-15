@@ -28,15 +28,15 @@ type Server struct {
 	validator         *validator.Validate
 }
 
-func New(cfg *config.HTTPConfig, documentConnector DocumentServiceConnector, authConnector AuthServiceConnector, userConnector UserServiceConnector) *Server {
+func New(cfg *config.HTTPConfig, corsCfg config.CORSConfig, documentConnector DocumentServiceConnector, authConnector AuthServiceConnector, userConnector UserServiceConnector) *Server {
 	router := fiber.New()
 	logger := slog.Default()
 	router.Use(slogfiber.New(logger))
 
 	// CORS configuration for cookie-based authentication
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000", // TODO: Configure specific origins in production
-		AllowCredentials: true,                    // Required for cookies
+		AllowOrigins:     corsCfg.AllowOrigins,
+		AllowCredentials: true, // Required for cookies
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Device-ID",
 		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS, PATCH",
 	}))
