@@ -7,6 +7,7 @@ import (
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/contrib/otelfiber/v2"
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
@@ -16,6 +17,7 @@ import (
 	slogfiber "github.com/samber/slog-fiber"
 
 	"github.com/artmexbet/raibecas/services/gateway/internal/config"
+	"github.com/artmexbet/raibecas/services/gateway/internal/connector"
 )
 
 const serviceName = "gateway"
@@ -25,10 +27,11 @@ type Server struct {
 	documentConnector DocumentServiceConnector
 	authConnector     AuthServiceConnector
 	userConnector     UserServiceConnector
+	chatConnector     *connector.ChatWSConnector
 	validator         *validator.Validate
 }
 
-func New(cfg *config.HTTPConfig, corsCfg config.CORSConfig, documentConnector DocumentServiceConnector, authConnector AuthServiceConnector, userConnector UserServiceConnector) *Server {
+func New(cfg *config.HTTPConfig, corsCfg config.CORSConfig, documentConnector DocumentServiceConnector, authConnector AuthServiceConnector, userConnector UserServiceConnector, chatConnector *connector.ChatWSConnector) *Server {
 	router := fiber.New()
 	logger := slog.Default()
 	router.Use(slogfiber.New(logger))
@@ -62,6 +65,7 @@ func New(cfg *config.HTTPConfig, corsCfg config.CORSConfig, documentConnector Do
 		documentConnector: documentConnector,
 		authConnector:     authConnector,
 		userConnector:     userConnector,
+		chatConnector:     chatConnector,
 		validator:         validator.New(),
 	}
 
@@ -69,8 +73,16 @@ func New(cfg *config.HTTPConfig, corsCfg config.CORSConfig, documentConnector Do
 	s.setupPublicRoutes()
 	s.setupCookieAuthRoutes()
 	s.setupProtectedRoutes()
+	s.setupWebSocketRoutes()
 
 	return s
+}
+
+// setupWebSocketRoutes sets up WebSocket routes for real-time features
+func (s *Server) setupWebSocketRoutes() {
+	// WebSocket chat endpoint - requires authentication
+	s.router.Use("/ws/chat/:userID", s.authMiddleware(), s.WebSocketUpgradeHandler)
+	s.router.Get("/ws/chat/:userID", websocket.New(s.handleWebSocketChat))
 }
 
 // setupPublicRoutes sets up public routes that don't require authentication

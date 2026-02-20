@@ -3,11 +3,13 @@ module github.com/artmexbet/raibecas/services/chat
 go 1.25.1
 
 require (
+	github.com/artmexbet/raibecas/libs/natsw v0.0.0-00010101000000-000000000000
 	github.com/artmexbet/raibecas/libs/telemetry v0.0.0-00010101000000-000000000000
 	github.com/artmexbet/raibecas/libs/utils v0.0.0-00010101000000-000000000000
 	github.com/gofiber/fiber/v2 v2.52.11
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/mailru/easyjson v0.9.1
+	github.com/nats-io/nats.go v1.38.0
 	github.com/ollama/ollama v0.13.0
 	github.com/qdrant/go-client v1.16.1
 	github.com/redis/go-redis/v9 v9.17.3
@@ -56,3 +58,5 @@ require (
 replace github.com/artmexbet/raibecas/libs/utils => ../../libs/utils
 
 replace github.com/artmexbet/raibecas/libs/telemetry => ../../libs/telemetry
+
+replace github.com/artmexbet/raibecas/libs/natsw => ../../libs/natsw

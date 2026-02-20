@@ -10,12 +10,14 @@ require (
 	github.com/artmexbet/raibecas/libs/utils v0.0.0-20260205142418-b1bdabf86b2d
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/gofiber/contrib/otelfiber/v2 v2.2.3
+	github.com/gofiber/contrib/websocket v1.3.4
 	github.com/gofiber/fiber/v2 v2.52.11
 	github.com/google/uuid v1.6.0
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/mailru/easyjson v0.9.1
 	github.com/nats-io/nats.go v1.48.0
 	github.com/samber/slog-fiber v1.20.1
+	github.com/stretchr/testify v1.9.0
 	go.opentelemetry.io/otel/sdk v1.40.0
 )
 
@@ -34,6 +36,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.5.0 // indirect
+	github.com/fasthttp/websocket v1.5.8 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -55,6 +58,7 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.67.5 // indirect
 	github.com/prometheus/procfs v0.19.2 // indirect
+	github.com/savsgio/gotils v0.0.0-20240303185622-093b76447511 // indirect
 	github.com/tinylib/msgp v1.6.3 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.69.0 // indirect
