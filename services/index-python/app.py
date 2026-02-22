@@ -12,6 +12,7 @@ from pipeline.chunker import ChunkSplitter
 from pipeline.config import AppConfig
 from pipeline.embeddings import EmbeddingService
 from pipeline.loader import DocumentLoader
+from pipeline.minio_loader import MinIOConfig, MinIODocumentLoader
 from pipeline.types import DocumentIndexRequest
 from pipeline.writer import QdrantWriter
 
@@ -21,10 +22,11 @@ logger = logging.getLogger(__name__)
 
 
 class App:
-    def __init__(self, config: Optional[AppConfig] = None, nats_cfg: None | nats_connector.NATSConfig = None):
+    def __init__(self, config: Optional[AppConfig] = None, nats_cfg: None | nats_connector.NATSConfig = None, minio_cfg: None | MinIOConfig = None):
         self.config = config or AppConfig()
         self.nats_connector = nats_connector.NATSConnector(nats_cfg or nats_connector.NATSConfig())
         self.document_loader = DocumentLoader()
+        self.minio_loader = MinIODocumentLoader(minio_cfg or MinIOConfig())
         self.chunk_splitter = ChunkSplitter(self.config.chunk)
         self.embedding_service = EmbeddingService(self.config.ollama)
         self.qdrant_writer = QdrantWriter(self.config.qdrant)
@@ -46,6 +48,9 @@ class App:
     async def __init_handlers(self) -> None:
         await self.nats_connector.subscribe(const.INDEX_SUBJECT, self.index_handler)
         logger.info("subscribed to %s", const.INDEX_SUBJECT)
+
+        await self.nats_connector.subscribe(const.DOCUMENT_CREATED_SUBJECT, self.document_created_handler)
+        logger.info("subscribed to %s", const.DOCUMENT_CREATED_SUBJECT)
 
     async def _keep_alive(self) -> None:
         try:
@@ -69,8 +74,50 @@ class App:
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception("failed to process document: %s", exc)
 
+    async def document_created_handler(self, msg: Msg) -> None:
+        """Handles corpus.document.created events from the documents service."""
+        logger.info("received document.created event")
+        try:
+            payload = json.loads(msg.data.decode())
+
+            document_id = payload.get("document_id")
+            title = payload.get("title", "")
+            content_path = payload.get("content_path")
+            author_id = payload.get("author_id")
+            category_id = payload.get("category_id")
+            version = payload.get("version", 1)
+
+            if not content_path:
+                logger.error("document_created event missing content_path: %s", payload)
+                return
+
+            logger.info(
+                "indexing document from MinIO: document_id=%s title=%s path=%s",
+                document_id, title, content_path,
+            )
+
+            text = await self.minio_loader.load(content_path)
+
+            request = DocumentIndexRequest(
+                title=title,
+                path=content_path,
+                content=text,
+                document_id=str(document_id) if document_id else None,
+                metadata={
+                    "author_id": str(author_id) if author_id else "",
+                    "category_id": str(category_id) if category_id else "",
+                    "version": str(version),
+                    "source": "corpus.document.created",
+                },
+            )
+
+            await self._process_document(request, text)
+            logger.info("successfully indexed document: document_id=%s", document_id)
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception("failed to handle document_created event: %s", exc)
+
     async def _process_document(self, request: DocumentIndexRequest, text: str) -> None:
-        document_id = str(uuid.uuid4())
+        document_id = request.document_id or str(uuid.uuid4())
         metadata = self._base_metadata(request, document_id)
         chunks = self.chunk_splitter.split(text, metadata)
         if not chunks:
