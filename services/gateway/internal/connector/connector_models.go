@@ -61,21 +61,3 @@ type RejectRegistrationRequest struct {
 	ApproverID uuid.UUID `json:"approver_id"`
 	Reason     string    `json:"reason,omitempty"`
 }
-
-// Documents connector models
-
-// GetDocumentRequest represents a get document request
-type GetDocumentRequest struct {
-	ID string `json:"id"`
-}
-
-// DeleteDocumentRequest represents a delete document request
-type DeleteDocumentRequest struct {
-	ID string `json:"id"`
-}
-
-// UpdateDocumentRequestWrapper wraps document update request with ID
-type UpdateDocumentRequestWrapper struct {
-	ID      string                 `json:"id"`
-	Updates map[string]interface{} `json:"updates"`
-}

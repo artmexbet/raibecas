@@ -2,11 +2,11 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/nats-io/nats.go"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -26,59 +26,48 @@ type App struct {
 	tracer   *trace.TracerProvider
 }
 
-func New() *App {
+// New creates a new App instance with all dependencies initialized
+func New() (*App, error) {
 	// Load configuration
-	cfg := &config.Config{
-		HTTP: config.HTTPConfig{
-			Host:    getEnvOrDefault("HTTP_HOST", "0.0.0.0"),
-			Port:    8080,
-			Timeout: 30 * time.Second,
-			RPS:     100,
-		},
-		NATS: config.NATSConfig{
-			URL:            getEnvOrDefault("NATS_URL", "nats://localhost:4222"),
-			RequestTimeout: 5 * time.Second,
-			MaxReconnects:  10,
-			ReconnectWait:  2 * time.Second,
-		},
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	return &App{
-		cfg: cfg,
-	}
-}
+	slog.Info("configuration loaded",
+		"http_host", cfg.HTTP.Host,
+		"http_port", cfg.HTTP.Port,
+		"nats_url", cfg.NATS.URL,
+	)
 
-func (a *App) Run() error {
 	// Connect to NATS
 	natsConn, err := nats.Connect(
-		a.cfg.NATS.URL,
-		nats.MaxReconnects(a.cfg.NATS.MaxReconnects),
-		nats.ReconnectWait(a.cfg.NATS.ReconnectWait),
+		cfg.NATS.URL,
+		nats.MaxReconnects(cfg.NATS.MaxReconnects),
+		nats.ReconnectWait(cfg.NATS.ReconnectWait),
 	)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to connect to NATS: %w", err)
 	}
-	a.natsConn = natsConn
-	slog.Info("connected to NATS", "url", a.cfg.NATS.URL)
+	slog.Info("connected to NATS", "url", cfg.NATS.URL)
 
 	// Initialize tracer
 	tp, err := telemetry.InitTracer(telemetry.TracerConfig{
-		ServiceName:    "gateway",
-		ServiceVersion: "1.0.0",
-		OTLPEndpoint:   "localhost:4318",
-		Enabled:        true,
-		ExportTimeout:  30 * time.Second,
-		BatchTimeout:   5 * time.Second,
-		MaxQueueSize:   2048,
-		MaxExportBatch: 512,
+		ServiceName:    cfg.Telemetry.ServiceName,
+		ServiceVersion: cfg.Telemetry.ServiceVersion,
+		OTLPEndpoint:   cfg.Telemetry.OTLPEndpoint,
+		Enabled:        cfg.Telemetry.Enabled,
+		ExportTimeout:  cfg.Telemetry.ExportTimeout,
+		BatchTimeout:   cfg.Telemetry.BatchTimeout,
+		MaxQueueSize:   cfg.Telemetry.MaxQueueSize,
+		MaxExportBatch: cfg.Telemetry.MaxExportBatch,
 	})
 	if err != nil {
-		slog.Error("failed to initialize tracer", "error", err)
-		return err
+		natsConn.Close()
+		return nil, fmt.Errorf("failed to initialize tracer: %w", err)
 	}
-	a.tracer = tp
 
-	natsTracer := a.tracer.Tracer("nats-client")
+	natsTracer := tp.Tracer("nats-client")
 
 	// Create single NATS wrapper client for trace propagation
 	natsClient := natsw.NewClient(
@@ -90,17 +79,33 @@ func (a *App) Run() error {
 	)
 
 	// Create connectors with shared NATS client
-	documentConnector := connector.NewNATSDocumentConnector(natsClient, a.cfg.NATS.RequestTimeout)
+	documentConnector := connector.NewNATSDocumentConnector(natsClient, cfg.NATS.RequestTimeout)
 	authConnector := connector.NewNATSAuthConnector(natsClient)
 	userConnector := connector.NewNATSUserConnector(natsClient)
 
-	// Create and start server
-	a.server = server.New(&a.cfg.HTTP, documentConnector, authConnector, userConnector)
+	// Create chat WebSocket connector
+	chatConnector := connector.NewChatWSConnector(cfg.ChatService.WebSocketURL)
 
+	// Create chat HTTP connector (for history/sessions API)
+	chatHTTPConnector := connector.NewChatHTTPConnector(cfg.ChatService.HTTPURL)
+
+	// Create server
+	srv := server.New(&cfg.HTTP, cfg.CORS, documentConnector, authConnector, userConnector, chatConnector, chatHTTPConnector)
+
+	return &App{
+		cfg:      cfg,
+		natsConn: natsConn,
+		server:   srv,
+		tracer:   tp,
+	}, nil
+}
+
+func (a *App) Run() error {
 	// Start server in goroutine
 	go func() {
+		slog.Info("starting server", "address", fmt.Sprintf("%s:%d", a.cfg.HTTP.Host, a.cfg.HTTP.Port))
 		if err := a.server.Listen(&a.cfg.HTTP); err != nil {
-			slog.Error("server error", "error", err)
+			slog.ErrorContext(context.Background(), "server error", "error", err)
 		}
 	}()
 
@@ -109,32 +114,25 @@ func (a *App) Run() error {
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 
-	shContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), a.cfg.HTTP.ShutdownTimeout)
 	defer cancel()
 
-	slog.Info("shutting down application...")
+	slog.InfoContext(ctx, "shutting down application...")
 
 	// Shutdown server
 	if err := a.server.Shutdown(); err != nil {
-		slog.Error("server shutdown error", "error", err)
+		slog.ErrorContext(ctx, "server shutdown error", "error", err)
 	}
 
 	// Close NATS connection
 	a.natsConn.Close()
-	slog.Info("NATS connection closed")
+	slog.InfoContext(ctx, "NATS connection closed")
 
-	if err := telemetry.Shutdown(shContext, a.tracer); err != nil {
-		slog.Error("tracer shutdown error", "error", err)
+	if err := telemetry.Shutdown(ctx, a.tracer); err != nil {
+		slog.ErrorContext(ctx, "tracer shutdown error", "error", err)
 	}
 
-	slog.Info("application shutdown complete")
+	slog.InfoContext(ctx, "application shutdown complete")
 
 	return nil
-}
-
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }

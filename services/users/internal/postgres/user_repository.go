@@ -73,7 +73,7 @@ func (p *Postgres) CountTotalUsers(ctx context.Context) (int64, error) {
 func (p *Postgres) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	u, err := p.q.GetUserByID(ctx, id)
 	if err != nil {
-		if errors.Is(pgx.ErrNoRows, err) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil // Not found
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -95,16 +95,7 @@ func (p *Postgres) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User,
 	}, nil
 }
 
-type UpdateUserParams struct {
-	ID       uuid.UUID
-	Email    *string
-	Username *string
-	FullName *string
-	Role     *string
-	IsActive *bool
-}
-
-func (p *Postgres) UpdateUser(ctx context.Context, params UpdateUserParams) (*domain.User, error) {
+func (p *Postgres) UpdateUser(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
 	// Start transaction
 	tx, err := p.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {

@@ -78,7 +78,7 @@ func (s *Server) createDocument(c *fiber.Ctx) error {
 	}
 
 	// Call document service via connector
-	response, err := s.documentConnector.CreateDocument(c.UserContext(), req)
+	response, err := s.documentConnector.CreateDocument(c.UserContext(), req, getUserRole(c))
 	if err != nil {
 		slog.Error("failed to create document", "error", err)
 		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
@@ -141,6 +141,7 @@ func (s *Server) updateDocument(c *fiber.Ctx) error {
 			Message: "Invalid request body",
 		})
 	}
+	req.ID = id
 
 	// Validate request
 	if err := s.validator.Struct(&req); err != nil {
@@ -153,7 +154,7 @@ func (s *Server) updateDocument(c *fiber.Ctx) error {
 	}
 
 	// Call document service via connector
-	response, err := s.documentConnector.UpdateDocument(c.UserContext(), id, req)
+	response, err := s.documentConnector.UpdateDocument(c.UserContext(), req, getUserRole(c))
 	if err != nil {
 		slog.Error("failed to update document", "id", id, "error", err)
 		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
@@ -180,7 +181,7 @@ func (s *Server) deleteDocument(c *fiber.Ctx) error {
 	}
 
 	// Call document service via connector
-	if err := s.documentConnector.DeleteDocument(c.UserContext(), id); err != nil {
+	if err := s.documentConnector.DeleteDocument(c.UserContext(), id, getUserRole(c)); err != nil {
 		slog.Error("failed to delete document", "id", id, "error", err)
 		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
 			Error:   "internal_error",

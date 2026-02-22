@@ -13,6 +13,8 @@ import (
 	"github.com/artmexbet/raibecas/services/users/internal/postgres/queries"
 )
 
+//go:generate sqlc generate
+
 type Postgres struct {
 	pool *pgxpool.Pool
 	q    *queries.Queries

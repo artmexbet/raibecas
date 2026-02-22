@@ -8,6 +8,7 @@ use (
 
 	./services/auth
 	./services/chat
+	./services/documents
 	./services/gateway
 	./services/users
 )

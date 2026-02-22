@@ -112,6 +112,21 @@ func (c *NATSAuthConnector) ValidateToken(ctx context.Context, token string, fin
 		Token:       token,
 		Fingerprint: fingerprint,
 	}
+	return c.doValidate(ctx, req)
+}
+
+// ValidateTokenWS validates an access token without fingerprint check.
+// Used for WebSocket connections where browsers cannot set custom headers.
+func (c *NATSAuthConnector) ValidateTokenWS(ctx context.Context, token string) (*domain.ValidateTokenResponse, error) {
+	req := domain.AuthServiceValidateRequest{
+		Token:           token,
+		SkipFingerprint: true,
+	}
+	return c.doValidate(ctx, req)
+}
+
+// doValidate sends a validate request to auth service via NATS
+func (c *NATSAuthConnector) doValidate(ctx context.Context, req domain.AuthServiceValidateRequest) (*domain.ValidateTokenResponse, error) {
 	reqData, err := req.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal validate request: %w", err)

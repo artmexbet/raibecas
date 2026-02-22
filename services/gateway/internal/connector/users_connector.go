@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/artmexbet/raibecas/libs/utils/pointer"
 	"github.com/google/uuid"
 	"github.com/mailru/easyjson"
 	"github.com/nats-io/nats.go"
 
 	"github.com/artmexbet/raibecas/libs/dto"
 	"github.com/artmexbet/raibecas/libs/natsw"
+	"github.com/artmexbet/raibecas/libs/utils/pointer"
 
 	"github.com/artmexbet/raibecas/services/gateway/internal/domain"
 )

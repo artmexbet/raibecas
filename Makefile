@@ -9,4 +9,4 @@ up:
 	docker compose -f ./deploy/docker-compose.dev.yml up -d --build
 
 up-env:
-	docker compose -f ./deploy/docker-compose.dev.yml up -d --build postgres redis nats qdrant
+	docker compose -f ./deploy/docker-compose.dev.yml up -d --build postgres redis nats qdrant minio

@@ -38,3 +38,13 @@ func IsValidRole(role string) bool {
 		return false
 	}
 }
+
+// UpdateUserParams represents parameters for updating a user
+type UpdateUserParams struct {
+	ID       uuid.UUID
+	Email    *string
+	Username *string
+	FullName *string
+	Role     *string
+	IsActive *bool
+}

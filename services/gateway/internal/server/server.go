@@ -7,6 +7,7 @@ import (
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/contrib/otelfiber/v2"
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
@@ -16,6 +17,7 @@ import (
 	slogfiber "github.com/samber/slog-fiber"
 
 	"github.com/artmexbet/raibecas/services/gateway/internal/config"
+	"github.com/artmexbet/raibecas/services/gateway/internal/connector"
 )
 
 const serviceName = "gateway"
@@ -25,18 +27,28 @@ type Server struct {
 	documentConnector DocumentServiceConnector
 	authConnector     AuthServiceConnector
 	userConnector     UserServiceConnector
+	chatConnector     *connector.ChatWSConnector
+	chatHTTPConnector *connector.ChatHTTPConnector
 	validator         *validator.Validate
 }
 
-func New(cfg *config.HTTPConfig, documentConnector DocumentServiceConnector, authConnector AuthServiceConnector, userConnector UserServiceConnector) *Server {
+func New(
+	cfg *config.HTTPConfig,
+	corsCfg config.CORSConfig,
+	documentConnector DocumentServiceConnector,
+	authConnector AuthServiceConnector,
+	userConnector UserServiceConnector,
+	chatConnector *connector.ChatWSConnector,
+	chatHTTPConnector *connector.ChatHTTPConnector,
+) *Server {
 	router := fiber.New()
 	logger := slog.Default()
 	router.Use(slogfiber.New(logger))
 
 	// CORS configuration for cookie-based authentication
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000", // TODO: Configure specific origins in production
-		AllowCredentials: true,                    // Required for cookies
+		AllowOrigins:     corsCfg.AllowOrigins,
+		AllowCredentials: true, // Required for cookies
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Device-ID",
 		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS, PATCH",
 	}))
@@ -62,15 +74,26 @@ func New(cfg *config.HTTPConfig, documentConnector DocumentServiceConnector, aut
 		documentConnector: documentConnector,
 		authConnector:     authConnector,
 		userConnector:     userConnector,
+		chatConnector:     chatConnector,
+		chatHTTPConnector: chatHTTPConnector,
 		validator:         validator.New(),
 	}
 
 	// Setup routes
 	s.setupPublicRoutes()
+	s.setupWebSocketRoutes()
 	s.setupCookieAuthRoutes()
 	s.setupProtectedRoutes()
 
 	return s
+}
+
+// setupWebSocketRoutes sets up WebSocket routes for real-time features
+func (s *Server) setupWebSocketRoutes() {
+	// WebSocket chat endpoint - token via query param (browsers can't set Authorization header on WS)
+	wsGroup := s.router.Group("/ws/chat", s.wsAuthMiddleware())
+	//s.router.Use("/ws/chat/:userID", s.wsAuthMiddleware(), s.WebSocketUpgradeHandler)
+	wsGroup.Get("/:userID", websocket.New(s.handleWebSocketChat))
 }
 
 // setupPublicRoutes sets up public routes that don't require authentication
@@ -115,12 +138,32 @@ func (s *Server) setupProtectedRoutes() {
 	docs.Patch("/:id", s.updateDocument)
 	docs.Delete("/:id", s.deleteDocument)
 
+	// Authors routes
+	authors := protected.Group("/api/v1/authors")
+	authors.Get("/", s.listAuthors)
+	authors.Post("/", s.createAuthor)
+
+	// Categories routes
+	categories := protected.Group("/api/v1/categories")
+	categories.Get("/", s.listCategories)
+	categories.Post("/", s.createCategory)
+
+	// Tags routes
+	tags := protected.Group("/api/v1/tags")
+	tags.Get("/", s.listTags)
+	tags.Post("/", s.createTag)
+
 	// Users routes
 	users := protected.Group("/api/v1/users")
 	users.Get("/", s.listUsers)
 	users.Get("/:id", s.getUser)
 	users.Patch("/:id", s.updateUser)
 	users.Delete("/:id", s.deleteUser)
+
+	// Chat sessions routes (admin/history)
+	chatSessions := protected.Group("/api/v1/chat")
+	chatSessions.Get("/:userID/sessions", s.getChatSessions)
+	chatSessions.Post("/:userID/sessions", s.createChatSession)
 
 	// Registration requests (protected actions)
 	registrationRequests := protected.Group("/api/v1/registration-requests")

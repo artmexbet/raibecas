@@ -28,6 +28,8 @@ type iChatHistoryStore interface {
 	SaveMessage(ctx context.Context, userID string, message domain.Message) error
 	ClearChatHistory(ctx context.Context, userID string) error
 	GetChatSize(ctx context.Context, userID string) (int, error)
+	GetUserSessions(ctx context.Context, userID string) ([]domain.ChatSession, error)
+	CreateSession(ctx context.Context, userID, title string) (string, error)
 }
 
 type Chat struct {
@@ -119,4 +121,14 @@ func (c *Chat) ProcessInput(ctx context.Context, input, userID string, fn func(r
 // ClearUserChat clears all chat history for a user
 func (c *Chat) ClearUserChat(ctx context.Context, userID string) error {
 	return c.historyStore.ClearChatHistory(ctx, userID)
+}
+
+// GetUserSessions returns all chat sessions with messages for a user
+func (c *Chat) GetUserSessions(ctx context.Context, userID string) ([]domain.ChatSession, error) {
+	return c.historyStore.GetUserSessions(ctx, userID)
+}
+
+// CreateSession creates a new chat session for a user
+func (c *Chat) CreateSession(ctx context.Context, userID, title string) (string, error) {
+	return c.historyStore.CreateSession(ctx, userID, title)
 }

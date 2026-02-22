@@ -146,6 +146,59 @@ func (s *Server) extractBearerToken(c *fiber.Ctx) (string, bool) {
 	return token, token != ""
 }
 
+// wsAuthMiddleware validates token for WebSocket connections.
+// Browsers cannot set custom headers on WebSocket upgrade requests, so the
+// access token is read from the ?token= query parameter (falling back to the
+// Authorization header for non-browser clients).
+// Fingerprint is NOT required here: the access token is already short-lived and
+// transmitted directly — adding a fingerprint check would require JS to read an
+// HttpOnly cookie, which is impossible by design.
+func (s *Server) wsAuthMiddleware() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// Prefer query param, fall back to Authorization header
+		token := c.Query("token")
+		if token == "" {
+			var ok bool
+			token, ok = s.extractBearerToken(c)
+			if !ok {
+				slog.Warn("ws: missing token")
+				return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+					"error":   "unauthorized",
+					"message": "Token required (pass ?token=<access_token>)",
+				})
+			}
+		}
+
+		// Validate without fingerprint — browsers cannot read HttpOnly cookies in WS upgrade.
+		validationResp, err := s.authConnector.ValidateTokenWS(c.UserContext(), token)
+		if err != nil {
+			slog.Error("ws: token validation failed", "error", err)
+			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"error":   "unauthorized",
+				"message": "Token validation failed",
+			})
+		}
+
+		if !validationResp.Valid {
+			slog.Warn("ws: invalid token")
+			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"error":   "unauthorized",
+				"message": "Invalid or expired token",
+			})
+		}
+
+		authUser := &AuthUser{
+			ID:   validationResp.UserID,
+			Role: validationResp.Role,
+			JTI:  validationResp.JTI,
+		}
+		c.Locals(UserContextKey, authUser)
+
+		slog.Debug("ws: user authenticated", "user_id", authUser.ID)
+		return c.Next()
+	}
+}
+
 // hasRefreshToken checks if refresh token exists in cookies
 func (s *Server) hasRefreshToken(c *fiber.Ctx) bool {
 	return getSecureCookie(c, CookieRefreshToken) != ""
@@ -155,4 +208,12 @@ func (s *Server) hasRefreshToken(c *fiber.Ctx) bool {
 func getAuthUser(c *fiber.Ctx) (*AuthUser, bool) {
 	user, ok := c.Locals(UserContextKey).(*AuthUser)
 	return user, ok
+}
+
+// getUserRole extracts user role from fiber context and returns it
+func getUserRole(c *fiber.Ctx) string {
+	if user, ok := getAuthUser(c); ok {
+		return user.Role
+	}
+	return ""
 }

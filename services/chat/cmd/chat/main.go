@@ -1,11 +1,21 @@
 package main
 
-import "github.com/artmexbet/raibecas/services/chat/internal/app"
+import (
+	"log/slog"
+	"os"
+
+	"github.com/artmexbet/raibecas/services/chat/internal/app"
+)
 
 func main() {
-	_app := app.New()
-	err := _app.Run()
+	a, err := app.New()
 	if err != nil {
-		panic(err)
+		slog.Error("failed to initialize app", "error", err)
+		os.Exit(1)
+	}
+
+	if err := a.Run(); err != nil {
+		slog.Error("app error", "error", err)
+		os.Exit(1)
 	}
 }

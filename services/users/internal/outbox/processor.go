@@ -3,6 +3,7 @@ package outbox
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -153,7 +154,7 @@ func (p *Processor) processEvent(ctx context.Context, tx pgx.Tx, event domain.Ou
 		if markErr := p.repo.MarkEventAsFailed(ctx, tx, event.ID, errMsg); markErr != nil {
 			p.logger.Error("failed to mark event as failed", "error", markErr)
 		}
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	// Publish to NATS
@@ -162,7 +163,7 @@ func (p *Processor) processEvent(ctx context.Context, tx pgx.Tx, event domain.Ou
 		if markErr := p.repo.MarkEventAsFailed(ctx, tx, event.ID, errMsg); markErr != nil {
 			p.logger.Error("failed to mark event as failed", "error", markErr)
 		}
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	// Mark as processed
