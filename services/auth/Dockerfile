@@ -18,6 +18,7 @@ COPY services/auth/go.mod services/auth/go.sum* ./services/auth/
 COPY services/gateway/go.mod services/gateway/go.sum* ./services/gateway/
 COPY services/chat/go.mod services/chat/go.sum* ./services/chat/
 COPY services/users/go.mod services/users/go.sum* ./services/users/
+COPY services/documents/go.mod services/documents/go.sum* ./services/documents/
 
 # Download dependencies
 RUN go work sync && go mod download

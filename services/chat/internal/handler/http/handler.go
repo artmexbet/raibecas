@@ -18,6 +18,8 @@ import (
 type service interface {
 	ProcessInput(ctx context.Context, input, userID string, fn func(response domain.ChatResponse) error) error
 	ClearUserChat(ctx context.Context, userID string) error
+	GetUserSessions(ctx context.Context, userID string) ([]domain.ChatSession, error)
+	CreateSession(ctx context.Context, userID, title string) (string, error)
 }
 
 // Handler represents the HTTP handler.
@@ -53,6 +55,10 @@ func (h *Handler) RegisterRoutes() {
 
 	// Clear chat history endpoint
 	h.router.Delete("/api/v1/chat/:userID", h.deleteChatHandler)
+
+	// Sessions (admin) endpoints
+	h.router.Get("/api/v1/chat/:userID/sessions", h.getUserSessionsHandler)
+	h.router.Post("/api/v1/chat/:userID/sessions", h.createSessionHandler)
 
 	// WebSocket chat endpoint for Gateway connection
 	h.router.Use("/ws/chat", h.WSUpgradeHandler)

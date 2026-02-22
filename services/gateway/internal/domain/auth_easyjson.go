@@ -916,6 +916,12 @@ func easyjson4a0f95aaDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 			} else {
 				out.Fingerprint = string(in.String())
 			}
+		case "skip_fingerprint":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.SkipFingerprint = bool(in.Bool())
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -939,6 +945,11 @@ func easyjson4a0f95aaEncodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 		const prefix string = ",\"fingerprint\":"
 		out.RawString(prefix)
 		out.String(string(in.Fingerprint))
+	}
+	if in.SkipFingerprint {
+		const prefix string = ",\"skip_fingerprint\":"
+		out.RawString(prefix)
+		out.Bool(bool(in.SkipFingerprint))
 	}
 	out.RawByte('}')
 }

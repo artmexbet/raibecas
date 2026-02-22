@@ -18,6 +18,16 @@ type Message struct {
 	Content string `json:"content"`
 }
 
+// ChatSession represents a single chat session with its messages.
+type ChatSession struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Title     string    `json:"title"`
+	CreatedAt string    `json:"created_at"`
+	UpdatedAt string    `json:"updated_at"`
+	Messages  []Message `json:"messages"`
+}
+
 type ChatResponse struct {
 	Done      bool      `json:"done"`
 	Message   *Message  `json:"message"`

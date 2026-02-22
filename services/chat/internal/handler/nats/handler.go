@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/artmexbet/raibecas/libs/natsw"
+
 	"github.com/artmexbet/raibecas/services/chat/internal/domain"
 )
 
@@ -99,8 +100,11 @@ func (h *Handler) handleChatRequest(msg *natsw.Message) error {
 			},
 		}
 		data, _ := json.Marshal(errorChunk)
-		h.client.Publish(ctx, responseSubject, data)
+		err = h.client.Publish(ctx, responseSubject, data)
+		if err != nil {
+			slog.Error("Failed to publish error response", "error", err)
+		}
 	}
-	
+
 	return nil
 }

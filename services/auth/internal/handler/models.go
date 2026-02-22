@@ -49,8 +49,9 @@ type ErrorResponse struct {
 
 // ValidateRequest represents a token validation request
 type ValidateRequest struct {
-	Token       string `json:"token"`
-	Fingerprint string `json:"fingerprint"` // ВАЖНО: обязателен для валидации
+	Token           string `json:"token"`
+	Fingerprint     string `json:"fingerprint"`      // ВАЖНО: обязателен для валидации
+	SkipFingerprint bool   `json:"skip_fingerprint"` // Только для WebSocket (браузер не может передать fingerprint)
 }
 
 // ValidateResponse represents a token validation response

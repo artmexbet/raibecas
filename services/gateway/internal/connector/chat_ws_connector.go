@@ -152,7 +152,7 @@ func (c *ChatWSConnector) Disconnect(userID string) {
 			conn.cancel()
 		}
 		if conn.chatServiceConn != nil {
-			conn.chatServiceConn.Close()
+			conn.chatServiceConn.Close() //nolint:errcheck // safe to ignore
 		}
 		slog.Info("Disconnected from chat service", "user_id", userID)
 	}
@@ -173,7 +173,7 @@ func (c *ChatWSConnector) Close() {
 			conn.cancel()
 		}
 		if conn.chatServiceConn != nil {
-			conn.chatServiceConn.Close()
+			conn.chatServiceConn.Close() //nolint:errcheck // safe to ignore
 		}
 	}
 }

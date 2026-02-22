@@ -193,9 +193,11 @@ func (m *Manager) ValidateAccessToken(ctx context.Context, tokenString string, e
 		return result, result.Error
 	}
 
-	// Проверяем fingerprint для защиты от XSS
+	// Проверяем fingerprint для защиты от XSS.
+	// Если expectedFingerprint пустой — проверка пропускается (WS-режим: браузер не может
+	// передать HttpOnly cookie при WS upgrade, токен итак короткоживущий).
 	tokenFingerprint, _ := claims["fingerprint"].(string)
-	if tokenFingerprint != expectedFingerprint {
+	if expectedFingerprint != "" && tokenFingerprint != expectedFingerprint {
 		result.FingerprintMismatch = true
 		result.Error = fmt.Errorf("fingerprint mismatch")
 		return result, result.Error

@@ -94,8 +94,8 @@ func (h *AuthHandler) HandleValidate(msg *natsw.Message) error {
 		return h.respondError(msg, "Invalid request format")
 	}
 
-	// Проверяем наличие fingerprint
-	if req.Fingerprint == "" {
+	// Проверяем наличие fingerprint (кроме WS-соединений, где браузер не может его передать)
+	if !req.SkipFingerprint && req.Fingerprint == "" {
 		response := ValidateResponse{Valid: false}
 		return h.respond(msg, response)
 	}

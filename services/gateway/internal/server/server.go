@@ -28,10 +28,19 @@ type Server struct {
 	authConnector     AuthServiceConnector
 	userConnector     UserServiceConnector
 	chatConnector     *connector.ChatWSConnector
+	chatHTTPConnector *connector.ChatHTTPConnector
 	validator         *validator.Validate
 }
 
-func New(cfg *config.HTTPConfig, corsCfg config.CORSConfig, documentConnector DocumentServiceConnector, authConnector AuthServiceConnector, userConnector UserServiceConnector, chatConnector *connector.ChatWSConnector) *Server {
+func New(
+	cfg *config.HTTPConfig,
+	corsCfg config.CORSConfig,
+	documentConnector DocumentServiceConnector,
+	authConnector AuthServiceConnector,
+	userConnector UserServiceConnector,
+	chatConnector *connector.ChatWSConnector,
+	chatHTTPConnector *connector.ChatHTTPConnector,
+) *Server {
 	router := fiber.New()
 	logger := slog.Default()
 	router.Use(slogfiber.New(logger))
@@ -66,23 +75,25 @@ func New(cfg *config.HTTPConfig, corsCfg config.CORSConfig, documentConnector Do
 		authConnector:     authConnector,
 		userConnector:     userConnector,
 		chatConnector:     chatConnector,
+		chatHTTPConnector: chatHTTPConnector,
 		validator:         validator.New(),
 	}
 
 	// Setup routes
 	s.setupPublicRoutes()
+	s.setupWebSocketRoutes()
 	s.setupCookieAuthRoutes()
 	s.setupProtectedRoutes()
-	s.setupWebSocketRoutes()
 
 	return s
 }
 
 // setupWebSocketRoutes sets up WebSocket routes for real-time features
 func (s *Server) setupWebSocketRoutes() {
-	// WebSocket chat endpoint - requires authentication
-	s.router.Use("/ws/chat/:userID", s.authMiddleware(), s.WebSocketUpgradeHandler)
-	s.router.Get("/ws/chat/:userID", websocket.New(s.handleWebSocketChat))
+	// WebSocket chat endpoint - token via query param (browsers can't set Authorization header on WS)
+	wsGroup := s.router.Group("/ws/chat", s.wsAuthMiddleware())
+	//s.router.Use("/ws/chat/:userID", s.wsAuthMiddleware(), s.WebSocketUpgradeHandler)
+	wsGroup.Get("/:userID", websocket.New(s.handleWebSocketChat))
 }
 
 // setupPublicRoutes sets up public routes that don't require authentication
@@ -148,6 +159,11 @@ func (s *Server) setupProtectedRoutes() {
 	users.Get("/:id", s.getUser)
 	users.Patch("/:id", s.updateUser)
 	users.Delete("/:id", s.deleteUser)
+
+	// Chat sessions routes (admin/history)
+	chatSessions := protected.Group("/api/v1/chat")
+	chatSessions.Get("/:userID/sessions", s.getChatSessions)
+	chatSessions.Post("/:userID/sessions", s.createChatSession)
 
 	// Registration requests (protected actions)
 	registrationRequests := protected.Group("/api/v1/registration-requests")
