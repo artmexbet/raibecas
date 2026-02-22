@@ -99,7 +99,7 @@ func New(cfg *config.Config) (*App, error) {
 		redisotel.WithTracerProvider(tracerProvider),
 	); err != nil {
 		pool.Close()
-		redisClient.Close()
+		redisClient.Close() //nolint:errcheck // safe to ignore error on close during setup failure
 		return nil, fmt.Errorf("failed to instrument redis client: %w", err)
 	}
 
@@ -112,7 +112,7 @@ func New(cfg *config.Config) (*App, error) {
 	)
 	if err != nil {
 		pool.Close()
-		redisClient.Close()
+		redisClient.Close() //nolint:errcheck // safe to ignore error on close during setup failure
 		return nil, fmt.Errorf("failed to connect to nats: %w", err)
 	}
 

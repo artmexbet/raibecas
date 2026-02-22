@@ -37,11 +37,17 @@ type CORSConfig struct {
 	AllowOrigins string `env:"CORS_ALLOW_ORIGINS" env-default:"http://localhost:3000"`
 }
 
+type ChatServiceConfig struct {
+	WebSocketURL string `env:"CHAT_WS_URL" env-default:"ws://localhost:8081/ws/chat"`
+	HTTPURL      string `env:"CHAT_HTTP_URL" env-default:"http://localhost:8081"`
+}
+
 type Config struct {
-	HTTP      HTTPConfig      `env-prefix:"GATEWAY_"`
-	NATS      NATSConfig      `env-prefix:"NATS_"`
-	Telemetry TelemetryConfig `env-prefix:"TELEMETRY_"`
-	CORS      CORSConfig      `env-prefix:"CORS_"`
+	HTTP        HTTPConfig        `env-prefix:"GATEWAY_"`
+	NATS        NATSConfig        `env-prefix:"NATS_"`
+	Telemetry   TelemetryConfig   `env-prefix:"TELEMETRY_"`
+	CORS        CORSConfig        `env-prefix:"CORS_"`
+	ChatService ChatServiceConfig `env-prefix:"CHAT_"`
 }
 
 // Load loads configuration from environment variables using cleanenv

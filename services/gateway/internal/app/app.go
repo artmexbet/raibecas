@@ -83,8 +83,14 @@ func New() (*App, error) {
 	authConnector := connector.NewNATSAuthConnector(natsClient)
 	userConnector := connector.NewNATSUserConnector(natsClient)
 
+	// Create chat WebSocket connector
+	chatConnector := connector.NewChatWSConnector(cfg.ChatService.WebSocketURL)
+
+	// Create chat HTTP connector (for history/sessions API)
+	chatHTTPConnector := connector.NewChatHTTPConnector(cfg.ChatService.HTTPURL)
+
 	// Create server
-	srv := server.New(&cfg.HTTP, cfg.CORS, documentConnector, authConnector, userConnector)
+	srv := server.New(&cfg.HTTP, cfg.CORS, documentConnector, authConnector, userConnector, chatConnector, chatHTTPConnector)
 
 	return &App{
 		cfg:      cfg,

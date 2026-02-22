@@ -243,6 +243,8 @@ func (r *DocumentRepository) UpdateIndexedStatus(ctx context.Context, id uuid.UU
 }
 
 // toDomain converts to domain model
+//
+// nolint:unused
 func (r *DocumentRepository) toDomain(doc *queries.Document) *domain.Document {
 	return &domain.Document{
 		ID:              doc.ID,

@@ -3,11 +3,13 @@ module github.com/artmexbet/raibecas/services/chat
 go 1.25.1
 
 require (
+	github.com/artmexbet/raibecas/libs/natsw v0.0.0-00010101000000-000000000000
 	github.com/artmexbet/raibecas/libs/telemetry v0.0.0-00010101000000-000000000000
 	github.com/artmexbet/raibecas/libs/utils v0.0.0-00010101000000-000000000000
 	github.com/gofiber/fiber/v2 v2.52.11
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/mailru/easyjson v0.9.1
+	github.com/nats-io/nats.go v1.48.0
 	github.com/ollama/ollama v0.13.0
 	github.com/qdrant/go-client v1.16.1
 	github.com/redis/go-redis/v9 v9.17.3
@@ -26,6 +28,9 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.7 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/pgx/v5 v5.8.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.18.3 // indirect
@@ -56,3 +61,5 @@ require (
 replace github.com/artmexbet/raibecas/libs/utils => ../../libs/utils
 
 replace github.com/artmexbet/raibecas/libs/telemetry => ../../libs/telemetry
+
+replace github.com/artmexbet/raibecas/libs/natsw => ../../libs/natsw

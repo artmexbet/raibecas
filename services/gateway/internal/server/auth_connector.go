@@ -19,6 +19,10 @@ type AuthServiceConnector interface {
 	// ValidateToken validates an access token with fingerprint
 	ValidateToken(ctx context.Context, token string, fingerprint string) (*domain.ValidateTokenResponse, error)
 
+	// ValidateTokenWS validates an access token without fingerprint check (for WebSocket connections).
+	// Browsers cannot set custom headers on WS upgrade, so fingerprint cannot be read from HttpOnly cookie.
+	ValidateTokenWS(ctx context.Context, token string) (*domain.ValidateTokenResponse, error)
+
 	// Logout logs out a user from the current device
 	Logout(ctx context.Context, tokenID, accessTokenJTI string, userID uuid.UUID, token string) error
 

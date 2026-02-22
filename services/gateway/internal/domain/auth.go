@@ -87,8 +87,9 @@ type ValidateTokenRequest struct {
 
 // AuthServiceValidateRequest represents validation request to Auth service (internal)
 type AuthServiceValidateRequest struct {
-	Token       string `json:"token"`
-	Fingerprint string `json:"fingerprint"`
+	Token           string `json:"token"`
+	Fingerprint     string `json:"fingerprint"`
+	SkipFingerprint bool   `json:"skip_fingerprint,omitempty"` // Для WS: браузер не может передать fingerprint
 }
 
 // ValidateTokenResponse represents a token validation response

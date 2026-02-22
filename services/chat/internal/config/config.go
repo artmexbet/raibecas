@@ -66,10 +66,35 @@ func (h *HTTP) GetAddress() string {
 	return fmt.Sprintf("%s:%s", h.Host, h.Port)
 }
 
+type NATS struct {
+	URL            string        `yaml:"url" env:"URL" env-default:"nats://localhost:4222"`
+	RequestTimeout time.Duration `yaml:"request_timeout" env:"REQUEST_TIMEOUT" env-default:"30s"`
+	MaxReconnects  int           `yaml:"max_reconnects" env:"MAX_RECONNECTS" env-default:"10"`
+	ReconnectWait  time.Duration `yaml:"reconnect_wait" env:"RECONNECT_WAIT" env-default:"2s"`
+}
+
+type Database struct {
+	Host     string `yaml:"host" env:"HOST" env-default:"localhost"`
+	Port     int    `yaml:"port" env:"PORT" env-default:"5432"`
+	User     string `yaml:"user" env:"USER" env-default:"postgres"`
+	Password string `yaml:"password" env:"PASSWORD" env-default:"postgres"`
+	DBName   string `yaml:"db_name" env:"DB_NAME" env-default:"raibecas_chat"`
+	SSLMode  string `yaml:"ssl_mode" env:"SSL_MODE" env-default:"disable"`
+}
+
+func (d *Database) GetDSN() string {
+	return fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		d.Host, d.Port, d.User, d.Password, d.DBName, d.SSLMode,
+	)
+}
+
 type Config struct {
-	Qdrant Qdrant `yaml:"qdrant" env-prefix:"QDRANT_"`
-	Ollama Ollama `yaml:"ollama" env-prefix:"OLLAMA_"`
-	Redis  Redis  `yaml:"redis" env-prefix:"REDIS_"`
+	Qdrant   Qdrant   `yaml:"qdrant" env-prefix:"QDRANT_"`
+	Ollama   Ollama   `yaml:"ollama" env-prefix:"OLLAMA_"`
+	Redis    Redis    `yaml:"redis" env-prefix:"REDIS_"`
+	NATS     NATS     `yaml:"nats" env-prefix:"NATS_"`
+	Database Database `yaml:"database" env-prefix:"CHAT_DB_"`
 
 	HTTP    HTTP `yaml:"http" env-prefix:"HTTP_"`
 	UseHTTP bool `yaml:"use_http" env:"USE_HTTP" env-default:"false"`
