@@ -18,6 +18,7 @@ import (
 
 	"github.com/artmexbet/raibecas/services/gateway/internal/config"
 	"github.com/artmexbet/raibecas/services/gateway/internal/connector"
+	"github.com/artmexbet/raibecas/services/gateway/internal/domain"
 )
 
 const serviceName = "gateway"
@@ -124,6 +125,10 @@ func (s *Server) setupProtectedRoutes() {
 	// Apply auth middleware to all protected routes
 	protected := s.router.Group("", s.authMiddleware())
 
+	// Shorthand role sets
+	adminOnly := requireRole(string(domain.RoleAdmin), string(domain.RoleSuperAdmin))
+	superAdminOnly := requireRole(string(domain.RoleSuperAdmin))
+
 	// Auth routes (except login and refresh)
 	auth := protected.Group("/api/v1/auth")
 	auth.Post("/logout", s.logout)
@@ -131,45 +136,47 @@ func (s *Server) setupProtectedRoutes() {
 	auth.Post("/change-password", s.changePassword)
 
 	// Documents routes
+	// GET  - any authenticated user (User, Admin, SuperAdmin)
+	// POST / PATCH / DELETE - Admin and SuperAdmin only
 	docs := protected.Group("/api/v1/documents")
 	docs.Get("/", s.listDocuments)
 	docs.Get("/:id", s.getDocument)
-	docs.Post("/", s.createDocument)
-	docs.Patch("/:id", s.updateDocument)
-	docs.Delete("/:id", s.deleteDocument)
+	docs.Post("/", adminOnly, s.createDocument)
+	docs.Patch("/:id", adminOnly, s.updateDocument)
+	docs.Delete("/:id", adminOnly, s.deleteDocument)
 
 	// Authors routes
 	authors := protected.Group("/api/v1/authors")
 	authors.Get("/", s.listAuthors)
-	authors.Post("/", s.createAuthor)
+	authors.Post("/", adminOnly, s.createAuthor)
 
 	// Categories routes
 	categories := protected.Group("/api/v1/categories")
 	categories.Get("/", s.listCategories)
-	categories.Post("/", s.createCategory)
+	categories.Post("/", adminOnly, s.createCategory)
 
 	// Tags routes
 	tags := protected.Group("/api/v1/tags")
 	tags.Get("/", s.listTags)
-	tags.Post("/", s.createTag)
+	tags.Post("/", adminOnly, s.createTag)
 
-	// Users routes
+	// Users routes - Admin can read/update, SuperAdmin can delete
 	users := protected.Group("/api/v1/users")
-	users.Get("/", s.listUsers)
-	users.Get("/:id", s.getUser)
-	users.Patch("/:id", s.updateUser)
-	users.Delete("/:id", s.deleteUser)
+	users.Get("/", adminOnly, s.listUsers)
+	users.Get("/:id", adminOnly, s.getUser)
+	users.Patch("/:id", adminOnly, s.updateUser)
+	users.Delete("/:id", superAdminOnly, s.deleteUser)
 
-	// Chat sessions routes (admin/history)
+	// Chat sessions routes
 	chatSessions := protected.Group("/api/v1/chat")
 	chatSessions.Get("/:userID/sessions", s.getChatSessions)
 	chatSessions.Post("/:userID/sessions", s.createChatSession)
 
-	// Registration requests (protected actions)
+	// Registration requests - only Admin/SuperAdmin can list and act on them
 	registrationRequests := protected.Group("/api/v1/registration-requests")
-	registrationRequests.Get("/", s.listRegistrationRequests)
-	registrationRequests.Post("/:id/approve", s.approveRegistrationRequest)
-	registrationRequests.Post("/:id/reject", s.rejectRegistrationRequest)
+	registrationRequests.Get("/", adminOnly, s.listRegistrationRequests)
+	registrationRequests.Post("/:id/approve", adminOnly, s.approveRegistrationRequest)
+	registrationRequests.Post("/:id/reject", adminOnly, s.rejectRegistrationRequest)
 }
 
 func (s *Server) Listen(cfg *config.HTTPConfig) error {
