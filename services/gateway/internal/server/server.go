@@ -142,8 +142,10 @@ func (s *Server) setupProtectedRoutes() {
 	docs.Get("/", s.listDocuments)
 	docs.Get("/:id", s.getDocument)
 	docs.Post("/", adminOnly, s.createDocument)
+	docs.Put("/:id", adminOnly, s.updateDocument)
 	docs.Patch("/:id", adminOnly, s.updateDocument)
 	docs.Delete("/:id", adminOnly, s.deleteDocument)
+	docs.Post("/:id/cover", adminOnly, s.uploadCover)
 
 	// Authors routes
 	authors := protected.Group("/api/v1/authors")

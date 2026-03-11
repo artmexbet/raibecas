@@ -25,6 +25,9 @@ type DocumentServiceConnector interface {
 	// DeleteDocument deletes a document by ID
 	DeleteDocument(ctx context.Context, id uuid.UUID, userRole string) error
 
+	// UploadCover uploads a cover image for a document
+	UploadCover(ctx context.Context, id uuid.UUID, data []byte, contentType string, userRole string) (string, error)
+
 	// Metadata methods
 
 	// ListAuthors retrieves all authors

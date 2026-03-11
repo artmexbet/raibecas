@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
@@ -16,6 +18,7 @@ import (
 
 const (
 	contentTypeMarkdown = "text/markdown"
+	coverPresignedTTL   = 24 * time.Hour
 )
 
 // MinIOStorage implements Storage interface using MinIO
@@ -140,4 +143,58 @@ func (s *MinIOStorage) ListVersions(ctx context.Context, documentID uuid.UUID) (
 // buildPath constructs the storage path for a document version
 func (s *MinIOStorage) buildPath(documentID uuid.UUID, version int) string {
 	return fmt.Sprintf("%s/v%d.md", documentID.String(), version)
+}
+
+// SaveCover saves a cover image and returns the storage path
+func (s *MinIOStorage) SaveCover(ctx context.Context, documentID uuid.UUID, data []byte, contentType string) (string, error) {
+	ext := extensionByContentType(contentType)
+	path := fmt.Sprintf("covers/%s%s", documentID.String(), ext)
+	reader := bytes.NewReader(data)
+
+	_, err := s.client.PutObject(ctx, s.bucket, path, reader, int64(len(data)), minio.PutObjectOptions{
+		ContentType: contentType,
+	})
+	if err != nil {
+		return "", fmt.Errorf("save cover to minio: %w", err)
+	}
+
+	s.logger.InfoContext(ctx, "saved cover to minio",
+		"document_id", documentID,
+		"path", path,
+		"size", len(data),
+	)
+
+	return path, nil
+}
+
+// GetCoverPresignedURL generates a presigned GET URL for a cover image
+func (s *MinIOStorage) GetCoverPresignedURL(ctx context.Context, path string) (string, error) {
+	presignedURL, err := s.client.PresignedGetObject(ctx, s.bucket, path, coverPresignedTTL, nil)
+	if err != nil {
+		return "", fmt.Errorf("generate presigned url for cover: %w", err)
+	}
+	return presignedURL.String(), nil
+}
+
+// DeleteCover deletes a cover image by path
+func (s *MinIOStorage) DeleteCover(ctx context.Context, path string) error {
+	if err := s.client.RemoveObject(ctx, s.bucket, path, minio.RemoveObjectOptions{}); err != nil {
+		return fmt.Errorf("delete cover from minio: %w", err)
+	}
+	s.logger.InfoContext(ctx, "deleted cover from minio", "path", path)
+	return nil
+}
+
+// extensionByContentType returns file extension for a given MIME type
+func extensionByContentType(ct string) string {
+	switch strings.ToLower(ct) {
+	case "image/jpeg", "image/jpg":
+		return ".jpg"
+	case "image/png":
+		return ".png"
+	case "image/webp":
+		return ".webp"
+	default:
+		return ".jpg"
+	}
 }

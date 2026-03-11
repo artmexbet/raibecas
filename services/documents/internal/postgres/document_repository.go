@@ -64,6 +64,7 @@ func (r *DocumentRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain
 		CategoryID:      int(row.CategoryID),
 		PublicationDate: row.PublicationDate.Time,
 		ContentPath:     row.ContentPath,
+		CoverPath:       row.CoverPath,
 		CurrentVersion:  int(row.CurrentVersion),
 		Indexed:         row.Indexed,
 		CreatedAt:       row.CreatedAt,
@@ -132,6 +133,7 @@ func (r *DocumentRepository) List(ctx context.Context, params domain.ListDocumen
 			CategoryID:      int(row.CategoryID),
 			PublicationDate: row.PublicationDate.Time,
 			ContentPath:     row.ContentPath,
+			CoverPath:       row.CoverPath,
 			CurrentVersion:  int(row.CurrentVersion),
 			Indexed:         row.Indexed,
 			CreatedAt:       row.CreatedAt,
@@ -206,6 +208,7 @@ func (r *DocumentRepository) Update(ctx context.Context, doc *domain.Document) e
 		PublicationDate: timeToDate(doc.PublicationDate),
 		ContentPath:     &doc.ContentPath,
 		CurrentVersion:  &currentVersion,
+		CoverPath:       doc.CoverPath,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

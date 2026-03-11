@@ -452,6 +452,20 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 					*out.Content = string(in.String())
 				}
 			}
+		case "cover_url":
+			if in.IsNull() {
+				in.Skip()
+				out.CoverURL = nil
+			} else {
+				if out.CoverURL == nil {
+					out.CoverURL = new(string)
+				}
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					*out.CoverURL = string(in.String())
+				}
+			}
 		case "created_at":
 			if in.IsNull() {
 				in.Skip()
@@ -536,6 +550,11 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasServicesGatewayInternalDoma
 		const prefix string = ",\"content\":"
 		out.RawString(prefix)
 		out.String(string(*in.Content))
+	}
+	if in.CoverURL != nil {
+		const prefix string = ",\"cover_url\":"
+		out.RawString(prefix)
+		out.String(string(*in.CoverURL))
 	}
 	{
 		const prefix string = ",\"created_at\":"

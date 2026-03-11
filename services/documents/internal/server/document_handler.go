@@ -306,6 +306,36 @@ func (h *DocumentHandler) HandleDocumentIndexed(msg *natsw.Message) error {
 	return nil
 }
 
+// HandleUploadCover handles cover image upload requests
+func (h *DocumentHandler) HandleUploadCover(msg *natsw.Message) error {
+	var req documents.UploadCoverRequest
+	if err := req.UnmarshalJSON(msg.Data); err != nil {
+		h.logger.ErrorContext(msg.Ctx, "invalid upload cover request", "error", err)
+		return h.respondError(msg, dto.ErrCodeInvalidRequest)
+	}
+
+	// Check authorization (admin only)
+	if !h.isAdmin(msg) {
+		h.logger.WarnContext(msg.Ctx, "unauthorized upload cover attempt")
+		return h.respondError(msg, dto.ErrCodeUnauthorized)
+	}
+
+	coverURL, err := h.service.UploadCover(msg.Ctx, req.ID, req.Data, req.ContentType)
+	if err != nil {
+		h.logger.ErrorContext(msg.Ctx, "failed to upload cover", "error", err)
+		if errors.Is(err, service.ErrNotFound) {
+			return h.respondError(msg, dto.ErrCodeNotFound)
+		}
+		return h.respondError(msg, dto.ErrCodeInternal)
+	}
+
+	response := documents.UploadCoverResponse{
+		CoverURL: coverURL,
+	}
+
+	return msg.RespondEasyJSON(&response)
+}
+
 // isAdmin checks if the user has admin role from message context
 func (h *DocumentHandler) isAdmin(msg *natsw.Message) bool {
 	// Extract role from message headers (set by gateway)
@@ -336,6 +366,7 @@ func convertDomainToDTO(doc domain.Document) documents.Document {
 		Indexed:         doc.Indexed,
 		CreatedAt:       doc.CreatedAt,
 		UpdatedAt:       doc.UpdatedAt,
+		CoverURL:        doc.CoverURL,
 	}
 
 	if doc.Author != nil {

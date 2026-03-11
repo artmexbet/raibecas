@@ -14,6 +14,9 @@ type Storage interface {
 	GetDocument(ctx context.Context, path string) ([]byte, error)
 	DeleteDocument(ctx context.Context, path string) error
 	ListVersions(ctx context.Context, documentID uuid.UUID) ([]string, error)
+	SaveCover(ctx context.Context, documentID uuid.UUID, data []byte, contentType string) (string, error)
+	GetCoverPresignedURL(ctx context.Context, path string) (string, error)
+	DeleteCover(ctx context.Context, path string) error
 }
 
 // EventPublisher defines the interface for publishing events

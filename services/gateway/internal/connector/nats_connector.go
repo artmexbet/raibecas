@@ -17,12 +17,13 @@ import (
 
 // NATS subjects for document service communication
 const (
-	SubjectDocumentsList       = "documents.list"
-	SubjectDocumentsGet        = "documents.get"
-	SubjectDocumentsGetContent = "documents.get.content"
-	SubjectDocumentsCreate     = "documents.create"
-	SubjectDocumentsUpdate     = "documents.update"
-	SubjectDocumentsDelete     = "documents.delete"
+	SubjectDocumentsList        = "documents.list"
+	SubjectDocumentsGet         = "documents.get"
+	SubjectDocumentsGetContent  = "documents.get.content"
+	SubjectDocumentsCreate      = "documents.create"
+	SubjectDocumentsUpdate      = "documents.update"
+	SubjectDocumentsDelete      = "documents.delete"
+	SubjectDocumentsCoverUpload = "documents.cover.upload"
 
 	// Metadata subjects
 	SubjectAuthorsList      = "documents.authors.list"
@@ -276,6 +277,7 @@ func convertDocument(dto documents.Document) domain.Document {
 		Title:           dto.Title,
 		Description:     dto.Description,
 		PublicationDate: dto.PublicationDate,
+		CoverURL:        dto.CoverURL,
 		Additional: domain.Additional{
 			CreatedAt: dto.CreatedAt,
 			UpdatedAt: dto.UpdatedAt,
@@ -318,6 +320,42 @@ func convertDocuments(dtoDocuments []documents.Document) []domain.Document {
 		result[i] = convertDocument(dto)
 	}
 	return result
+}
+
+// UploadCover uploads a cover image for a document
+func (c *NATSDocumentConnector) UploadCover(ctx context.Context, id uuid.UUID, data []byte, contentType string, userRole string) (string, error) {
+	req := documents.UploadCoverRequest{
+		ID:          id,
+		Data:        data,
+		ContentType: contentType,
+	}
+
+	reqData, err := req.MarshalJSON()
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal upload cover request: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectDocumentsCoverUpload)
+	msg.Data = reqData
+	if userRole != "" {
+		msg.Header.Set("X-User-Role", userRole)
+	}
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return "", fmt.Errorf("failed to send upload cover request: %w", err)
+	}
+
+	if errResp := checkErrorResponse(respMsg.Data); errResp != nil {
+		return "", errResp
+	}
+
+	var dtoResponse documents.UploadCoverResponse
+	if err := dtoResponse.UnmarshalJSON(respMsg.Data); err != nil {
+		return "", fmt.Errorf("failed to unmarshal upload cover response: %w", err)
+	}
+
+	return dtoResponse.CoverURL, nil
 }
 
 // checkErrorResponse checks if NATS response contains an error and returns it

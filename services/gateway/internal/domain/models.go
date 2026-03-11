@@ -63,6 +63,7 @@ type Document struct {
 	PublicationDate time.Time `json:"publication_date" validate:"required"`
 	Tags            []Tag     `json:"tags" validate:"dive"`
 	Content         *string   `json:"content,omitempty"`
+	CoverURL        *string   `json:"cover_url,omitempty"`
 	Additional
 }
 

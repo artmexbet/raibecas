@@ -191,3 +191,84 @@ func (s *Server) deleteDocument(c *fiber.Ctx) error {
 
 	return c.SendStatus(http.StatusNoContent)
 }
+
+const (
+	maxCoverSize = 5 * 1024 * 1024 // 5 MB
+)
+
+var allowedCoverTypes = map[string]bool{
+	"image/jpeg": true,
+	"image/jpg":  true,
+	"image/png":  true,
+	"image/webp": true,
+}
+
+// uploadCover handles POST /documents/:id/cover - upload cover image for a document
+func (s *Server) uploadCover(c *fiber.Ctx) error {
+	idStr := c.Params("id")
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		slog.Error("invalid document ID", "id", idStr, "error", err)
+		return c.Status(http.StatusBadRequest).JSON(domain.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Invalid document ID format",
+		})
+	}
+
+	file, err := c.FormFile("cover")
+	if err != nil {
+		slog.Error("failed to get cover file", "error", err)
+		return c.Status(http.StatusBadRequest).JSON(domain.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Cover file is required (field: cover)",
+		})
+	}
+
+	if file.Size > maxCoverSize {
+		return c.Status(http.StatusBadRequest).JSON(domain.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Cover image must be smaller than 5 MB",
+		})
+	}
+
+	contentType := file.Header.Get("Content-Type")
+	if !allowedCoverTypes[contentType] {
+		return c.Status(http.StatusBadRequest).JSON(domain.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Only JPEG, PNG and WebP images are allowed",
+		})
+	}
+
+	f, err := file.Open()
+	if err != nil {
+		slog.Error("failed to open cover file", "error", err)
+		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to process cover file",
+		})
+	}
+	defer f.Close() //nolint:errcheck
+
+	data := make([]byte, file.Size)
+	if _, err := f.Read(data); err != nil {
+		slog.Error("failed to read cover file", "error", err)
+		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to read cover file",
+		})
+	}
+
+	coverURL, err := s.documentConnector.UploadCover(c.UserContext(), id, data, contentType, getUserRole(c))
+	if err != nil {
+		slog.Error("failed to upload cover", "id", id, "error", err)
+		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to upload cover",
+		})
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{
+		"cover_url": coverURL,
+	})
+}

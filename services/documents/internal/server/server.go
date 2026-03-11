@@ -5,14 +5,15 @@ import (
 )
 
 const (
-	subjectDocumentsCreate     = "documents.create"
-	subjectDocumentsGet        = "documents.get"
-	subjectDocumentsGetContent = "documents.get.content"
-	subjectDocumentsList       = "documents.list"
-	subjectDocumentsUpdate     = "documents.update"
-	subjectDocumentsDelete     = "documents.delete"
-	subjectDocumentsVersions   = "documents.versions"
-	subjectDocumentIndexed     = "indexing.document.indexed"
+	subjectDocumentsCreate      = "documents.create"
+	subjectDocumentsGet         = "documents.get"
+	subjectDocumentsGetContent  = "documents.get.content"
+	subjectDocumentsList        = "documents.list"
+	subjectDocumentsUpdate      = "documents.update"
+	subjectDocumentsDelete      = "documents.delete"
+	subjectDocumentsVersions    = "documents.versions"
+	subjectDocumentIndexed      = "indexing.document.indexed"
+	subjectDocumentsCoverUpload = "documents.cover.upload"
 
 	// Metadata subjects
 	subjectAuthorsList      = "documents.authors.list"
@@ -51,6 +52,7 @@ func (s *Server) Start() error {
 	s.client.Subscribe(subjectDocumentsUpdate, s.handler.HandleUpdateDocument)
 	s.client.Subscribe(subjectDocumentsDelete, s.handler.HandleDeleteDocument)
 	s.client.Subscribe(subjectDocumentsVersions, s.handler.HandleListDocumentVersions)
+	s.client.Subscribe(subjectDocumentsCoverUpload, s.handler.HandleUploadCover)
 
 	// Event subscriptions (pub-sub)
 	s.client.Subscribe(subjectDocumentIndexed, s.handler.HandleDocumentIndexed)

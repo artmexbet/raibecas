@@ -147,6 +147,7 @@ type Document struct {
 	ContentPath     string    `json:"content_path"`
 	CurrentVersion  int       `json:"current_version"`
 	Indexed         bool      `json:"indexed"`
+	CoverURL        *string   `json:"cover_url,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 	Author          *Author   `json:"author,omitempty"`
@@ -260,4 +261,20 @@ type CreateTagResponse struct {
 //easyjson:json
 type ListTagsResponse struct {
 	Tags []Tag `json:"tags"`
+}
+
+// UploadCoverRequest represents a cover image upload request
+//
+//easyjson:json
+type UploadCoverRequest struct {
+	ID          uuid.UUID `json:"id"`
+	Data        []byte    `json:"data"`
+	ContentType string    `json:"content_type"`
+}
+
+// UploadCoverResponse represents a cover image upload response
+//
+//easyjson:json
+type UploadCoverResponse struct {
+	CoverURL string `json:"cover_url"`
 }
