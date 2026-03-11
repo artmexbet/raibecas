@@ -217,3 +217,36 @@ func getUserRole(c *fiber.Ctx) string {
 	}
 	return ""
 }
+
+// requireRole returns a middleware that allows access only to users with one of the specified roles.
+// Must be used after authMiddleware (which populates UserContextKey).
+func requireRole(roles ...string) fiber.Handler {
+	allowed := make(map[string]struct{}, len(roles))
+	for _, r := range roles {
+		allowed[r] = struct{}{}
+	}
+
+	return func(c *fiber.Ctx) error {
+		user, ok := getAuthUser(c)
+		if !ok {
+			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+				"error":   "unauthorized",
+				"message": "Authentication required",
+			})
+		}
+
+		if _, permitted := allowed[user.Role]; !permitted {
+			slog.Warn("access denied: insufficient role",
+				"user_id", user.ID,
+				"user_role", user.Role,
+				"required_roles", roles,
+			)
+			return c.Status(http.StatusForbidden).JSON(fiber.Map{
+				"error":   "forbidden",
+				"message": "Insufficient permissions",
+			})
+		}
+
+		return c.Next()
+	}
+}
