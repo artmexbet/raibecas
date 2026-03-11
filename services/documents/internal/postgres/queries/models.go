@@ -34,6 +34,7 @@ type Document struct {
 	CategoryID      int32
 	PublicationDate pgtype.Date
 	ContentPath     string
+	CoverPath       *string
 	CurrentVersion  int32
 	Indexed         bool
 	CreatedAt       time.Time

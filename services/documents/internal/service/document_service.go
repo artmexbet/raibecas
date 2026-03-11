@@ -116,6 +116,7 @@ func (s *DocumentService) GetDocument(ctx context.Context, id uuid.UUID) (*domai
 	if err != nil {
 		return nil, fmt.Errorf("get document: %w", err)
 	}
+	s.enrichCoverURL(ctx, doc)
 	return doc, nil
 }
 
@@ -144,6 +145,10 @@ func (s *DocumentService) ListDocuments(ctx context.Context, params domain.ListD
 	if err != nil {
 		s.logger.WarnContext(ctx, "failed to count documents", "error", err)
 		total = len(docs)
+	}
+
+	for i := range docs {
+		s.enrichCoverURL(ctx, &docs[i])
 	}
 
 	return docs, total, nil
@@ -193,6 +198,9 @@ func (s *DocumentService) UpdateDocument(ctx context.Context, id uuid.UUID, req 
 	}
 	if req.PublicationDate != nil {
 		doc.PublicationDate = *req.PublicationDate
+	}
+	if req.CoverPath != nil {
+		doc.CoverPath = req.CoverPath
 	}
 
 	if err := s.docRepo.Update(ctx, doc); err != nil {
@@ -246,6 +254,13 @@ func (s *DocumentService) DeleteDocument(ctx context.Context, id uuid.UUID) erro
 	} else {
 		for _, path := range versions {
 			_ = s.storage.DeleteDocument(ctx, path)
+		}
+	}
+
+	// Delete cover if exists
+	if doc.CoverPath != nil && *doc.CoverPath != "" {
+		if err := s.storage.DeleteCover(ctx, *doc.CoverPath); err != nil {
+			s.logger.WarnContext(ctx, "failed to delete cover", "error", err)
 		}
 	}
 
@@ -312,4 +327,49 @@ func (s *DocumentService) CreateTag(ctx context.Context, title string) (*domain.
 		return nil, fmt.Errorf("%w: title is required", ErrInvalidInput)
 	}
 	return s.metadataRepo.CreateTag(ctx, title)
+}
+
+// UploadCover saves a cover image for a document and returns the presigned URL
+func (s *DocumentService) UploadCover(ctx context.Context, id uuid.UUID, data []byte, contentType string) (string, error) {
+	doc, err := s.docRepo.GetByID(ctx, id)
+	if err != nil {
+		return "", fmt.Errorf("get document: %w", err)
+	}
+
+	// Delete old cover if exists
+	if doc.CoverPath != nil && *doc.CoverPath != "" {
+		if err := s.storage.DeleteCover(ctx, *doc.CoverPath); err != nil {
+			s.logger.WarnContext(ctx, "failed to delete old cover", "error", err)
+		}
+	}
+
+	coverPath, err := s.storage.SaveCover(ctx, id, data, contentType)
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", ErrStorageFailure, err)
+	}
+
+	doc.CoverPath = &coverPath
+	if err := s.docRepo.Update(ctx, doc); err != nil {
+		return "", fmt.Errorf("update document cover path: %w", err)
+	}
+
+	presignedURL, err := s.storage.GetCoverPresignedURL(ctx, coverPath)
+	if err != nil {
+		return "", fmt.Errorf("get cover presigned url: %w", err)
+	}
+
+	return presignedURL, nil
+}
+
+// enrichCoverURL adds presigned cover URL to a document if it has a cover
+func (s *DocumentService) enrichCoverURL(ctx context.Context, doc *domain.Document) {
+	if doc.CoverPath == nil || *doc.CoverPath == "" {
+		return
+	}
+	url, err := s.storage.GetCoverPresignedURL(ctx, *doc.CoverPath)
+	if err != nil {
+		s.logger.WarnContext(ctx, "failed to get cover presigned url", "document_id", doc.ID, "error", err)
+		return
+	}
+	doc.CoverURL = &url
 }

@@ -78,6 +78,7 @@ SET
     publication_date = COALESCE(sqlc.narg('publication_date'), publication_date),
     content_path = COALESCE(sqlc.narg('content_path'), content_path),
     current_version = COALESCE(sqlc.narg('current_version'), current_version),
+    cover_path = COALESCE(sqlc.narg('cover_path'), cover_path),
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;

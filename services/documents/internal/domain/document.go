@@ -49,6 +49,7 @@ type Document struct {
 	CategoryID      int       `db:"category_id" json:"category_id"`
 	PublicationDate time.Time `db:"publication_date" json:"publication_date"`
 	ContentPath     string    `db:"content_path" json:"content_path"`
+	CoverPath       *string   `db:"cover_path" json:"cover_path,omitempty"`
 	CurrentVersion  int       `db:"current_version" json:"current_version"`
 	Indexed         bool      `db:"indexed" json:"indexed"`
 	CreatedAt       time.Time `db:"created_at" json:"created_at"`
@@ -56,6 +57,7 @@ type Document struct {
 	Author          *Author   `json:"author,omitempty"`
 	Category        *Category `json:"category,omitempty"`
 	Tags            []Tag     `json:"tags,omitempty"`
+	CoverURL        *string   `db:"-" json:"cover_url,omitempty"`
 }
 
 // DocumentVersion represents a version of a document
@@ -98,6 +100,7 @@ type UpdateDocumentRequest struct {
 	TagIDs          []int      `json:"tag_ids,omitempty"`
 	Changes         *string    `json:"changes,omitempty"`
 	UpdatedBy       *uuid.UUID `json:"updated_by,omitempty"`
+	CoverPath       *string    `json:"cover_path,omitempty"`
 }
 
 // ListDocumentsParams represents parameters for listing documents

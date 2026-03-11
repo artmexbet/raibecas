@@ -178,6 +178,20 @@ func easyjson18605acbDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 					}
 				}
 			}
+		case "cover_path":
+			if in.IsNull() {
+				in.Skip()
+				out.CoverPath = nil
+			} else {
+				if out.CoverPath == nil {
+					out.CoverPath = new(string)
+				}
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					*out.CoverPath = string(in.String())
+				}
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -286,6 +300,16 @@ func easyjson18605acbEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 			out.RawString(prefix)
 		}
 		out.RawText((*in.UpdatedBy).MarshalText())
+	}
+	if in.CoverPath != nil {
+		const prefix string = ",\"cover_path\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(*in.CoverPath))
 	}
 	out.RawByte('}')
 }
@@ -785,6 +809,20 @@ func easyjson18605acbDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 			} else {
 				out.ContentPath = string(in.String())
 			}
+		case "cover_path":
+			if in.IsNull() {
+				in.Skip()
+				out.CoverPath = nil
+			} else {
+				if out.CoverPath == nil {
+					out.CoverPath = new(string)
+				}
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					*out.CoverPath = string(in.String())
+				}
+			}
 		case "current_version":
 			if in.IsNull() {
 				in.Skip()
@@ -868,6 +906,20 @@ func easyjson18605acbDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 				}
 				in.Delim(']')
 			}
+		case "cover_url":
+			if in.IsNull() {
+				in.Skip()
+				out.CoverURL = nil
+			} else {
+				if out.CoverURL == nil {
+					out.CoverURL = new(string)
+				}
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					*out.CoverURL = string(in.String())
+				}
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -917,6 +969,11 @@ func easyjson18605acbEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 		out.RawString(prefix)
 		out.String(string(in.ContentPath))
 	}
+	if in.CoverPath != nil {
+		const prefix string = ",\"cover_path\":"
+		out.RawString(prefix)
+		out.String(string(*in.CoverPath))
+	}
 	{
 		const prefix string = ",\"current_version\":"
 		out.RawString(prefix)
@@ -960,6 +1017,11 @@ func easyjson18605acbEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 			}
 			out.RawByte(']')
 		}
+	}
+	if in.CoverURL != nil {
+		const prefix string = ",\"cover_url\":"
+		out.RawString(prefix)
+		out.String(string(*in.CoverURL))
 	}
 	out.RawByte('}')
 }
