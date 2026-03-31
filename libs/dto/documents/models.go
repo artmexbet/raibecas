@@ -6,6 +6,8 @@ import (
 	"github.com/google/uuid"
 )
 
+type BookmarkKind string
+
 //go:generate easyjson -all models.go
 
 // Document DTOs - Shared data structures for document service communication
@@ -32,6 +34,75 @@ type ListDocumentsResponse struct {
 	Page       int        `json:"page,omitempty"`
 	Limit      int        `json:"limit,omitempty"`
 	TotalPages int        `json:"totalPages,omitempty"`
+}
+
+// ListBookmarksQuery represents query parameters for listing bookmarks.
+//
+//easyjson:json
+type ListBookmarksQuery struct {
+	Page   int          `json:"page,omitempty"`
+	Limit  int          `json:"limit,omitempty"`
+	Search string       `json:"search,omitempty"`
+	Kind   BookmarkKind `json:"kind,omitempty"`
+	UserID uuid.UUID    `json:"user_id,omitempty"`
+}
+
+// BookmarkItem represents either a publication bookmark or a quote bookmark.
+//
+//easyjson:json
+type BookmarkItem struct {
+	ID        string       `json:"id"`
+	Kind      BookmarkKind `json:"kind"`
+	SavedAt   time.Time    `json:"saved_at"`
+	Document  Document     `json:"document"`
+	QuoteText *string      `json:"quote_text,omitempty"`
+	Context   *string      `json:"context,omitempty"`
+	PageLabel *string      `json:"page_label,omitempty"`
+}
+
+// ListBookmarksResponse represents the response for listing bookmarks.
+//
+//easyjson:json
+type ListBookmarksResponse struct {
+	Items      []BookmarkItem `json:"items"`
+	Total      int            `json:"total"`
+	Page       int            `json:"page,omitempty"`
+	Limit      int            `json:"limit,omitempty"`
+	TotalPages int            `json:"totalPages,omitempty"`
+}
+
+// CreateBookmarkRequest represents a request to save a bookmark.
+//
+//easyjson:json
+type CreateBookmarkRequest struct {
+	UserID     uuid.UUID    `json:"user_id"`
+	DocumentID uuid.UUID    `json:"document_id"`
+	Kind       BookmarkKind `json:"kind"`
+	QuoteText  *string      `json:"quote_text,omitempty"`
+	Context    *string      `json:"context,omitempty"`
+	PageLabel  *string      `json:"page_label,omitempty"`
+}
+
+// CreateBookmarkResponse represents a bookmark creation response.
+//
+//easyjson:json
+type CreateBookmarkResponse struct {
+	Item BookmarkItem `json:"item"`
+}
+
+// DeleteBookmarkRequest represents a request to delete a bookmark.
+//
+//easyjson:json
+type DeleteBookmarkRequest struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+// DeleteBookmarkResponse represents a bookmark deletion response.
+//
+//easyjson:json
+type DeleteBookmarkResponse struct {
+	Success bool `json:"success"`
 }
 
 // CreateDocumentRequest represents a document creation request

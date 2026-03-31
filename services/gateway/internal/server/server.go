@@ -147,6 +147,12 @@ func (s *Server) setupProtectedRoutes() {
 	docs.Delete("/:id", adminOnly, s.deleteDocument)
 	docs.Post("/:id/cover", adminOnly, s.uploadCover)
 
+	// Bookmarks routes
+	bookmarks := protected.Group("/api/v1/bookmarks")
+	bookmarks.Get("/", s.listBookmarks)
+	bookmarks.Post("/", s.createBookmark)
+	bookmarks.Delete("/:id", s.deleteBookmark)
+
 	// Authors routes
 	authors := protected.Group("/api/v1/authors")
 	authors.Get("/", s.listAuthors)

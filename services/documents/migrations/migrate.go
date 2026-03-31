@@ -12,7 +12,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-//go:embed 000001_create_reference_tables.up.sql 000001_create_reference_tables.down.sql 000002_create_documents_table.up.sql 000002_create_documents_table.down.sql 000003_create_document_versions_table.up.sql 000003_create_document_versions_table.down.sql 000004_seed_data.up.sql 000004_seed_data.down.sql 000005_add_cover_path.up.sql 000005_add_cover_path.down.sql
+//go:embed 000001_create_reference_tables.up.sql 000001_create_reference_tables.down.sql 000002_create_documents_table.up.sql 000002_create_documents_table.down.sql 000003_create_document_versions_table.up.sql 000003_create_document_versions_table.down.sql 000004_seed_data.up.sql 000004_seed_data.down.sql 000005_add_cover_path.up.sql 000005_add_cover_path.down.sql 000006_create_document_bookmarks_table.up.sql 000006_create_document_bookmarks_table.down.sql
 var files embed.FS
 
 func Up(databaseDSN string) error {

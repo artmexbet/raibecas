@@ -173,6 +173,145 @@ func (h *DocumentHandler) HandleListDocuments(msg *natsw.Message) error {
 	return msg.RespondEasyJSON(&response)
 }
 
+// HandleListBookmarks handles bookmark listing requests.
+func (h *DocumentHandler) HandleListBookmarks(msg *natsw.Message) error {
+	var req documents.ListBookmarksQuery
+	if err := msg.UnmarshalEasyJSON(&req); err != nil {
+		h.logger.ErrorContext(msg.Ctx, "invalid list bookmarks request", "error", err)
+		return h.respondError(msg, dto.ErrCodeInvalidRequest)
+	}
+
+	page := max(req.Page, 1)
+	limit := req.Limit
+	if limit <= 0 || limit > 100 {
+		limit = 16
+	}
+
+	if req.UserID == uuid.Nil {
+		if userIDValue := msg.Header.Get("X-User-ID"); userIDValue != "" {
+			userID, err := uuid.Parse(userIDValue)
+			if err != nil {
+				h.logger.ErrorContext(msg.Ctx, "invalid X-User-ID header", "error", err)
+				return h.respondError(msg, dto.ErrCodeInvalidRequest)
+			}
+			req.UserID = userID
+		}
+	}
+
+	items, total, err := h.service.ListBookmarks(msg.Ctx, domain.ListBookmarksParams{
+		Page:   page,
+		Limit:  limit,
+		Search: req.Search,
+		Kind:   domain.BookmarkKind(req.Kind),
+		UserID: req.UserID,
+	})
+	if err != nil {
+		h.logger.ErrorContext(msg.Ctx, "failed to list bookmarks", "error", err)
+		if errors.Is(err, service.ErrInvalidInput) {
+			return h.respondError(msg, dto.ErrCodeInvalidRequest)
+		}
+		return h.respondError(msg, dto.ErrCodeInternal)
+	}
+
+	totalPages := 0
+	if total > 0 {
+		totalPages = (total + limit - 1) / limit
+	}
+
+	dtoItems := make([]documents.BookmarkItem, len(items))
+	for i, item := range items {
+		dtoItems[i] = convertBookmarkDomainToDTOItem(item)
+	}
+
+	response := documents.ListBookmarksResponse{
+		Items:      dtoItems,
+		Total:      total,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+	}
+
+	return msg.RespondEasyJSON(response)
+}
+
+// HandleCreateBookmark handles bookmark creation requests.
+func (h *DocumentHandler) HandleCreateBookmark(msg *natsw.Message) error {
+	var req documents.CreateBookmarkRequest
+	if err := msg.UnmarshalEasyJSON(&req); err != nil {
+		h.logger.ErrorContext(msg.Ctx, "invalid create bookmark request", "error", err)
+		return h.respondError(msg, dto.ErrCodeInvalidRequest)
+	}
+
+	if req.UserID == uuid.Nil {
+		if userIDValue := msg.Header.Get("X-User-ID"); userIDValue != "" {
+			userID, err := uuid.Parse(userIDValue)
+			if err != nil {
+				h.logger.ErrorContext(msg.Ctx, "invalid X-User-ID header", "error", err)
+				return h.respondError(msg, dto.ErrCodeInvalidRequest)
+			}
+			req.UserID = userID
+		}
+	}
+
+	item, err := h.service.CreateBookmark(msg.Ctx, domain.CreateBookmarkRequest{
+		UserID:     req.UserID,
+		DocumentID: req.DocumentID,
+		Kind:       domain.BookmarkKind(req.Kind),
+		QuoteText:  req.QuoteText,
+		Context:    req.Context,
+		PageLabel:  req.PageLabel,
+	})
+	if err != nil {
+		h.logger.ErrorContext(msg.Ctx, "failed to create bookmark", "error", err)
+		switch {
+		case errors.Is(err, service.ErrInvalidInput):
+			return h.respondError(msg, dto.ErrCodeInvalidRequest)
+		case errors.Is(err, service.ErrNotFound):
+			return h.respondError(msg, dto.ErrCodeNotFound)
+		default:
+			return h.respondError(msg, dto.ErrCodeInternal)
+		}
+	}
+
+	response := documents.CreateBookmarkResponse{Item: convertBookmarkDomainToDTOItem(*item)}
+	return msg.RespondEasyJSON(response)
+}
+
+// HandleDeleteBookmark handles bookmark deletion requests.
+func (h *DocumentHandler) HandleDeleteBookmark(msg *natsw.Message) error {
+	var req documents.DeleteBookmarkRequest
+	if err := msg.UnmarshalEasyJSON(&req); err != nil {
+		h.logger.ErrorContext(msg.Ctx, "invalid delete bookmark request", "error", err)
+		return h.respondError(msg, dto.ErrCodeInvalidRequest)
+	}
+
+	if req.UserID == uuid.Nil {
+		if userIDValue := msg.Header.Get("X-User-ID"); userIDValue != "" {
+			userID, err := uuid.Parse(userIDValue)
+			if err != nil {
+				h.logger.ErrorContext(msg.Ctx, "invalid X-User-ID header", "error", err)
+				return h.respondError(msg, dto.ErrCodeInvalidRequest)
+			}
+			req.UserID = userID
+		}
+	}
+
+	if err := h.service.DeleteBookmark(msg.Ctx, req.UserID, req.ID); err != nil {
+		h.logger.ErrorContext(msg.Ctx, "failed to delete bookmark", "error", err)
+		switch {
+		case errors.Is(err, service.ErrInvalidInput):
+			return h.respondError(msg, dto.ErrCodeInvalidRequest)
+		case errors.Is(err, service.ErrNotFound):
+			return h.respondError(msg, dto.ErrCodeNotFound)
+		default:
+			return h.respondError(msg, dto.ErrCodeInternal)
+		}
+	}
+
+	response := documents.DeleteBookmarkResponse{Success: true}
+	return msg.RespondEasyJSON(response)
+}
+
 // HandleUpdateDocument handles document update requests
 func (h *DocumentHandler) HandleUpdateDocument(msg *natsw.Message) error {
 	var req documents.UpdateDocumentRequest
@@ -400,4 +539,16 @@ func convertDomainToDTO(doc domain.Document) documents.Document {
 	}
 
 	return dtoDoc
+}
+
+func convertBookmarkDomainToDTOItem(item domain.BookmarkItem) documents.BookmarkItem {
+	return documents.BookmarkItem{
+		ID:        item.ID,
+		Kind:      documents.BookmarkKind(item.Kind),
+		SavedAt:   item.SavedAt,
+		Document:  convertDomainToDTO(item.Document),
+		QuoteText: item.QuoteText,
+		Context:   item.Context,
+		PageLabel: item.PageLabel,
+	}
 }

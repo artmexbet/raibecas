@@ -37,6 +37,16 @@ type DocumentRepository interface {
 	UpdateIndexedStatus(ctx context.Context, id uuid.UUID, indexed bool) error
 }
 
+// BookmarkRepository defines the interface for bookmark persistence.
+type BookmarkRepository interface {
+	Create(ctx context.Context, bookmark *domain.Bookmark) error
+	GetByIDForUser(ctx context.Context, userID, bookmarkID uuid.UUID) (*domain.Bookmark, error)
+	GetPublicationByUserAndDocument(ctx context.Context, userID, documentID uuid.UUID) (*domain.Bookmark, error)
+	ListByUser(ctx context.Context, params domain.ListBookmarksParams) ([]domain.Bookmark, error)
+	CountByUser(ctx context.Context, params domain.ListBookmarksParams) (int, error)
+	Delete(ctx context.Context, userID, bookmarkID uuid.UUID) error
+}
+
 // VersionRepository defines the interface for version data access
 type VersionRepository interface {
 	Create(ctx context.Context, version *domain.DocumentVersion) error

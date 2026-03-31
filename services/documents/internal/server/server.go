@@ -6,6 +6,9 @@ import (
 
 const (
 	subjectDocumentsCreate      = "documents.create"
+	subjectBookmarksList        = "documents.bookmarks.list"
+	subjectBookmarksCreate      = "documents.bookmarks.create"
+	subjectBookmarksDelete      = "documents.bookmarks.delete"
 	subjectDocumentsGet         = "documents.get"
 	subjectDocumentsGetContent  = "documents.get.content"
 	subjectDocumentsList        = "documents.list"
@@ -46,6 +49,9 @@ func New(client *natsw.Client, handler *DocumentHandler, metadataHandler *Metada
 func (s *Server) Start() error {
 	// Document operations (request-reply)
 	s.client.Subscribe(subjectDocumentsCreate, s.handler.HandleCreateDocument)
+	s.client.Subscribe(subjectBookmarksList, s.handler.HandleListBookmarks)
+	s.client.Subscribe(subjectBookmarksCreate, s.handler.HandleCreateBookmark)
+	s.client.Subscribe(subjectBookmarksDelete, s.handler.HandleDeleteBookmark)
 	s.client.Subscribe(subjectDocumentsGet, s.handler.HandleGetDocument)
 	s.client.Subscribe(subjectDocumentsGetContent, s.handler.HandleGetDocumentContent)
 	s.client.Subscribe(subjectDocumentsList, s.handler.HandleListDocuments)
