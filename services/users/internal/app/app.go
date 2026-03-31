@@ -27,6 +27,7 @@ import (
 	"github.com/artmexbet/raibecas/services/users/internal/postgres"
 	"github.com/artmexbet/raibecas/services/users/internal/server"
 	"github.com/artmexbet/raibecas/services/users/internal/service"
+	"github.com/artmexbet/raibecas/services/users/migrations"
 )
 
 type App struct {
@@ -43,6 +44,10 @@ func New() (*App, error) {
 	cfg, err := config.Load()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	if err := migrations.Up(cfg.Database.DSN()); err != nil {
+		return nil, fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
 	// Create tracer using unified telemetry package

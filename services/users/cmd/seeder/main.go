@@ -44,7 +44,7 @@ func main() {
 			Email:    "admin@example.com",
 			Password: "password123",
 			FullName: "Admin User",
-			Role:     "admin",
+			Role:     "Admin",
 			IsActive: true,
 		},
 		{
@@ -52,7 +52,7 @@ func main() {
 			Email:    "user@example.com",
 			Password: "password123",
 			FullName: "Regular User",
-			Role:     "user",
+			Role:     "User",
 			IsActive: true,
 		},
 		{
@@ -60,7 +60,7 @@ func main() {
 			Email:    "inactive@example.com",
 			Password: "password123",
 			FullName: "Inactive User",
-			Role:     "user",
+			Role:     "User",
 			IsActive: false,
 		},
 	}

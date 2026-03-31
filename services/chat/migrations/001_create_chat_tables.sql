@@ -1,6 +1,8 @@
 -- 001_create_chat_tables.sql
 -- +migrate Up
 
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 CREATE TABLE IF NOT EXISTS chat_sessions (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     TEXT NOT NULL,

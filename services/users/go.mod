@@ -7,6 +7,7 @@ require (
 	github.com/artmexbet/raibecas/libs/natsw v0.0.0-20260126080331-f6cbb701e26d
 	github.com/artmexbet/raibecas/libs/telemetry v0.0.0
 	github.com/exaring/otelpgx v0.10.0
+	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/google/uuid v1.6.0
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/jackc/pgx/v5 v5.8.0

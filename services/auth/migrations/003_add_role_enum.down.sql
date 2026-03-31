@@ -1,0 +1,11 @@
+ALTER TABLE users
+    ALTER COLUMN role DROP DEFAULT;
+
+ALTER TABLE users
+    ALTER COLUMN role TYPE VARCHAR(50) USING role::text;
+
+ALTER TABLE users
+    ALTER COLUMN role SET DEFAULT 'user';
+
+DROP TYPE IF EXISTS role_enum;
+
