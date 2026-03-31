@@ -31,6 +31,13 @@ type DatabaseConfig struct {
 	MinConns int    `env:"MIN_CONNS" env-default:"5"`
 }
 
+func (d DatabaseConfig) DSN() string {
+	return fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		d.Host, d.Port, d.User, d.Password, d.DBName, d.SSLMode,
+	)
+}
+
 type Config struct {
 	NATS     NATS           `yaml:"nats" env-prefix:"NATS_"`
 	Database DatabaseConfig `yaml:"database" env-prefix:"DB_"`

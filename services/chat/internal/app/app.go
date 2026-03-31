@@ -24,6 +24,7 @@ import (
 	"github.com/artmexbet/raibecas/services/chat/internal/postgres"
 	qdrantWrapper "github.com/artmexbet/raibecas/services/chat/internal/qdrant-wrapper"
 	"github.com/artmexbet/raibecas/services/chat/internal/service"
+	"github.com/artmexbet/raibecas/services/chat/migrations"
 )
 
 // App represents the main entry point for the chat service application.
@@ -55,6 +56,10 @@ func New() (*App, error) {
 		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 	slog.Info("configuration loaded", "qdrant_host", cfg.Qdrant.Host, "nats_url", cfg.NATS.URL)
+
+	if err := migrations.Up(cfg.Database.GetDSN()); err != nil {
+		return nil, fmt.Errorf("failed to apply migrations: %w", err)
+	}
 
 	// Initialize tracer
 	tp, err := telemetry.InitTracer(telemetry.TracerConfig{

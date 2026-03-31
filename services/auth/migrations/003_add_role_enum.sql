@@ -1,6 +1,14 @@
 -- Add role enum type to auth database
 CREATE TYPE role_enum AS ENUM ('User', 'Admin', 'SuperAdmin');
 
+UPDATE users
+SET role = CASE role
+    WHEN 'user' THEN 'User'
+    WHEN 'admin' THEN 'Admin'
+    WHEN 'superadmin' THEN 'SuperAdmin'
+    ELSE role
+END;
+
 -- Update users table role column to use enum
 ALTER TABLE users
     ALTER COLUMN role DROP DEFAULT;

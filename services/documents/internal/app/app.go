@@ -22,6 +22,7 @@ import (
 	"github.com/artmexbet/raibecas/services/documents/internal/server"
 	"github.com/artmexbet/raibecas/services/documents/internal/service"
 	"github.com/artmexbet/raibecas/services/documents/internal/storage"
+	"github.com/artmexbet/raibecas/services/documents/migrations"
 )
 
 // App represents the application
@@ -74,6 +75,10 @@ func New(ctx context.Context) (*App, error) {
 				"endpoint", cfg.Telemetry.OTLPEndpoint,
 			)
 		}
+	}
+
+	if err := migrations.Up(cfg.Database.DSN()); err != nil {
+		return nil, fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
 	// Initialize database
