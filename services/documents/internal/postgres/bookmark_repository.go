@@ -4,21 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/artmexbet/raibecas/services/documents/internal/domain"
+	"github.com/artmexbet/raibecas/services/documents/internal/postgres/queries"
 )
 
 type BookmarkRepository struct {
-	pool *pgxpool.Pool
+	queries *queries.Queries
 }
 
-func NewBookmarkRepository(pool *pgxpool.Pool) *BookmarkRepository {
-	return &BookmarkRepository{pool: pool}
+func NewBookmarkRepository(q *queries.Queries) *BookmarkRepository {
+	return &BookmarkRepository{queries: q}
 }
 
 func (r *BookmarkRepository) Create(ctx context.Context, bookmark *domain.Bookmark) error {
@@ -26,189 +26,137 @@ func (r *BookmarkRepository) Create(ctx context.Context, bookmark *domain.Bookma
 		bookmark.ID = uuid.New()
 	}
 
-	const query = `
-		INSERT INTO document_bookmarks (
-			id, user_id, document_id, kind, quote_text, quote_context, page_label
-		) VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING created_at, updated_at`
-
-	err := r.pool.QueryRow(
-		ctx,
-		query,
-		bookmark.ID,
-		bookmark.UserID,
-		bookmark.DocumentID,
-		string(bookmark.Kind),
-		bookmark.QuoteText,
-		bookmark.Context,
-		bookmark.PageLabel,
-	).Scan(&bookmark.CreatedAt, &bookmark.UpdatedAt)
+	created, err := r.queries.CreateBookmark(ctx, queries.CreateBookmarkParams{
+		ID:           bookmark.ID,
+		UserID:       bookmark.UserID,
+		DocumentID:   bookmark.DocumentID,
+		Kind:         string(bookmark.Kind),
+		QuoteText:    bookmark.QuoteText,
+		QuoteContext: bookmark.Context,
+		PageLabel:    bookmark.PageLabel,
+	})
 	if err != nil {
-		return fmt.Errorf("create bookmark: %w", err)
+		return fmt.Errorf("create bookmark: %w", mapBookmarkConstraintError(err))
 	}
 
+	bookmark.CreatedAt = created.CreatedAt
+	bookmark.UpdatedAt = created.UpdatedAt
 	return nil
 }
 
 func (r *BookmarkRepository) GetByIDForUser(ctx context.Context, userID, bookmarkID uuid.UUID) (*domain.Bookmark, error) {
-	const query = `
-		SELECT id, user_id, document_id, kind, quote_text, quote_context, page_label, created_at, updated_at
-		FROM document_bookmarks
-		WHERE id = $1 AND user_id = $2`
-
-	return r.getBookmark(ctx, query, bookmarkID, userID)
-}
-
-func (r *BookmarkRepository) GetPublicationByUserAndDocument(ctx context.Context, userID, documentID uuid.UUID) (*domain.Bookmark, error) {
-	const query = `
-		SELECT id, user_id, document_id, kind, quote_text, quote_context, page_label, created_at, updated_at
-		FROM document_bookmarks
-		WHERE user_id = $1 AND document_id = $2 AND kind = 'publication'
-		LIMIT 1`
-
-	return r.getBookmark(ctx, query, userID, documentID)
-}
-
-func (r *BookmarkRepository) ListByUser(ctx context.Context, params domain.ListBookmarksParams) ([]domain.Bookmark, error) {
-	query, args := buildBookmarkListQuery(params, false)
-
-	rows, err := r.pool.Query(ctx, query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("list bookmarks: %w", err)
-	}
-	defer rows.Close()
-
-	bookmarks := make([]domain.Bookmark, 0)
-	for rows.Next() {
-		bookmark, err := scanBookmark(rows)
-		if err != nil {
-			return nil, err
-		}
-		bookmarks = append(bookmarks, bookmark)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate bookmarks rows: %w", err)
-	}
-
-	return bookmarks, nil
-}
-
-func (r *BookmarkRepository) CountByUser(ctx context.Context, params domain.ListBookmarksParams) (int, error) {
-	query, args := buildBookmarkListQuery(params, true)
-
-	var count int
-	if err := r.pool.QueryRow(ctx, query, args...).Scan(&count); err != nil {
-		return 0, fmt.Errorf("count bookmarks: %w", err)
-	}
-	return count, nil
-}
-
-func (r *BookmarkRepository) Delete(ctx context.Context, userID, bookmarkID uuid.UUID) error {
-	const query = `DELETE FROM document_bookmarks WHERE id = $1 AND user_id = $2`
-
-	commandTag, err := r.pool.Exec(ctx, query, bookmarkID, userID)
-	if err != nil {
-		return fmt.Errorf("delete bookmark: %w", err)
-	}
-	if commandTag.RowsAffected() == 0 {
-		return domain.ErrNotFound
-	}
-
-	return nil
-}
-
-func (r *BookmarkRepository) getBookmark(ctx context.Context, query string, args ...any) (*domain.Bookmark, error) {
-	row := r.pool.QueryRow(ctx, query, args...)
-
-	bookmark, err := scanBookmark(row)
+	row, err := r.queries.GetBookmarkByIDForUser(ctx, queries.GetBookmarkByIDForUserParams{
+		ID:     bookmarkID,
+		UserID: userID,
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
-		return nil, err
+		return nil, fmt.Errorf("get bookmark by id for user: %w", err)
 	}
 
+	bookmark := toDomainBookmark(row)
 	return &bookmark, nil
 }
 
-func buildBookmarkListQuery(params domain.ListBookmarksParams, countOnly bool) (string, []any) {
-	var builder strings.Builder
-	args := []any{params.UserID}
-	argIndex := 2
-
-	if countOnly {
-		builder.WriteString(`
-			SELECT COUNT(*)
-			FROM document_bookmarks b
-			JOIN documents d ON d.id = b.document_id
-			JOIN authors a ON a.id = d.author_id
-			JOIN categories c ON c.id = d.category_id
-			WHERE b.user_id = $1`)
-	} else {
-		builder.WriteString(`
-			SELECT b.id, b.user_id, b.document_id, b.kind, b.quote_text, b.quote_context, b.page_label, b.created_at, b.updated_at
-			FROM document_bookmarks b
-			JOIN documents d ON d.id = b.document_id
-			JOIN authors a ON a.id = d.author_id
-			JOIN categories c ON c.id = d.category_id
-			WHERE b.user_id = $1`)
+func (r *BookmarkRepository) GetPublicationByUserAndDocument(ctx context.Context, userID, documentID uuid.UUID) (*domain.Bookmark, error) {
+	row, err := r.queries.GetPublicationBookmarkByUserAndDocument(ctx, queries.GetPublicationBookmarkByUserAndDocumentParams{
+		UserID:     userID,
+		DocumentID: documentID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, fmt.Errorf("get publication bookmark by user and document: %w", err)
 	}
 
-	if params.Kind != "" {
-		builder.WriteString(fmt.Sprintf(" AND b.kind = $%d", argIndex))
-		args = append(args, string(params.Kind))
-		argIndex++
-	}
-
-	if search := strings.TrimSpace(params.Search); search != "" {
-		builder.WriteString(fmt.Sprintf(`
-			AND (
-				d.title ILIKE '%%' || $%d || '%%'
-				OR COALESCE(d.description, '') ILIKE '%%' || $%d || '%%'
-				OR a.name ILIKE '%%' || $%d || '%%'
-				OR c.title ILIKE '%%' || $%d || '%%'
-				OR COALESCE(b.quote_text, '') ILIKE '%%' || $%d || '%%'
-				OR COALESCE(b.quote_context, '') ILIKE '%%' || $%d || '%%'
-				OR EXISTS (
-					SELECT 1
-					FROM document_tags dt
-					JOIN tags t ON t.id = dt.tag_id
-					WHERE dt.document_id = d.id
-					  AND t.title ILIKE '%%' || $%d || '%%'
-				)
-			)`, argIndex, argIndex, argIndex, argIndex, argIndex, argIndex, argIndex))
-		args = append(args, search)
-		argIndex++
-	}
-
-	if !countOnly {
-		builder.WriteString(fmt.Sprintf(" ORDER BY b.created_at DESC, b.id DESC LIMIT $%d OFFSET $%d", argIndex, argIndex+1))
-		args = append(args, params.Limit, (max(params.Page, 1)-1)*params.Limit)
-	}
-
-	return builder.String(), args
+	bookmark := toDomainBookmark(row)
+	return &bookmark, nil
 }
 
-func scanBookmark(scanner interface{ Scan(dest ...any) error }) (domain.Bookmark, error) {
-	var bookmark domain.Bookmark
-	var kind string
-
-	err := scanner.Scan(
-		&bookmark.ID,
-		&bookmark.UserID,
-		&bookmark.DocumentID,
-		&kind,
-		&bookmark.QuoteText,
-		&bookmark.Context,
-		&bookmark.PageLabel,
-		&bookmark.CreatedAt,
-		&bookmark.UpdatedAt,
-	)
+func (r *BookmarkRepository) ListByUser(ctx context.Context, params domain.ListBookmarksParams) ([]domain.Bookmark, error) {
+	rows, err := r.queries.ListBookmarksByUser(ctx, queries.ListBookmarksByUserParams{
+		UserID: params.UserID,
+		Limit:  int32(params.Limit),
+		Offset: int32((max(params.Page, 1) - 1) * params.Limit),
+		Kind:   convertBookmarkKindToPtr(params.Kind),
+		Search: convertStringToPtr(params.Search),
+	})
 	if err != nil {
-		return domain.Bookmark{}, fmt.Errorf("scan bookmark: %w", err)
+		return nil, fmt.Errorf("list bookmarks: %w", err)
 	}
 
-	bookmark.Kind = domain.BookmarkKind(kind)
-	return bookmark, nil
+	bookmarks := make([]domain.Bookmark, len(rows))
+	for i, row := range rows {
+		bookmarks[i] = toDomainBookmark(row)
+	}
+	return bookmarks, nil
+}
+
+func (r *BookmarkRepository) CountByUser(ctx context.Context, params domain.ListBookmarksParams) (int, error) {
+	count, err := r.queries.CountBookmarksByUser(ctx, queries.CountBookmarksByUserParams{
+		UserID: params.UserID,
+		Kind:   convertBookmarkKindToPtr(params.Kind),
+		Search: convertStringToPtr(params.Search),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("count bookmarks: %w", err)
+	}
+	return int(count), nil
+}
+
+func (r *BookmarkRepository) Delete(ctx context.Context, userID, bookmarkID uuid.UUID) error {
+	rowsAffected, err := r.queries.DeleteBookmark(ctx, queries.DeleteBookmarkParams{
+		ID:     bookmarkID,
+		UserID: userID,
+	})
+	if err != nil {
+		return fmt.Errorf("delete bookmark: %w", err)
+	}
+	if rowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+func toDomainBookmark(bookmark queries.DocumentBookmark) domain.Bookmark {
+	return domain.Bookmark{
+		ID:         bookmark.ID,
+		UserID:     bookmark.UserID,
+		DocumentID: bookmark.DocumentID,
+		Kind:       domain.BookmarkKind(bookmark.Kind),
+		QuoteText:  bookmark.QuoteText,
+		Context:    bookmark.QuoteContext,
+		PageLabel:  bookmark.PageLabel,
+		CreatedAt:  bookmark.CreatedAt,
+		UpdatedAt:  bookmark.UpdatedAt,
+	}
+}
+
+func convertBookmarkKindToPtr(kind domain.BookmarkKind) *string {
+	if kind == "" {
+		return nil
+	}
+	value := string(kind)
+	return &value
+}
+
+func mapBookmarkConstraintError(err error) error {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return err
+	}
+
+	switch {
+	case pgErr.Code == "23503" && pgErr.ConstraintName == "document_bookmarks_document_id_fkey":
+		return domain.ErrNotFound
+	case pgErr.Code == "23505" && pgErr.ConstraintName == "uq_document_bookmarks_publication":
+		return domain.ErrInvalidInput
+	case pgErr.Code == "23514" && (pgErr.ConstraintName == "chk_document_bookmarks_kind" || pgErr.ConstraintName == "chk_document_bookmarks_quote"):
+		return domain.ErrInvalidInput
+	default:
+		return err
+	}
 }

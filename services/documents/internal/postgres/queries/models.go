@@ -34,11 +34,23 @@ type Document struct {
 	CategoryID      int32
 	PublicationDate pgtype.Date
 	ContentPath     string
-	CoverPath       *string
 	CurrentVersion  int32
 	Indexed         bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	CoverPath       *string
+}
+
+type DocumentBookmark struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	DocumentID   uuid.UUID
+	Kind         string
+	QuoteText    *string
+	QuoteContext *string
+	PageLabel    *string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 type DocumentTag struct {

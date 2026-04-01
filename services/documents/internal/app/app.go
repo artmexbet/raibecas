@@ -130,7 +130,7 @@ func New(ctx context.Context) (*App, error) {
 
 	// Initialize repositories
 	docRepo := postgres.NewDocumentRepository(q)
-	bookmarkRepo := postgres.NewBookmarkRepository(pool)
+	bookmarkRepo := postgres.NewBookmarkRepository(q)
 	versionRepo := postgres.NewVersionRepository(q)
 	tagRepo := postgres.NewTagRepository(q)
 	metadataRepo := postgres.NewMetadataRepository(q)

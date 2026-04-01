@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/artmexbet/raibecas/services/documents/internal/domain"
 )
@@ -25,6 +26,41 @@ func TestCreateBookmarkRejectsQuoteWithoutText(t *testing.T) {
 	}
 }
 
+func TestCreateBookmarkRejectsPublicationWithQuoteDetails(t *testing.T) {
+	t.Parallel()
+
+	quoteText := "Лишнее содержимое"
+	svc := &DocumentService{}
+	_, err := svc.CreateBookmark(t.Context(), domain.CreateBookmarkRequest{
+		UserID:     uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		DocumentID: uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		Kind:       domain.BookmarkKindPublication,
+		QuoteText:  &quoteText,
+	})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput, got %v", err)
+	}
+}
+
+func TestCreateBookmarkReturnsNotFoundWhenDocumentMissing(t *testing.T) {
+	t.Parallel()
+
+	documentID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	docRepo := NewMockDocumentRepository(t)
+	bookmarkRepo := NewMockBookmarkRepository(t)
+	docRepo.EXPECT().GetByID(mock.Anything, documentID).Return(nil, ErrNotFound).Once()
+
+	svc := &DocumentService{docRepo: docRepo, bookmarkRepo: bookmarkRepo}
+	_, err := svc.CreateBookmark(t.Context(), domain.CreateBookmarkRequest{
+		UserID:     uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		DocumentID: documentID,
+		Kind:       domain.BookmarkKindPublication,
+	})
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
 func TestCreateBookmarkReturnsExistingPublication(t *testing.T) {
 	t.Parallel()
 
@@ -32,23 +68,19 @@ func TestCreateBookmarkReturnsExistingPublication(t *testing.T) {
 	documentID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 	bookmarkID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
 	createdAt := time.Date(2026, time.March, 30, 10, 0, 0, 0, time.UTC)
+	doc := testBookmarkDocument(documentID, "Системность и детерминизм", "Описание")
+	bookmark := &domain.Bookmark{
+		ID:         bookmarkID,
+		UserID:     userID,
+		DocumentID: documentID,
+		Kind:       domain.BookmarkKindPublication,
+		CreatedAt:  createdAt,
+	}
 
-	docRepo := &stubDocumentRepository{
-		documents: map[uuid.UUID]domain.Document{
-			documentID: testBookmarkDocument(documentID, "Системность и детерминизм", "Описание"),
-		},
-	}
-	bookmarkRepo := &stubBookmarkRepository{
-		publicationByDocument: map[string]domain.Bookmark{
-			publicationKey(userID, documentID): {
-				ID:         bookmarkID,
-				UserID:     userID,
-				DocumentID: documentID,
-				Kind:       domain.BookmarkKindPublication,
-				CreatedAt:  createdAt,
-			},
-		},
-	}
+	docRepo := NewMockDocumentRepository(t)
+	bookmarkRepo := NewMockBookmarkRepository(t)
+	docRepo.EXPECT().GetByID(mock.Anything, documentID).Return(&doc, nil).Twice()
+	bookmarkRepo.EXPECT().GetPublicationByUserAndDocument(mock.Anything, userID, documentID).Return(bookmark, nil).Once()
 
 	svc := &DocumentService{docRepo: docRepo, bookmarkRepo: bookmarkRepo}
 	item, err := svc.CreateBookmark(t.Context(), domain.CreateBookmarkRequest{
@@ -62,9 +94,6 @@ func TestCreateBookmarkReturnsExistingPublication(t *testing.T) {
 	if item.ID != bookmarkID.String() {
 		t.Fatalf("expected existing bookmark ID %s, got %s", bookmarkID, item.ID)
 	}
-	if bookmarkRepo.createCalls != 0 {
-		t.Fatalf("expected repository Create not to be called, got %d calls", bookmarkRepo.createCalls)
-	}
 }
 
 func TestCreateBookmarkPersistsQuote(t *testing.T) {
@@ -75,13 +104,20 @@ func TestCreateBookmarkPersistsQuote(t *testing.T) {
 	quoteText := "Уточняющий вопрос делает предмет обсуждения общим."
 	contextText := "Фрагмент семинарского обсуждения"
 	pageLabel := "23"
+	createdAt := time.Date(2026, time.March, 31, 9, 0, 0, 0, time.UTC)
+	doc := testBookmarkDocument(documentID, "Диалог как форма научного уточнения", "Описание")
 
-	docRepo := &stubDocumentRepository{
-		documents: map[uuid.UUID]domain.Document{
-			documentID: testBookmarkDocument(documentID, "Диалог как форма научного уточнения", "Описание"),
+	docRepo := NewMockDocumentRepository(t)
+	bookmarkRepo := NewMockBookmarkRepository(t)
+	docRepo.EXPECT().GetByID(mock.Anything, documentID).Return(&doc, nil).Twice()
+	bookmarkRepo.EXPECT().Create(mock.Anything, mock.AnythingOfType("*domain.Bookmark")).RunAndReturn(
+		func(_ context.Context, bookmark *domain.Bookmark) error {
+			bookmark.ID = uuid.MustParse("66666666-6666-6666-6666-666666666666")
+			bookmark.CreatedAt = createdAt
+			bookmark.UpdatedAt = createdAt
+			return nil
 		},
-	}
-	bookmarkRepo := &stubBookmarkRepository{}
+	).Once()
 
 	svc := &DocumentService{docRepo: docRepo, bookmarkRepo: bookmarkRepo}
 	item, err := svc.CreateBookmark(t.Context(), domain.CreateBookmarkRequest{
@@ -101,8 +137,91 @@ func TestCreateBookmarkPersistsQuote(t *testing.T) {
 	if item.QuoteText == nil || *item.QuoteText != quoteText {
 		t.Fatalf("expected quote text %q, got %v", quoteText, item.QuoteText)
 	}
-	if bookmarkRepo.createCalls != 1 {
-		t.Fatalf("expected repository Create to be called once, got %d", bookmarkRepo.createCalls)
+}
+
+func TestCreateBookmarkReturnsExistingPublicationAfterConcurrentInsert(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	documentID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	bookmarkID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	createdAt := time.Date(2026, time.March, 30, 10, 0, 0, 0, time.UTC)
+	doc := testBookmarkDocument(documentID, "Системность и детерминизм", "Описание")
+	bookmark := &domain.Bookmark{
+		ID:         bookmarkID,
+		UserID:     userID,
+		DocumentID: documentID,
+		Kind:       domain.BookmarkKindPublication,
+		CreatedAt:  createdAt,
+	}
+
+	docRepo := NewMockDocumentRepository(t)
+	bookmarkRepo := NewMockBookmarkRepository(t)
+	docRepo.EXPECT().GetByID(mock.Anything, documentID).Return(&doc, nil).Twice()
+	bookmarkRepo.EXPECT().GetPublicationByUserAndDocument(mock.Anything, userID, documentID).Return(nil, ErrNotFound).Once()
+	bookmarkRepo.EXPECT().Create(mock.Anything, mock.AnythingOfType("*domain.Bookmark")).Return(ErrInvalidInput).Once()
+	bookmarkRepo.EXPECT().GetPublicationByUserAndDocument(mock.Anything, userID, documentID).Return(bookmark, nil).Once()
+
+	svc := &DocumentService{docRepo: docRepo, bookmarkRepo: bookmarkRepo}
+	item, err := svc.CreateBookmark(t.Context(), domain.CreateBookmarkRequest{
+		UserID:     userID,
+		DocumentID: documentID,
+		Kind:       domain.BookmarkKindPublication,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if item.ID != bookmarkID.String() {
+		t.Fatalf("expected bookmark ID %s, got %s", bookmarkID, item.ID)
+	}
+}
+
+func TestDeleteBookmarkRejectsMissingIDs(t *testing.T) {
+	t.Parallel()
+
+	svc := &DocumentService{bookmarkRepo: NewMockBookmarkRepository(t)}
+	err := svc.DeleteBookmark(t.Context(), uuid.Nil, uuid.Nil)
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput, got %v", err)
+	}
+}
+
+func TestDeleteBookmarkPropagatesNotFound(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	bookmarkID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	bookmarkRepo := NewMockBookmarkRepository(t)
+	bookmarkRepo.EXPECT().Delete(mock.Anything, userID, bookmarkID).Return(ErrNotFound).Once()
+
+	svc := &DocumentService{bookmarkRepo: bookmarkRepo}
+	err := svc.DeleteBookmark(t.Context(), userID, bookmarkID)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestListBookmarksNormalizesPagination(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	bookmarkRepo := NewMockBookmarkRepository(t)
+	expected := domain.ListBookmarksParams{
+		UserID: userID,
+		Page:   1,
+		Limit:  16,
+	}
+	bookmarkRepo.EXPECT().ListByUser(mock.Anything, expected).Return([]domain.Bookmark{}, nil).Once()
+	bookmarkRepo.EXPECT().CountByUser(mock.Anything, expected).Return(0, nil).Once()
+
+	svc := &DocumentService{bookmarkRepo: bookmarkRepo}
+	_, _, err := svc.ListBookmarks(t.Context(), domain.ListBookmarksParams{
+		UserID: userID,
+		Page:   0,
+		Limit:  999,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
 	}
 }
 
@@ -119,69 +238,6 @@ func TestNormalizeOptionalString(t *testing.T) {
 	if got == nil || *got != "важный фрагмент" {
 		t.Fatalf("expected trimmed value, got %v", got)
 	}
-}
-
-type stubDocumentRepository struct {
-	documents map[uuid.UUID]domain.Document
-}
-
-func (s *stubDocumentRepository) Create(context.Context, *domain.Document) error { return nil }
-func (s *stubDocumentRepository) List(context.Context, domain.ListDocumentsParams) ([]domain.Document, error) {
-	return nil, nil
-}
-func (s *stubDocumentRepository) Count(context.Context, domain.ListDocumentsParams) (int, error) {
-	return 0, nil
-}
-func (s *stubDocumentRepository) Update(context.Context, *domain.Document) error { return nil }
-func (s *stubDocumentRepository) Delete(context.Context, uuid.UUID) error        { return nil }
-func (s *stubDocumentRepository) UpdateIndexedStatus(context.Context, uuid.UUID, bool) error {
-	return nil
-}
-func (s *stubDocumentRepository) GetByID(_ context.Context, id uuid.UUID) (*domain.Document, error) {
-	doc, ok := s.documents[id]
-	if !ok {
-		return nil, domain.ErrNotFound
-	}
-	copyDoc := doc
-	return &copyDoc, nil
-}
-
-type stubBookmarkRepository struct {
-	publicationByDocument map[string]domain.Bookmark
-	createCalls           int
-}
-
-func (s *stubBookmarkRepository) Create(_ context.Context, bookmark *domain.Bookmark) error {
-	s.createCalls++
-	bookmark.ID = uuid.MustParse("66666666-6666-6666-6666-666666666666")
-	bookmark.CreatedAt = time.Date(2026, time.March, 31, 9, 0, 0, 0, time.UTC)
-	bookmark.UpdatedAt = bookmark.CreatedAt
-	return nil
-}
-func (s *stubBookmarkRepository) GetByIDForUser(context.Context, uuid.UUID, uuid.UUID) (*domain.Bookmark, error) {
-	return nil, domain.ErrNotFound
-}
-func (s *stubBookmarkRepository) GetPublicationByUserAndDocument(_ context.Context, userID, documentID uuid.UUID) (*domain.Bookmark, error) {
-	if s.publicationByDocument == nil {
-		return nil, domain.ErrNotFound
-	}
-	bookmark, ok := s.publicationByDocument[publicationKey(userID, documentID)]
-	if !ok {
-		return nil, domain.ErrNotFound
-	}
-	copyBookmark := bookmark
-	return &copyBookmark, nil
-}
-func (s *stubBookmarkRepository) ListByUser(context.Context, domain.ListBookmarksParams) ([]domain.Bookmark, error) {
-	return nil, nil
-}
-func (s *stubBookmarkRepository) CountByUser(context.Context, domain.ListBookmarksParams) (int, error) {
-	return 0, nil
-}
-func (s *stubBookmarkRepository) Delete(context.Context, uuid.UUID, uuid.UUID) error { return nil }
-
-func publicationKey(userID, documentID uuid.UUID) string {
-	return userID.String() + ":" + documentID.String()
 }
 
 func testBookmarkDocument(id uuid.UUID, title, description string) domain.Document {

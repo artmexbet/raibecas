@@ -1,17 +1,24 @@
 all: true
 dir: '{{.InterfaceDir}}'
-filename: '{{.SrcPackageName}}_mocks.go'
-force-file-write: true
-formatter: goimports
+filename: '{{.InterfaceNameSnake}}_mocks.go'
 include-auto-generated: false
+disable-version-string: True
+resolve-type-alias: False
+issue-845-fix: True
+inpackage: true
 log-level: info
-structname: '{{.Mock}}{{.InterfaceName}}'
-pkgname: '{{.SrcPackageName}}'
 recursive: true
-require-template-schema-exists: true
-template: testify
-template-schema: '{{.Template}}.schema.json'
+mockname: '{{.Mock}}{{.InterfaceName}}'
+with-expecter: true
 packages:
+  github.com/artmexbet/raibecas/services/documents/internal/service:
+    config:
+      all: true
+      include-auto-generated: false
+  github.com/artmexbet/raibecas/services/gateway/internal/server:
+    config:
+      all: true
+      include-auto-generated: false
   github.com/artmexbet/raibecas/services/auth/internal/service:
     config:
       all: true

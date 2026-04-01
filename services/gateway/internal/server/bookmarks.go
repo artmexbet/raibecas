@@ -1,18 +1,27 @@
 package server
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
+	"github.com/artmexbet/raibecas/services/gateway/internal/connector"
 	"github.com/artmexbet/raibecas/services/gateway/internal/domain"
 )
 
 // listBookmarks handles GET /bookmarks - list user bookmarks with filtering and pagination.
 func (s *Server) listBookmarks(c *fiber.Ctx) error {
+	authUser, ok := getAuthUser(c)
+	if !ok {
+		return c.Status(http.StatusUnauthorized).JSON(domain.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "Authentication required",
+		})
+	}
+
 	var query domain.ListBookmarksQuery
 
 	if err := c.QueryParser(&query); err != nil {
@@ -30,9 +39,7 @@ func (s *Server) listBookmarks(c *fiber.Ctx) error {
 		query.Limit = 16
 	}
 
-	if authUser, ok := getAuthUser(c); ok {
-		query.UserID = authUser.ID
-	}
+	query.UserID = authUser.ID
 
 	if err := s.validator.Struct(&query); err != nil {
 		slog.Error("bookmarks query validation failed", "error", err)
@@ -58,6 +65,14 @@ func (s *Server) listBookmarks(c *fiber.Ctx) error {
 
 // createBookmark handles POST /bookmarks - save a bookmark for the authenticated user.
 func (s *Server) createBookmark(c *fiber.Ctx) error {
+	authUser, ok := getAuthUser(c)
+	if !ok {
+		return c.Status(http.StatusUnauthorized).JSON(domain.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "Authentication required",
+		})
+	}
+
 	var req domain.CreateBookmarkRequest
 
 	if err := c.BodyParser(&req); err != nil {
@@ -68,9 +83,7 @@ func (s *Server) createBookmark(c *fiber.Ctx) error {
 		})
 	}
 
-	if authUser, ok := getAuthUser(c); ok {
-		req.UserID = authUser.ID
-	}
+	req.UserID = authUser.ID
 
 	if err := s.validator.Struct(&req); err != nil {
 		slog.Error("bookmark request validation failed", "error", err)
@@ -131,10 +144,14 @@ func mapBookmarkConnectorError(err error, fallbackMessage string) (status int, e
 	}
 
 	switch {
-	case strings.Contains(err.Error(), "invalid_request"):
+	case errors.Is(err, connector.ErrInvalidRequest):
 		return http.StatusBadRequest, "invalid_request", fallbackMessage
-	case strings.Contains(err.Error(), "not_found"):
+	case errors.Is(err, connector.ErrNotFound):
 		return http.StatusNotFound, "not_found", fallbackMessage
+	case errors.Is(err, connector.ErrUnauthorized):
+		return http.StatusUnauthorized, "unauthorized", fallbackMessage
+	case errors.Is(err, connector.ErrForbidden):
+		return http.StatusForbidden, "forbidden", fallbackMessage
 	default:
 		return http.StatusInternalServerError, "internal_error", fallbackMessage
 	}

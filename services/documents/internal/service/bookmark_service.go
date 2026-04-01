@@ -50,8 +50,16 @@ func (s *DocumentService) CreateBookmark(ctx context.Context, req domain.CreateB
 	if req.Kind != domain.BookmarkKindPublication && req.Kind != domain.BookmarkKindQuote {
 		return nil, fmt.Errorf("%w: unsupported bookmark kind", ErrInvalidInput)
 	}
+
+	req.QuoteText = normalizeOptionalString(req.QuoteText)
+	req.Context = normalizeOptionalString(req.Context)
+	req.PageLabel = normalizeOptionalString(req.PageLabel)
+
+	if req.Kind == domain.BookmarkKindPublication && hasBookmarkDetails(req) {
+		return nil, fmt.Errorf("%w: publication bookmark cannot include quote details", ErrInvalidInput)
+	}
 	if req.Kind == domain.BookmarkKindQuote {
-		if req.QuoteText == nil || strings.TrimSpace(*req.QuoteText) == "" {
+		if req.QuoteText == nil {
 			return nil, fmt.Errorf("%w: quote text is required for quote bookmarks", ErrInvalidInput)
 		}
 	}
@@ -74,7 +82,7 @@ func (s *DocumentService) CreateBookmark(ctx context.Context, req domain.CreateB
 			}
 			return &item, nil
 		}
-		if err != nil && !errors.Is(err, ErrNotFound) {
+		if !errors.Is(err, ErrNotFound) {
 			return nil, fmt.Errorf("check existing publication bookmark: %w", err)
 		}
 	}
@@ -83,12 +91,22 @@ func (s *DocumentService) CreateBookmark(ctx context.Context, req domain.CreateB
 		UserID:     req.UserID,
 		DocumentID: req.DocumentID,
 		Kind:       req.Kind,
-		QuoteText:  normalizeOptionalString(req.QuoteText),
-		Context:    normalizeOptionalString(req.Context),
-		PageLabel:  normalizeOptionalString(req.PageLabel),
+		QuoteText:  req.QuoteText,
+		Context:    req.Context,
+		PageLabel:  req.PageLabel,
 	}
 
 	if err := s.bookmarkRepo.Create(ctx, bookmark); err != nil {
+		if req.Kind == domain.BookmarkKindPublication && errors.Is(err, ErrInvalidInput) {
+			existing, getErr := s.bookmarkRepo.GetPublicationByUserAndDocument(ctx, req.UserID, req.DocumentID)
+			if getErr == nil {
+				item, buildErr := s.buildBookmarkItem(ctx, *existing)
+				if buildErr != nil {
+					return nil, fmt.Errorf("build concurrent bookmark item: %w", buildErr)
+				}
+				return &item, nil
+			}
+		}
 		return nil, fmt.Errorf("create bookmark: %w", err)
 	}
 
@@ -139,4 +157,8 @@ func normalizeOptionalString(value *string) *string {
 		return nil
 	}
 	return &trimmed
+}
+
+func hasBookmarkDetails(req domain.CreateBookmarkRequest) bool {
+	return req.QuoteText != nil || req.Context != nil || req.PageLabel != nil
 }

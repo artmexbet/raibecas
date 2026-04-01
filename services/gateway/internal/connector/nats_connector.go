@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -14,6 +15,14 @@ import (
 	"github.com/artmexbet/raibecas/libs/natsw"
 
 	"github.com/artmexbet/raibecas/services/gateway/internal/domain"
+)
+
+var (
+	ErrInvalidRequest = errors.New("invalid_request")
+	ErrNotFound       = errors.New("not_found")
+	ErrUnauthorized   = errors.New("unauthorized")
+	ErrForbidden      = errors.New("forbidden")
+	ErrInternal       = errors.New("internal_error")
 )
 
 // NATS subjects for document service communication
@@ -507,7 +516,20 @@ func (c *NATSDocumentConnector) UploadCover(ctx context.Context, id uuid.UUID, d
 func checkErrorResponse(data []byte) error {
 	var errorResp dto.ErrorResponse
 	if err := errorResp.UnmarshalJSON(data); err == nil && errorResp.Error != "" {
-		return fmt.Errorf("%s", errorResp.Error)
+		switch errorResp.Error {
+		case string(dto.ErrCodeInvalidRequest):
+			return ErrInvalidRequest
+		case string(dto.ErrCodeNotFound):
+			return ErrNotFound
+		case string(dto.ErrCodeUnauthorized):
+			return ErrUnauthorized
+		case string(dto.ErrCodeForbidden):
+			return ErrForbidden
+		case string(dto.ErrCodeInternal):
+			return ErrInternal
+		default:
+			return fmt.Errorf("nats error response: %s", errorResp.Error)
+		}
 	}
 	return nil
 }
