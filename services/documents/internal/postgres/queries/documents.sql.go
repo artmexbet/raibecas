@@ -176,7 +176,7 @@ INSERT INTO documents (
     content_path,
     current_version
 ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, title, description, author_id, category_id, publication_date, content_path, cover_path, current_version, indexed, created_at, updated_at
+RETURNING id, title, description, author_id, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path
 `
 
 type CreateDocumentParams struct {
@@ -200,7 +200,7 @@ type CreateDocumentParams struct {
 //	    content_path,
 //	    current_version
 //	) VALUES ($1, $2, $3, $4, $5, $6, $7)
-//	RETURNING id, title, description, author_id, category_id, publication_date, content_path, cover_path, current_version, indexed, created_at, updated_at
+//	RETURNING id, title, description, author_id, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path
 func (q *Queries) CreateDocument(ctx context.Context, arg CreateDocumentParams) (Document, error) {
 	row := q.db.QueryRow(ctx, createDocument,
 		arg.Title,
@@ -220,11 +220,11 @@ func (q *Queries) CreateDocument(ctx context.Context, arg CreateDocumentParams) 
 		&i.CategoryID,
 		&i.PublicationDate,
 		&i.ContentPath,
-		&i.CoverPath,
 		&i.CurrentVersion,
 		&i.Indexed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CoverPath,
 	)
 	return i, err
 }
@@ -361,7 +361,7 @@ func (q *Queries) GetCategoryByID(ctx context.Context, id int32) (Category, erro
 
 const getDocumentByID = `-- name: GetDocumentByID :one
 SELECT
-    documents.id, documents.title, documents.description, documents.author_id, documents.category_id, documents.publication_date, documents.content_path, documents.cover_path, documents.current_version, documents.indexed, documents.created_at, documents.updated_at,
+    documents.id, documents.title, documents.description, documents.author_id, documents.category_id, documents.publication_date, documents.content_path, documents.current_version, documents.indexed, documents.created_at, documents.updated_at, documents.cover_path,
     authors.id, authors.name, authors.bio, authors.created_at, authors.updated_at,
     categories.id, categories.title, categories.description, categories.created_at
 FROM documents
@@ -378,11 +378,11 @@ type GetDocumentByIDRow struct {
 	CategoryID      int32
 	PublicationDate pgtype.Date
 	ContentPath     string
-	CoverPath       *string
 	CurrentVersion  int32
 	Indexed         bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	CoverPath       *string
 	Author          Author
 	Category        Category
 }
@@ -390,7 +390,7 @@ type GetDocumentByIDRow struct {
 // GetDocumentByID
 //
 //	SELECT
-//	    documents.id, documents.title, documents.description, documents.author_id, documents.category_id, documents.publication_date, documents.content_path, documents.cover_path, documents.current_version, documents.indexed, documents.created_at, documents.updated_at,
+//	    documents.id, documents.title, documents.description, documents.author_id, documents.category_id, documents.publication_date, documents.content_path, documents.current_version, documents.indexed, documents.created_at, documents.updated_at, documents.cover_path,
 //	    authors.id, authors.name, authors.bio, authors.created_at, authors.updated_at,
 //	    categories.id, categories.title, categories.description, categories.created_at
 //	FROM documents
@@ -408,11 +408,11 @@ func (q *Queries) GetDocumentByID(ctx context.Context, id uuid.UUID) (GetDocumen
 		&i.CategoryID,
 		&i.PublicationDate,
 		&i.ContentPath,
-		&i.CoverPath,
 		&i.CurrentVersion,
 		&i.Indexed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CoverPath,
 		&i.Author.ID,
 		&i.Author.Name,
 		&i.Author.Bio,
@@ -614,7 +614,7 @@ func (q *Queries) ListDocumentVersions(ctx context.Context, documentID uuid.UUID
 
 const listDocuments = `-- name: ListDocuments :many
 SELECT
-    d.id, d.title, d.description, d.author_id, d.category_id, d.publication_date, d.content_path, d.cover_path, d.current_version, d.indexed, d.created_at, d.updated_at,
+    d.id, d.title, d.description, d.author_id, d.category_id, d.publication_date, d.content_path, d.current_version, d.indexed, d.created_at, d.updated_at, d.cover_path,
     a.id, a.name, a.bio, a.created_at, a.updated_at,
     c.id, c.title, c.description, c.created_at
 FROM documents d
@@ -657,11 +657,11 @@ type ListDocumentsRow struct {
 	CategoryID      int32
 	PublicationDate pgtype.Date
 	ContentPath     string
-	CoverPath       *string
 	CurrentVersion  int32
 	Indexed         bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	CoverPath       *string
 	Author          Author
 	Category        Category
 }
@@ -669,10 +669,31 @@ type ListDocumentsRow struct {
 // ListDocuments
 //
 //	SELECT
-//	    d.id, d.title, d.description, d.author_id, d.category_id, d.publication_date, d.content_path, d.cover_path, d.current_version, d.indexed, d.created_at, d.updated_at,
+//	    d.id, d.title, d.description, d.author_id, d.category_id, d.publication_date, d.content_path, d.current_version, d.indexed, d.created_at, d.updated_at, d.cover_path,
 //	    a.id, a.name, a.bio, a.created_at, a.updated_at,
 //	    c.id, c.title, c.description, c.created_at
-//	FROM documents d ...
+//	FROM documents d
+//	LEFT JOIN authors a ON d.author_id = a.id
+//	LEFT JOIN categories c ON d.category_id = c.id
+//	WHERE (
+//	    CASE
+//	        WHEN $3::uuid IS NOT NULL THEN d.author_id = $3::uuid
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $4::int IS NOT NULL THEN d.category_id = $4::int
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $5::text IS NOT NULL AND $5::text != ''
+//	        THEN to_tsvector('russian', d.title || ' ' || COALESCE(d.description, '')) @@ plainto_tsquery('russian', $5::text)
+//	        ELSE TRUE
+//	    END
+//	)
+//	ORDER BY d.created_at DESC
+//	LIMIT $1 OFFSET $2
 func (q *Queries) ListDocuments(ctx context.Context, arg ListDocumentsParams) ([]ListDocumentsRow, error) {
 	rows, err := q.db.Query(ctx, listDocuments,
 		arg.Limit,
@@ -696,11 +717,11 @@ func (q *Queries) ListDocuments(ctx context.Context, arg ListDocumentsParams) ([
 			&i.CategoryID,
 			&i.PublicationDate,
 			&i.ContentPath,
-			&i.CoverPath,
 			&i.CurrentVersion,
 			&i.Indexed,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.CoverPath,
 			&i.Author.ID,
 			&i.Author.Name,
 			&i.Author.Bio,
@@ -782,7 +803,7 @@ SET
     cover_path = COALESCE($9, cover_path),
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, title, description, author_id, category_id, publication_date, content_path, cover_path, current_version, indexed, created_at, updated_at
+RETURNING id, title, description, author_id, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path
 `
 
 type UpdateDocumentParams struct {
@@ -811,7 +832,7 @@ type UpdateDocumentParams struct {
 //	    cover_path = COALESCE($9, cover_path),
 //	    updated_at = NOW()
 //	WHERE id = $1
-//	RETURNING id, title, description, author_id, category_id, publication_date, content_path, cover_path, current_version, indexed, created_at, updated_at
+//	RETURNING id, title, description, author_id, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path
 func (q *Queries) UpdateDocument(ctx context.Context, arg UpdateDocumentParams) (Document, error) {
 	row := q.db.QueryRow(ctx, updateDocument,
 		arg.ID,
@@ -833,11 +854,11 @@ func (q *Queries) UpdateDocument(ctx context.Context, arg UpdateDocumentParams) 
 		&i.CategoryID,
 		&i.PublicationDate,
 		&i.ContentPath,
-		&i.CoverPath,
 		&i.CurrentVersion,
 		&i.Indexed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CoverPath,
 	)
 	return i, err
 }

@@ -13,6 +13,15 @@ type DocumentServiceConnector interface {
 	// ListDocuments retrieves a list of documents with filtering and pagination
 	ListDocuments(ctx context.Context, query domain.ListDocumentsQuery) (*domain.ListDocumentsResponse, error)
 
+	// ListBookmarks retrieves a list of user bookmarks with filtering and pagination
+	ListBookmarks(ctx context.Context, query domain.ListBookmarksQuery) (*domain.ListBookmarksResponse, error)
+
+	// CreateBookmark saves a bookmark for the authenticated user
+	CreateBookmark(ctx context.Context, req domain.CreateBookmarkRequest) (*domain.CreateBookmarkResponse, error)
+
+	// DeleteBookmark removes a bookmark for the authenticated user
+	DeleteBookmark(ctx context.Context, userID, bookmarkID uuid.UUID) error
+
 	// CreateDocument creates a new document
 	CreateDocument(ctx context.Context, req domain.CreateDocumentRequest, userRole string) (*domain.CreateDocumentResponse, error)
 

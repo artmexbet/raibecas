@@ -2,10 +2,12 @@ package connector
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/mailru/easyjson"
 	"github.com/nats-io/nats.go"
 
 	"github.com/artmexbet/raibecas/libs/dto"
@@ -15,9 +17,20 @@ import (
 	"github.com/artmexbet/raibecas/services/gateway/internal/domain"
 )
 
+var (
+	ErrInvalidRequest = errors.New("invalid_request")
+	ErrNotFound       = errors.New("not_found")
+	ErrUnauthorized   = errors.New("unauthorized")
+	ErrForbidden      = errors.New("forbidden")
+	ErrInternal       = errors.New("internal_error")
+)
+
 // NATS subjects for document service communication
 const (
 	SubjectDocumentsList        = "documents.list"
+	SubjectBookmarksList        = "documents.bookmarks.list"
+	SubjectBookmarksCreate      = "documents.bookmarks.create"
+	SubjectBookmarksDelete      = "documents.bookmarks.delete"
 	SubjectDocumentsGet         = "documents.get"
 	SubjectDocumentsGetContent  = "documents.get.content"
 	SubjectDocumentsCreate      = "documents.create"
@@ -96,6 +109,127 @@ func (c *NATSDocumentConnector) ListDocuments(ctx context.Context, query domain.
 	}
 
 	return response, nil
+}
+
+// ListBookmarks retrieves a list of bookmarks based on query parameters.
+func (c *NATSDocumentConnector) ListBookmarks(ctx context.Context, query domain.ListBookmarksQuery) (*domain.ListBookmarksResponse, error) {
+	dtoQuery := documents.ListBookmarksQuery{
+		Page:   query.Page,
+		Limit:  query.Limit,
+		Search: query.Search,
+		Kind:   documents.BookmarkKind(query.Kind),
+		UserID: query.UserID,
+	}
+
+	reqData, err := easyjson.Marshal(dtoQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal bookmarks list request: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectBookmarksList)
+	msg.Data = reqData
+	if query.UserID != uuid.Nil {
+		msg.Header.Set("X-User-ID", query.UserID.String())
+	}
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send bookmarks list request: %w", err)
+	}
+
+	if errResp := checkErrorResponse(respMsg.Data); errResp != nil {
+		return nil, errResp
+	}
+
+	var dtoResponse documents.ListBookmarksResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &dtoResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal bookmarks list response: %w", err)
+	}
+
+	return &domain.ListBookmarksResponse{
+		Items:      convertBookmarks(dtoResponse.Items),
+		Total:      dtoResponse.Total,
+		Page:       dtoResponse.Page,
+		Limit:      dtoResponse.Limit,
+		TotalPages: dtoResponse.TotalPages,
+	}, nil
+}
+
+// CreateBookmark saves a bookmark for the authenticated user.
+func (c *NATSDocumentConnector) CreateBookmark(ctx context.Context, req domain.CreateBookmarkRequest) (*domain.CreateBookmarkResponse, error) {
+	dtoReq := documents.CreateBookmarkRequest{
+		UserID:     req.UserID,
+		DocumentID: req.DocumentID,
+		Kind:       documents.BookmarkKind(req.Kind),
+		QuoteText:  req.QuoteText,
+		Context:    req.Context,
+		PageLabel:  req.PageLabel,
+	}
+
+	reqData, err := easyjson.Marshal(dtoReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal create bookmark request: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectBookmarksCreate)
+	msg.Data = reqData
+	if req.UserID != uuid.Nil {
+		msg.Header.Set("X-User-ID", req.UserID.String())
+	}
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send create bookmark request: %w", err)
+	}
+
+	if errResp := checkErrorResponse(respMsg.Data); errResp != nil {
+		return nil, errResp
+	}
+
+	var dtoResponse documents.CreateBookmarkResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &dtoResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal create bookmark response: %w", err)
+	}
+
+	return &domain.CreateBookmarkResponse{Item: convertBookmark(dtoResponse.Item)}, nil
+}
+
+// DeleteBookmark removes a bookmark for the authenticated user.
+func (c *NATSDocumentConnector) DeleteBookmark(ctx context.Context, userID, bookmarkID uuid.UUID) error {
+	dtoReq := documents.DeleteBookmarkRequest{
+		ID:     bookmarkID,
+		UserID: userID,
+	}
+
+	reqData, err := easyjson.Marshal(dtoReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal delete bookmark request: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectBookmarksDelete)
+	msg.Data = reqData
+	if userID != uuid.Nil {
+		msg.Header.Set("X-User-ID", userID.String())
+	}
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return fmt.Errorf("failed to send delete bookmark request: %w", err)
+	}
+
+	if errResp := checkErrorResponse(respMsg.Data); errResp != nil {
+		return errResp
+	}
+
+	var dtoResponse documents.DeleteBookmarkResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &dtoResponse); err != nil {
+		return fmt.Errorf("failed to unmarshal delete bookmark response: %w", err)
+	}
+	if !dtoResponse.Success {
+		return fmt.Errorf("delete bookmark failed")
+	}
+
+	return nil
 }
 
 // GetDocument retrieves a single document by ID
@@ -316,8 +450,28 @@ func convertDocument(dto documents.Document) domain.Document {
 
 func convertDocuments(dtoDocuments []documents.Document) []domain.Document {
 	result := make([]domain.Document, len(dtoDocuments))
-	for i, dto := range dtoDocuments {
-		result[i] = convertDocument(dto)
+	for i, dtoDocument := range dtoDocuments {
+		result[i] = convertDocument(dtoDocument)
+	}
+	return result
+}
+
+func convertBookmark(dtoBookmark documents.BookmarkItem) domain.BookmarkItem {
+	return domain.BookmarkItem{
+		ID:        dtoBookmark.ID,
+		Kind:      domain.BookmarkKind(dtoBookmark.Kind),
+		SavedAt:   dtoBookmark.SavedAt,
+		Document:  convertDocument(dtoBookmark.Document),
+		QuoteText: dtoBookmark.QuoteText,
+		Context:   dtoBookmark.Context,
+		PageLabel: dtoBookmark.PageLabel,
+	}
+}
+
+func convertBookmarks(dtoBookmarks []documents.BookmarkItem) []domain.BookmarkItem {
+	result := make([]domain.BookmarkItem, len(dtoBookmarks))
+	for i, dtoBookmark := range dtoBookmarks {
+		result[i] = convertBookmark(dtoBookmark)
 	}
 	return result
 }
@@ -362,7 +516,20 @@ func (c *NATSDocumentConnector) UploadCover(ctx context.Context, id uuid.UUID, d
 func checkErrorResponse(data []byte) error {
 	var errorResp dto.ErrorResponse
 	if err := errorResp.UnmarshalJSON(data); err == nil && errorResp.Error != "" {
-		return fmt.Errorf("%s", errorResp.Error)
+		switch errorResp.Error {
+		case string(dto.ErrCodeInvalidRequest):
+			return ErrInvalidRequest
+		case string(dto.ErrCodeNotFound):
+			return ErrNotFound
+		case string(dto.ErrCodeUnauthorized):
+			return ErrUnauthorized
+		case string(dto.ErrCodeForbidden):
+			return ErrForbidden
+		case string(dto.ErrCodeInternal):
+			return ErrInternal
+		default:
+			return fmt.Errorf("nats error response: %s", errorResp.Error)
+		}
 	}
 	return nil
 }
@@ -386,10 +553,10 @@ func (c *NATSDocumentConnector) ListAuthors(ctx context.Context) (*domain.ListAu
 
 	// Convert to domain type
 	authors := make([]domain.Author, len(dtoResponse.Authors))
-	for i, dto := range dtoResponse.Authors {
+	for i, dtoAuthor := range dtoResponse.Authors {
 		authors[i] = domain.Author{
-			ID:   dto.ID,
-			Name: dto.Name,
+			ID:   dtoAuthor.ID,
+			Name: dtoAuthor.Name,
 		}
 	}
 
@@ -457,10 +624,10 @@ func (c *NATSDocumentConnector) ListCategories(ctx context.Context) (*domain.Lis
 
 	// Convert to domain type
 	categories := make([]domain.Category, len(dtoResponse.Categories))
-	for i, dto := range dtoResponse.Categories {
+	for i, dtoCategory := range dtoResponse.Categories {
 		categories[i] = domain.Category{
-			ID:    dto.ID,
-			Title: dto.Title,
+			ID:    dtoCategory.ID,
+			Title: dtoCategory.Title,
 		}
 	}
 
@@ -528,10 +695,10 @@ func (c *NATSDocumentConnector) ListTags(ctx context.Context) (*domain.ListTagsR
 
 	// Convert to domain type
 	tags := make([]domain.Tag, len(dtoResponse.Tags))
-	for i, dto := range dtoResponse.Tags {
+	for i, dtoTag := range dtoResponse.Tags {
 		tags[i] = domain.Tag{
-			ID:    dto.ID,
-			Title: dto.Title,
+			ID:    dtoTag.ID,
+			Title: dtoTag.Title,
 		}
 	}
 

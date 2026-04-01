@@ -38,8 +38,8 @@ type CORSConfig struct {
 }
 
 type ChatServiceConfig struct {
-	WebSocketURL string `env:"CHAT_WS_URL" env-default:"ws://localhost:8081/ws/chat"`
-	HTTPURL      string `env:"CHAT_HTTP_URL" env-default:"http://localhost:8081"`
+	WebSocketURL string `env:"CHAT_WS_URL" env-default:"ws://localhost:8082/ws/chat"`
+	HTTPURL      string `env:"CHAT_HTTP_URL" env-default:"http://localhost:8082"`
 }
 
 type Config struct {

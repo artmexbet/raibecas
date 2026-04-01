@@ -14,6 +14,7 @@ import (
 // DocumentService handles business logic for documents
 type DocumentService struct {
 	docRepo      DocumentRepository
+	bookmarkRepo BookmarkRepository
 	versionRepo  VersionRepository
 	tagRepo      TagRepository
 	metadataRepo MetadataRepository
@@ -25,6 +26,7 @@ type DocumentService struct {
 // NewDocumentService creates a new document service
 func NewDocumentService(
 	docRepo DocumentRepository,
+	bookmarkRepo BookmarkRepository,
 	versionRepo VersionRepository,
 	tagRepo TagRepository,
 	metadataRepo MetadataRepository,
@@ -34,6 +36,7 @@ func NewDocumentService(
 ) *DocumentService {
 	return &DocumentService{
 		docRepo:      docRepo,
+		bookmarkRepo: bookmarkRepo,
 		versionRepo:  versionRepo,
 		tagRepo:      tagRepo,
 		metadataRepo: metadataRepo,
