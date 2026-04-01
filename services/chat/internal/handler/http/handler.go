@@ -16,7 +16,7 @@ import (
 )
 
 type service interface {
-	ProcessInput(ctx context.Context, input, userID string, fn func(response domain.ChatResponse) error) error
+	ProcessInput(ctx context.Context, input, userID, sessionID string, fn func(response domain.ChatResponse) error) error
 	ClearUserChat(ctx context.Context, userID string) error
 	GetUserSessions(ctx context.Context, userID string) ([]domain.ChatSession, error)
 	CreateSession(ctx context.Context, userID, title string) (string, error)

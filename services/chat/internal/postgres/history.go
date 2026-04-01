@@ -17,30 +17,63 @@ func (s *Store) q() *queries.Queries {
 	return queries.New(s.pool)
 }
 
-// ensureSession returns the most recent session ID for userID, creating one if none exists.
-func (s *Store) ensureSession(ctx context.Context, userID string) (uuid.UUID, error) {
-	id, err := s.q().GetLatestSession(ctx, userID)
-	if err == nil {
-		return id, nil
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return uuid.UUID{}, fmt.Errorf("ensureSession query: %w", err)
+func (s *Store) getOwnedSessionID(ctx context.Context, userID, sessionID string) (uuid.UUID, error) {
+	parsedSessionID, err := uuid.Parse(sessionID)
+	if err != nil {
+		return uuid.UUID{}, domain.ErrInvalidChatSessionID
 	}
 
-	// No session yet — create one.
-	id, err = s.q().InsertSession(ctx, queries.InsertSessionParams{
+	ownedSession, err := s.q().GetSessionByIDForUser(ctx, queries.GetSessionByIDForUserParams{
+		ID:     parsedSessionID,
+		UserID: userID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.UUID{}, domain.ErrChatSessionNotFound
+		}
+		return uuid.UUID{}, fmt.Errorf("getOwnedSessionID query: %w", err)
+	}
+
+	return ownedSession.ID, nil
+}
+
+func (s *Store) resolveSessionID(ctx context.Context, userID, sessionID string, createIfMissing bool) (uuid.UUID, error) {
+	if sessionID != "" {
+		return s.getOwnedSessionID(ctx, userID, sessionID)
+	}
+
+	latestSessionID, err := s.q().GetLatestSession(ctx, userID)
+	if err == nil {
+		return latestSessionID, nil
+	}
+
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return uuid.UUID{}, fmt.Errorf("resolveSessionID latest session: %w", err)
+	}
+
+	if !createIfMissing {
+		return uuid.UUID{}, pgx.ErrNoRows
+	}
+
+	createdSessionID, err := s.q().InsertSession(ctx, queries.InsertSessionParams{
 		UserID: userID,
 		Title:  "Новый чат",
 	})
 	if err != nil {
-		return uuid.UUID{}, fmt.Errorf("ensureSession insert: %w", err)
+		return uuid.UUID{}, fmt.Errorf("resolveSessionID insert: %w", err)
 	}
-	return id, nil
+
+	return createdSessionID, nil
+}
+
+// ensureSession returns the most recent session ID for userID, creating one if none exists.
+func (s *Store) ensureSession(ctx context.Context, userID string) (uuid.UUID, error) {
+	return s.resolveSessionID(ctx, userID, "", true)
 }
 
 // RetrieveChatHistory returns all messages from the latest session for userID.
-func (s *Store) RetrieveChatHistory(ctx context.Context, userID string) ([]domain.Message, error) {
-	sessionID, err := s.q().GetLatestSession(ctx, userID)
+func (s *Store) RetrieveChatHistory(ctx context.Context, userID, sessionID string) ([]domain.Message, error) {
+	resolvedSessionID, err := s.resolveSessionID(ctx, userID, sessionID, false)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return []domain.Message{}, nil
@@ -48,7 +81,7 @@ func (s *Store) RetrieveChatHistory(ctx context.Context, userID string) ([]domai
 		return nil, fmt.Errorf("RetrieveChatHistory session: %w", err)
 	}
 
-	rows, err := s.q().GetSessionMessages(ctx, sessionID)
+	rows, err := s.q().GetSessionMessages(ctx, resolvedSessionID)
 	if err != nil {
 		return nil, fmt.Errorf("RetrieveChatHistory messages: %w", err)
 	}
@@ -61,14 +94,14 @@ func (s *Store) RetrieveChatHistory(ctx context.Context, userID string) ([]domai
 }
 
 // SaveMessage saves a single message to the latest (or newly created) session.
-func (s *Store) SaveMessage(ctx context.Context, userID string, message domain.Message) error {
-	sessionID, err := s.ensureSession(ctx, userID)
+func (s *Store) SaveMessage(ctx context.Context, userID, sessionID string, message domain.Message) error {
+	resolvedSessionID, err := s.resolveSessionID(ctx, userID, sessionID, true)
 	if err != nil {
 		return err
 	}
 
 	if err := s.q().InsertMessage(ctx, queries.InsertMessageParams{
-		SessionID: sessionID,
+		SessionID: resolvedSessionID,
 		Role:      message.Role,
 		Content:   message.Content,
 	}); err != nil {
@@ -76,7 +109,7 @@ func (s *Store) SaveMessage(ctx context.Context, userID string, message domain.M
 	}
 
 	// Bump updated_at so latest-session detection stays correct.
-	if err := s.q().BumpSessionUpdatedAt(ctx, sessionID); err != nil {
+	if err := s.q().BumpSessionUpdatedAt(ctx, resolvedSessionID); err != nil {
 		return fmt.Errorf("SaveMessage bump session: %w", err)
 	}
 
@@ -101,7 +134,7 @@ func (s *Store) ClearChatHistory(ctx context.Context, userID string) error {
 
 // GetChatSize returns the number of messages in the latest session for userID.
 func (s *Store) GetChatSize(ctx context.Context, userID string) (int, error) {
-	history, err := s.RetrieveChatHistory(ctx, userID)
+	history, err := s.RetrieveChatHistory(ctx, userID, "")
 	if err != nil {
 		return 0, err
 	}

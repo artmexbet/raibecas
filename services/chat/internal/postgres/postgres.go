@@ -9,6 +9,8 @@ import (
 	"github.com/artmexbet/raibecas/services/chat/internal/config"
 )
 
+//go:generate sqlc generate
+
 // Store holds the pgxpool connection pool.
 type Store struct {
 	pool *pgxpool.Pool

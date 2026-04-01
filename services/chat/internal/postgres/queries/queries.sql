@@ -9,6 +9,12 @@ INSERT INTO chat_sessions (user_id, title)
 VALUES ($1, $2)
 RETURNING id;
 
+-- name: GetSessionByIDForUser :one
+SELECT id, user_id, title, created_at, updated_at
+FROM chat_sessions
+WHERE id = $1 AND user_id = $2
+LIMIT 1;
+
 -- name: GetSessionMessages :many
 SELECT role, content FROM chat_messages
 WHERE session_id = $1
