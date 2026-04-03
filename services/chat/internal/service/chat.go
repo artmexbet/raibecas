@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -24,8 +25,8 @@ type iNeuroConnector interface {
 }
 
 type iChatHistoryStore interface {
-	RetrieveChatHistory(ctx context.Context, userID string) ([]domain.Message, error)
-	SaveMessage(ctx context.Context, userID string, message domain.Message) error
+	RetrieveChatHistory(ctx context.Context, userID, sessionID string) ([]domain.Message, error)
+	SaveMessage(ctx context.Context, userID, sessionID string, message domain.Message) error
 	ClearChatHistory(ctx context.Context, userID string) error
 	GetChatSize(ctx context.Context, userID string) (int, error)
 	GetUserSessions(ctx context.Context, userID string) ([]domain.ChatSession, error)
@@ -56,7 +57,7 @@ func New(vectorStore iVectorStore, neuro iNeuroConnector, historyStore iChatHist
 //
 // Returns:
 //   - error: non-nil if embedding generation or vector retrieval fails.
-func (c *Chat) ProcessInput(ctx context.Context, input, userID string, fn func(response domain.ChatResponse) error) error {
+func (c *Chat) ProcessInput(ctx context.Context, input, userID, sessionID string, fn func(response domain.ChatResponse) error) error {
 	embedding, err := c.neuro.GenerateEmbeddings(ctx, input)
 	if err != nil {
 		return fmt.Errorf("could not generate embeddings: %w", err)
@@ -69,8 +70,11 @@ func (c *Chat) ProcessInput(ctx context.Context, input, userID string, fn func(r
 	slog.DebugContext(ctx, "retrieved documents", "count", len(docs), "docs", docs)
 
 	// Retrieve chat history from Redis
-	history, err := c.historyStore.RetrieveChatHistory(ctx, userID)
+	history, err := c.historyStore.RetrieveChatHistory(ctx, userID, sessionID)
 	if err != nil {
+		if errors.Is(err, domain.ErrInvalidChatSessionID) || errors.Is(err, domain.ErrChatSessionNotFound) {
+			return err
+		}
 		slog.WarnContext(ctx, "could not retrieve chat history", "error", err)
 		history = []domain.Message{}
 	}
@@ -80,8 +84,11 @@ func (c *Chat) ProcessInput(ctx context.Context, input, userID string, fn func(r
 		Role:    "user",
 		Content: input,
 	}
-	err = c.historyStore.SaveMessage(ctx, userID, userMessage)
+	err = c.historyStore.SaveMessage(ctx, userID, sessionID, userMessage)
 	if err != nil {
+		if errors.Is(err, domain.ErrInvalidChatSessionID) || errors.Is(err, domain.ErrChatSessionNotFound) {
+			return err
+		}
 		slog.WarnContext(ctx, "could not save user message", "error", err)
 	}
 
@@ -105,8 +112,12 @@ func (c *Chat) ProcessInput(ctx context.Context, input, userID string, fn func(r
 				Content: assistantContent.String(),
 			}
 			slog.DebugContext(ctx, "Sending chat response chunk")
-			err := c.historyStore.SaveMessage(ctx, userID, fullMessage)
+			err := c.historyStore.SaveMessage(ctx, userID, sessionID, fullMessage)
 			if err != nil {
+				if errors.Is(err, domain.ErrInvalidChatSessionID) || errors.Is(err, domain.ErrChatSessionNotFound) {
+					return err
+				}
+
 				slog.WarnContext(ctx, "could not save assistant message", "error", err)
 			}
 		}

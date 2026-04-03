@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 
 	"github.com/gofiber/contrib/websocket"
@@ -33,24 +34,34 @@ func (h *Handler) chatHandler(c *fiber.Ctx) error {
 	slog.Debug("Processing chat input", slog.String("request_id", c.Get(fiber.HeaderXRequestID)))
 	buf := bytes.NewBuffer(nil)
 	// Stream chunks as they arrive
-	err = h.svc.ProcessInput(c.UserContext(), req.Input, req.UserID, func(response domain.ChatResponse) error {
-		slog.DebugContext(c.UserContext(), "Sending chat response chunk",
-			slog.String("chunk", response.Message.Content),
-		)
-		// Marshal the response to JSON
-		data, err := json.Marshal(response)
-		if err != nil {
-			return err
-		}
-		buf.WriteString(string(data) + "\n")
+	err = h.svc.ProcessInput(
+		c.UserContext(),
+		req.Input, req.UserID, req.SessionID,
+		func(response domain.ChatResponse) error {
+			slog.DebugContext(c.UserContext(), "Sending chat response chunk",
+				slog.String("chunk", response.Message.Content),
+			)
+			// Marshal the response to JSON
+			data, err := json.Marshal(response)
+			if err != nil {
+				return err
+			}
+			buf.WriteString(string(data) + "\n")
 
-		// Flush the response writer to send data immediately
-		return nil
-	})
+			// Flush the response writer to send data immediately
+			return nil
+		})
 
 	if err != nil {
+		if errors.Is(err, domain.ErrInvalidChatSessionID) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		if errors.Is(err, domain.ErrChatSessionNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		}
 		return err
 	}
+
 	return c.SendStream(buf)
 }
 
@@ -104,17 +115,24 @@ func (h *Handler) wsChatHandler(c *websocket.Conn) {
 
 		// Process the chat input and stream responses
 		ctx := context.Background()
-		err = h.svc.ProcessInput(ctx, req.Input, userID, func(response domain.ChatResponse) error {
-			respData, err := json.Marshal(response)
-			if err != nil {
-				return err
-			}
-			return c.WriteMessage(msgType, respData)
-		})
+		err = h.svc.ProcessInput(ctx,
+			req.Input, userID, req.SessionID,
+			func(response domain.ChatResponse) error {
+				respData, err := json.Marshal(response)
+				if err != nil {
+					return err
+				}
+				return c.WriteMessage(msgType, respData)
+			})
 
 		if err != nil {
 			slog.Error("Chat processing error", "error", err)
-			err = c.WriteMessage(websocket.TextMessage, []byte(`{"error":"processing failed"}`))
+			errorMessage := "processing failed"
+			if errors.Is(err, domain.ErrInvalidChatSessionID) || errors.Is(err, domain.ErrChatSessionNotFound) {
+				errorMessage = err.Error()
+			}
+
+			err = c.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","error":"`+errorMessage+`"}`))
 			if err != nil {
 				slog.Error("Failed to write error message", "error", err)
 			}

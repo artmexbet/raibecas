@@ -37,6 +37,12 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasServicesChatInternalHandler
 			} else {
 				out.UserID = string(in.String())
 			}
+		case "session_id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.SessionID = string(in.String())
+			}
 		case "input":
 			if in.IsNull() {
 				in.Skip()
@@ -61,6 +67,11 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasServicesChatInternalHandler
 		const prefix string = ",\"user_id\":"
 		out.RawString(prefix[1:])
 		out.String(string(in.UserID))
+	}
+	if in.SessionID != "" {
+		const prefix string = ",\"session_id\":"
+		out.RawString(prefix)
+		out.String(string(in.SessionID))
 	}
 	{
 		const prefix string = ",\"input\":"

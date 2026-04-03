@@ -13,8 +13,9 @@ import (
 
 // ChatRequest represents a chat request from NATS
 type ChatRequest struct {
-	Input  string `json:"input"`
-	UserID string `json:"user_id"`
+	Input     string `json:"input"`
+	UserID    string `json:"user_id"`
+	SessionID string `json:"session_id,omitempty"`
 }
 
 // ChatResponseChunk represents a streaming response chunk
@@ -25,7 +26,7 @@ type ChatResponseChunk struct {
 
 // Service defines the chat service interface
 type Service interface {
-	ProcessInput(ctx context.Context, input, userID string, fn func(response domain.ChatResponse) error) error
+	ProcessInput(ctx context.Context, input, userID, sessionID string, fn func(response domain.ChatResponse) error) error
 	ClearUserChat(ctx context.Context, userID string) error
 }
 
@@ -69,7 +70,7 @@ func (h *Handler) handleChatRequest(msg *natsw.Message) error {
 	slog.Debug("Processing chat request via NATS", "user_id", req.UserID)
 
 	// Stream responses back through NATS
-	err := h.svc.ProcessInput(ctx, req.Input, req.UserID, func(response domain.ChatResponse) error {
+	err := h.svc.ProcessInput(ctx, req.Input, req.UserID, req.SessionID, func(response domain.ChatResponse) error {
 		chunk := ChatResponseChunk{
 			Done:    response.Done,
 			Message: response.Message,

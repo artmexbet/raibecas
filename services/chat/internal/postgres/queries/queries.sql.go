@@ -61,6 +61,37 @@ func (q *Queries) GetLatestSession(ctx context.Context, userID string) (uuid.UUI
 	return id, err
 }
 
+const getSessionByIDForUser = `-- name: GetSessionByIDForUser :one
+SELECT id, user_id, title, created_at, updated_at
+FROM chat_sessions
+WHERE id = $1 AND user_id = $2
+LIMIT 1
+`
+
+type GetSessionByIDForUserParams struct {
+	ID     uuid.UUID
+	UserID string
+}
+
+// GetSessionByIDForUser
+//
+//	SELECT id, user_id, title, created_at, updated_at
+//	FROM chat_sessions
+//	WHERE id = $1 AND user_id = $2
+//	LIMIT 1
+func (q *Queries) GetSessionByIDForUser(ctx context.Context, arg GetSessionByIDForUserParams) (ChatSession, error) {
+	row := q.db.QueryRow(ctx, getSessionByIDForUser, arg.ID, arg.UserID)
+	var i ChatSession
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Title,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getSessionMessages = `-- name: GetSessionMessages :many
 SELECT role, content FROM chat_messages
 WHERE session_id = $1
