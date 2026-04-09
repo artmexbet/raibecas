@@ -54,16 +54,38 @@ type Tag struct {
 	Title string `json:"title" validate:"required"`
 }
 
+type DocumentType struct {
+	ID   int    `json:"id" validate:"required,number"`
+	Name string `json:"name" validate:"required"`
+}
+
+type AuthorshipType struct {
+	ID    int    `json:"id" validate:"required,number"`
+	Title string `json:"title" validate:"required"`
+}
+
+type DocumentParticipant struct {
+	Author         Author         `json:"author" validate:"dive"`
+	AuthorshipType AuthorshipType `json:"authorshipType" validate:"dive"`
+}
+
+type DocumentParticipantRef struct {
+	AuthorID string `json:"authorId" validate:"required,uuid"`
+	TypeID   int    `json:"typeId" validate:"required,min=1"`
+}
+
 type Document struct {
-	ID              uuid.UUID `json:"id" validate:"required,uuid"`
-	Title           string    `json:"title" validate:"required"`
-	Description     *string   `json:"description" validate:"-"`
-	Author          Author    `json:"author" validate:"dive"`
-	Category        Category  `json:"category" validate:"dive"`
-	PublicationDate time.Time `json:"publication_date" validate:"required"`
-	Tags            []Tag     `json:"tags" validate:"dive"`
-	Content         *string   `json:"content,omitempty"`
-	CoverURL        *string   `json:"cover_url,omitempty"`
+	ID              uuid.UUID             `json:"id" validate:"required,uuid"`
+	Title           string                `json:"title" validate:"required"`
+	Description     *string               `json:"description" validate:"-"`
+	Author          Author                `json:"author" validate:"dive"`
+	Category        Category              `json:"category" validate:"dive"`
+	DocumentType    *DocumentType         `json:"documentType,omitempty" validate:"omitempty,dive"`
+	Participants    []DocumentParticipant `json:"participants,omitempty" validate:"dive"`
+	PublicationDate time.Time             `json:"publication_date" validate:"required"`
+	Tags            []Tag                 `json:"tags" validate:"dive"`
+	Content         *string               `json:"content,omitempty"`
+	CoverURL        *string               `json:"cover_url,omitempty"`
 	Additional
 }
 

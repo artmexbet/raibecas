@@ -16,13 +16,14 @@ type BookmarkKind string
 //
 //easyjson:json
 type ListDocumentsQuery struct {
-	Page       int       `json:"page,omitempty"`
-	Limit      int       `json:"limit,omitempty"`
-	Offset     int       `json:"offset,omitempty"`
-	AuthorID   uuid.UUID `json:"author_id,omitempty"`
-	CategoryID int       `json:"category_id,omitempty"`
-	TagID      int       `json:"tag_id,omitempty"`
-	Search     string    `json:"search,omitempty"`
+	Page           int       `json:"page,omitempty"`
+	Limit          int       `json:"limit,omitempty"`
+	Offset         int       `json:"offset,omitempty"`
+	AuthorID       uuid.UUID `json:"author_id,omitempty"`
+	CategoryID     int       `json:"category_id,omitempty"`
+	DocumentTypeID int       `json:"document_type_id,omitempty"`
+	TagID          int       `json:"tag_id,omitempty"`
+	Search         string    `json:"search,omitempty"`
 }
 
 // ListDocumentsResponse represents the response for listing documents
@@ -109,14 +110,15 @@ type DeleteBookmarkResponse struct {
 //
 //easyjson:json
 type CreateDocumentRequest struct {
-	Title           string     `json:"title"`
-	Description     *string    `json:"description,omitempty"`
-	AuthorID        uuid.UUID  `json:"author_id"`
-	CategoryID      int        `json:"category_id"`
-	PublicationDate time.Time  `json:"publication_date"`
-	Content         string     `json:"content,omitempty"`
-	TagIDs          []int      `json:"tag_ids,omitempty"`
-	CreatedBy       *uuid.UUID `json:"created_by,omitempty"`
+	Title           string                   `json:"title"`
+	Description     *string                  `json:"description,omitempty"`
+	CategoryID      int                      `json:"category_id,omitempty"`
+	DocumentTypeID  int                      `json:"document_type_id"`
+	Participants    []DocumentParticipantRef `json:"participants,omitempty"`
+	PublicationDate time.Time                `json:"publication_date"`
+	Content         string                   `json:"content,omitempty"`
+	TagIDs          []int                    `json:"tag_ids,omitempty"`
+	CreatedBy       *uuid.UUID               `json:"created_by,omitempty"`
 }
 
 // CreateDocumentResponse represents a document creation response
@@ -158,16 +160,17 @@ type GetDocumentContentResponse struct {
 //
 //easyjson:json
 type UpdateDocumentRequest struct {
-	ID              uuid.UUID  `json:"id,omitempty"`
-	Title           *string    `json:"title,omitempty"`
-	Description     *string    `json:"description,omitempty"`
-	AuthorID        *uuid.UUID `json:"author_id,omitempty"`
-	CategoryID      *int       `json:"category_id,omitempty"`
-	PublicationDate *time.Time `json:"publication_date,omitempty"`
-	Content         *string    `json:"content,omitempty"`
-	TagIDs          []int      `json:"tag_ids,omitempty"`
-	Changes         *string    `json:"changes,omitempty"`
-	UpdatedBy       *uuid.UUID `json:"updated_by,omitempty"`
+	ID              uuid.UUID                `json:"id,omitempty"`
+	Title           *string                  `json:"title,omitempty"`
+	Description     *string                  `json:"description,omitempty"`
+	CategoryID      int                      `json:"category_id,omitempty"`
+	DocumentTypeID  *int                     `json:"document_type_id,omitempty"`
+	Participants    []DocumentParticipantRef `json:"participants,omitempty"`
+	PublicationDate *time.Time               `json:"publication_date,omitempty"`
+	Content         *string                  `json:"content,omitempty"`
+	TagIDs          []int                    `json:"tag_ids,omitempty"`
+	Changes         *string                  `json:"changes,omitempty"`
+	UpdatedBy       *uuid.UUID               `json:"updated_by,omitempty"`
 }
 
 // UpdateDocumentResponse represents a document update response
@@ -209,21 +212,57 @@ type ListDocumentVersionsResponse struct {
 //
 //easyjson:json
 type Document struct {
-	ID              uuid.UUID `json:"id"`
-	Title           string    `json:"title"`
-	Description     *string   `json:"description,omitempty"`
-	AuthorID        uuid.UUID `json:"author_id"`
-	CategoryID      int       `json:"category_id"`
-	PublicationDate time.Time `json:"publication_date"`
-	ContentPath     string    `json:"content_path"`
-	CurrentVersion  int       `json:"current_version"`
-	Indexed         bool      `json:"indexed"`
-	CoverURL        *string   `json:"cover_url,omitempty"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
-	Author          *Author   `json:"author,omitempty"`
-	Category        *Category `json:"category,omitempty"`
-	Tags            []Tag     `json:"tags,omitempty"`
+	ID              uuid.UUID             `json:"id"`
+	Title           string                `json:"title"`
+	Description     *string               `json:"description,omitempty"`
+	CategoryID      int                   `json:"category_id,omitempty"`
+	DocumentTypeID  int                   `json:"document_type_id"`
+	PublicationDate time.Time             `json:"publication_date"`
+	ContentPath     string                `json:"content_path"`
+	CurrentVersion  int                   `json:"current_version"`
+	Indexed         bool                  `json:"indexed"`
+	CoverURL        *string               `json:"cover_url,omitempty"`
+	CreatedAt       time.Time             `json:"created_at"`
+	UpdatedAt       time.Time             `json:"updated_at"`
+	Author          *Author               `json:"author,omitempty"`
+	Category        *Category             `json:"category,omitempty"`
+	DocumentType    *DocumentType         `json:"document_type,omitempty"`
+	Participants    []DocumentParticipant `json:"participants,omitempty"`
+	Tags            []Tag                 `json:"tags,omitempty"`
+}
+
+// DocumentParticipantRef represents participant input for document create/update
+//
+//easyjson:json
+type DocumentParticipantRef struct {
+	AuthorID uuid.UUID `json:"author_id"`
+	TypeID   int       `json:"type_id"`
+}
+
+// AuthorshipType represents participant role metadata
+//
+//easyjson:json
+type AuthorshipType struct {
+	ID        int       `json:"id"`
+	Title     string    `json:"title"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// DocumentParticipant represents a linked participant with a role
+//
+//easyjson:json
+type DocumentParticipant struct {
+	Author         Author         `json:"author"`
+	AuthorshipType AuthorshipType `json:"authorship_type"`
+}
+
+// DocumentType represents a document kind
+//
+//easyjson:json
+type DocumentType struct {
+	ID        int       `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // Author represents a scientific work author
@@ -311,6 +350,20 @@ type CreateCategoryResponse struct {
 //easyjson:json
 type ListCategoriesResponse struct {
 	Categories []Category `json:"categories"`
+}
+
+// ListDocumentTypesResponse represents the response for listing document types
+//
+//easyjson:json
+type ListDocumentTypesResponse struct {
+	DocumentTypes []DocumentType `json:"document_types"`
+}
+
+// ListAuthorshipTypesResponse represents the response for listing authorship types
+//
+//easyjson:json
+type ListAuthorshipTypesResponse struct {
+	AuthorshipTypes []AuthorshipType `json:"authorship_types"`
 }
 
 // CreateTagRequest represents a tag creation request

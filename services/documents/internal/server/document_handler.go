@@ -46,8 +46,9 @@ func (h *DocumentHandler) HandleCreateDocument(msg *natsw.Message) error {
 	domainReq := domain.CreateDocumentRequest{
 		Title:           req.Title,
 		Description:     req.Description,
-		AuthorID:        req.AuthorID,
-		CategoryID:      req.CategoryID,
+		CategoryID:      intToIntPtr(req.CategoryID),
+		DocumentTypeID:  req.DocumentTypeID,
+		Participants:    convertParticipantRefsToDomain(req.Participants),
 		PublicationDate: req.PublicationDate,
 		Content:         req.Content,
 		TagIDs:          req.TagIDs,
@@ -142,17 +143,25 @@ func (h *DocumentHandler) HandleListDocuments(msg *natsw.Message) error {
 		categoryID = &cid
 	}
 
+	var documentTypeID *int32
+	if req.DocumentTypeID != 0 {
+		dtid := int32(req.DocumentTypeID)
+		documentTypeID = &dtid
+	}
+
 	var authorID *uuid.UUID
 	if req.AuthorID != uuid.Nil {
 		authorID = &req.AuthorID
 	}
 
 	docs, total, err := h.service.ListDocuments(msg.Ctx, domain.ListDocumentsParams{
-		Limit:      limit,
-		Offset:     req.Offset,
-		AuthorID:   authorID,
-		CategoryID: categoryID,
-		Search:     req.Search,
+		Limit:          limit,
+		Offset:         req.Offset,
+		AuthorID:       authorID,
+		CategoryID:     categoryID,
+		DocumentTypeID: documentTypeID,
+		TagID:          intToInt32Ptr(req.TagID),
+		Search:         req.Search,
 	})
 	if err != nil {
 		h.logger.ErrorContext(msg.Ctx, "failed to list documents", "error", err)
@@ -330,8 +339,9 @@ func (h *DocumentHandler) HandleUpdateDocument(msg *natsw.Message) error {
 	domainReq := domain.UpdateDocumentRequest{
 		Title:           req.Title,
 		Description:     req.Description,
-		AuthorID:        req.AuthorID,
-		CategoryID:      req.CategoryID,
+		CategoryID:      intToIntPtr(req.CategoryID),
+		DocumentTypeID:  req.DocumentTypeID,
+		Participants:    convertParticipantRefsToDomain(req.Participants),
 		PublicationDate: req.PublicationDate,
 		Content:         req.Content,
 		TagIDs:          req.TagIDs,
@@ -497,8 +507,8 @@ func convertDomainToDTO(doc domain.Document) documents.Document {
 		ID:              doc.ID,
 		Title:           doc.Title,
 		Description:     doc.Description,
-		AuthorID:        doc.AuthorID,
-		CategoryID:      doc.CategoryID,
+		CategoryID:      intPtrValue(doc.CategoryID),
+		DocumentTypeID:  doc.DocumentTypeID,
 		PublicationDate: doc.PublicationDate,
 		ContentPath:     doc.ContentPath,
 		CurrentVersion:  doc.CurrentVersion,
@@ -527,6 +537,34 @@ func convertDomainToDTO(doc domain.Document) documents.Document {
 		}
 	}
 
+	if doc.DocumentType != nil {
+		dtoDoc.DocumentType = &documents.DocumentType{
+			ID:        doc.DocumentType.ID,
+			Name:      doc.DocumentType.Name,
+			CreatedAt: doc.DocumentType.CreatedAt,
+		}
+	}
+
+	if len(doc.Participants) > 0 {
+		dtoDoc.Participants = make([]documents.DocumentParticipant, len(doc.Participants))
+		for i, participant := range doc.Participants {
+			dtoDoc.Participants[i] = documents.DocumentParticipant{
+				Author: documents.Author{
+					ID:        participant.Author.ID,
+					Name:      participant.Author.Name,
+					Bio:       participant.Author.Bio,
+					CreatedAt: participant.Author.CreatedAt,
+					UpdatedAt: participant.Author.UpdatedAt,
+				},
+				AuthorshipType: documents.AuthorshipType{
+					ID:        participant.AuthorshipType.ID,
+					Title:     participant.AuthorshipType.Title,
+					CreatedAt: participant.AuthorshipType.CreatedAt,
+				},
+			}
+		}
+	}
+
 	if len(doc.Tags) > 0 {
 		dtoDoc.Tags = make([]documents.Tag, len(doc.Tags))
 		for i, tag := range doc.Tags {
@@ -551,4 +589,41 @@ func convertBookmarkDomainToDTOItem(item domain.BookmarkItem) documents.Bookmark
 		Context:   item.Context,
 		PageLabel: item.PageLabel,
 	}
+}
+
+func convertParticipantRefsToDomain(participants []documents.DocumentParticipantRef) []domain.DocumentParticipantRef {
+	if len(participants) == 0 {
+		return nil
+	}
+	result := make([]domain.DocumentParticipantRef, len(participants))
+	for i, participant := range participants {
+		result[i] = domain.DocumentParticipantRef{
+			AuthorID: participant.AuthorID,
+			TypeID:   participant.TypeID,
+		}
+	}
+	return result
+}
+
+func intToInt32Ptr(value int) *int32 {
+	if value == 0 {
+		return nil
+	}
+	converted := int32(value)
+	return &converted
+}
+
+func intToIntPtr(value int) *int {
+	if value == 0 {
+		return nil
+	}
+	converted := value
+	return &converted
+}
+
+func intPtrValue(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
 }

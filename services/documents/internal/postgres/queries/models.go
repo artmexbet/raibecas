@@ -19,6 +19,12 @@ type Author struct {
 	UpdatedAt time.Time
 }
 
+type AuthorshipType struct {
+	ID        int32
+	Title     string
+	CreatedAt time.Time
+}
+
 type Category struct {
 	ID          int32
 	Title       string
@@ -30,8 +36,7 @@ type Document struct {
 	ID              uuid.UUID
 	Title           string
 	Description     *string
-	AuthorID        uuid.UUID
-	CategoryID      int32
+	CategoryID      *int32
 	PublicationDate pgtype.Date
 	ContentPath     string
 	CurrentVersion  int32
@@ -39,6 +44,13 @@ type Document struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	CoverPath       *string
+	DocumentTypeID  int32
+}
+
+type DocumentAuthor struct {
+	DocumentID uuid.UUID
+	AuthorID   uuid.UUID
+	TypeID     int32
 }
 
 type DocumentBookmark struct {
@@ -56,6 +68,12 @@ type DocumentBookmark struct {
 type DocumentTag struct {
 	DocumentID uuid.UUID
 	TagID      int32
+}
+
+type DocumentType struct {
+	ID        int32
+	Name      string
+	CreatedAt time.Time
 }
 
 type DocumentVersion struct {

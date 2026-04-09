@@ -289,35 +289,52 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments3(in *jlexe
 					*out.Description = string(in.String())
 				}
 			}
-		case "author_id":
-			if in.IsNull() {
-				in.Skip()
-				out.AuthorID = nil
-			} else {
-				if out.AuthorID == nil {
-					out.AuthorID = new(uuid.UUID)
-				}
-				if in.IsNull() {
-					in.Skip()
-				} else {
-					if data := in.UnsafeBytes(); in.Ok() {
-						in.AddError((*out.AuthorID).UnmarshalText(data))
-					}
-				}
-			}
 		case "category_id":
 			if in.IsNull() {
 				in.Skip()
-				out.CategoryID = nil
 			} else {
-				if out.CategoryID == nil {
-					out.CategoryID = new(int)
+				out.CategoryID = int(in.Int())
+			}
+		case "document_type_id":
+			if in.IsNull() {
+				in.Skip()
+				out.DocumentTypeID = nil
+			} else {
+				if out.DocumentTypeID == nil {
+					out.DocumentTypeID = new(int)
 				}
 				if in.IsNull() {
 					in.Skip()
 				} else {
-					*out.CategoryID = int(in.Int())
+					*out.DocumentTypeID = int(in.Int())
 				}
+			}
+		case "participants":
+			if in.IsNull() {
+				in.Skip()
+				out.Participants = nil
+			} else {
+				in.Delim('[')
+				if out.Participants == nil {
+					if !in.IsDelim(']') {
+						out.Participants = make([]DocumentParticipantRef, 0, 2)
+					} else {
+						out.Participants = []DocumentParticipantRef{}
+					}
+				} else {
+					out.Participants = (out.Participants)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v4 DocumentParticipantRef
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						(v4).UnmarshalEasyJSON(in)
+					}
+					out.Participants = append(out.Participants, v4)
+					in.WantComma()
+				}
+				in.Delim(']')
 			}
 		case "publication_date":
 			if in.IsNull() {
@@ -365,13 +382,13 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments3(in *jlexe
 					out.TagIDs = (out.TagIDs)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v4 int
+					var v5 int
 					if in.IsNull() {
 						in.Skip()
 					} else {
-						v4 = int(in.Int())
+						v5 = int(in.Int())
 					}
-					out.TagIDs = append(out.TagIDs, v4)
+					out.TagIDs = append(out.TagIDs, v5)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -446,17 +463,7 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments3(out *jwri
 		}
 		out.String(string(*in.Description))
 	}
-	if in.AuthorID != nil {
-		const prefix string = ",\"author_id\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		out.RawText((*in.AuthorID).MarshalText())
-	}
-	if in.CategoryID != nil {
+	if in.CategoryID != 0 {
 		const prefix string = ",\"category_id\":"
 		if first {
 			first = false
@@ -464,7 +471,36 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments3(out *jwri
 		} else {
 			out.RawString(prefix)
 		}
-		out.Int(int(*in.CategoryID))
+		out.Int(int(in.CategoryID))
+	}
+	if in.DocumentTypeID != nil {
+		const prefix string = ",\"document_type_id\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int(int(*in.DocumentTypeID))
+	}
+	if len(in.Participants) != 0 {
+		const prefix string = ",\"participants\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		{
+			out.RawByte('[')
+			for v6, v7 := range in.Participants {
+				if v6 > 0 {
+					out.RawByte(',')
+				}
+				(v7).MarshalEasyJSON(out)
+			}
+			out.RawByte(']')
+		}
 	}
 	if in.PublicationDate != nil {
 		const prefix string = ",\"publication_date\":"
@@ -496,11 +532,11 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments3(out *jwri
 		}
 		{
 			out.RawByte('[')
-			for v5, v6 := range in.TagIDs {
-				if v5 > 0 {
+			for v8, v9 := range in.TagIDs {
+				if v8 > 0 {
 					out.RawByte(',')
 				}
-				out.Int(int(v6))
+				out.Int(int(v9))
 			}
 			out.RawByte(']')
 		}
@@ -670,13 +706,13 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments5(in *jlexe
 					out.Tags = (out.Tags)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v7 Tag
+					var v10 Tag
 					if in.IsNull() {
 						in.Skip()
 					} else {
-						(v7).UnmarshalEasyJSON(in)
+						(v10).UnmarshalEasyJSON(in)
 					}
-					out.Tags = append(out.Tags, v7)
+					out.Tags = append(out.Tags, v10)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -702,11 +738,11 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments5(out *jwri
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v8, v9 := range in.Tags {
-				if v8 > 0 {
+			for v11, v12 := range in.Tags {
+				if v11 > 0 {
 					out.RawByte(',')
 				}
-				(v9).MarshalEasyJSON(out)
+				(v12).MarshalEasyJSON(out)
 			}
 			out.RawByte(']')
 		}
@@ -767,13 +803,13 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments6(in *jlexe
 					out.Documents = (out.Documents)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v10 Document
+					var v13 Document
 					if in.IsNull() {
 						in.Skip()
 					} else {
-						(v10).UnmarshalEasyJSON(in)
+						(v13).UnmarshalEasyJSON(in)
 					}
-					out.Documents = append(out.Documents, v10)
+					out.Documents = append(out.Documents, v13)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -823,11 +859,11 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments6(out *jwri
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v11, v12 := range in.Documents {
-				if v11 > 0 {
+			for v14, v15 := range in.Documents {
+				if v14 > 0 {
 					out.RawByte(',')
 				}
-				(v12).MarshalEasyJSON(out)
+				(v15).MarshalEasyJSON(out)
 			}
 			out.RawByte(']')
 		}
@@ -924,6 +960,12 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments7(in *jlexe
 			} else {
 				out.CategoryID = int(in.Int())
 			}
+		case "document_type_id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.DocumentTypeID = int(in.Int())
+			}
 		case "tag_id":
 			if in.IsNull() {
 				in.Skip()
@@ -995,6 +1037,16 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments7(out *jwri
 			out.RawString(prefix)
 		}
 		out.Int(int(in.CategoryID))
+	}
+	if in.DocumentTypeID != 0 {
+		const prefix string = ",\"document_type_id\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int(int(in.DocumentTypeID))
 	}
 	if in.TagID != 0 {
 		const prefix string = ",\"tag_id\":"
@@ -1072,13 +1124,13 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments8(in *jlexe
 					out.Versions = (out.Versions)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v13 DocumentVersion
+					var v16 DocumentVersion
 					if in.IsNull() {
 						in.Skip()
 					} else {
-						(v13).UnmarshalEasyJSON(in)
+						(v16).UnmarshalEasyJSON(in)
 					}
-					out.Versions = append(out.Versions, v13)
+					out.Versions = append(out.Versions, v16)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -1104,11 +1156,11 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments8(out *jwri
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v14, v15 := range in.Versions {
-				if v14 > 0 {
+			for v17, v18 := range in.Versions {
+				if v17 > 0 {
 					out.RawByte(',')
 				}
-				(v15).MarshalEasyJSON(out)
+				(v18).MarshalEasyJSON(out)
 			}
 			out.RawByte(']')
 		}
@@ -1206,7 +1258,104 @@ func (v *ListDocumentVersionsRequest) UnmarshalJSON(data []byte) error {
 func (v *ListDocumentVersionsRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments9(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments10(in *jlexer.Lexer, out *ListCategoriesResponse) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments10(in *jlexer.Lexer, out *ListDocumentTypesResponse) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "document_types":
+			if in.IsNull() {
+				in.Skip()
+				out.DocumentTypes = nil
+			} else {
+				in.Delim('[')
+				if out.DocumentTypes == nil {
+					if !in.IsDelim(']') {
+						out.DocumentTypes = make([]DocumentType, 0, 1)
+					} else {
+						out.DocumentTypes = []DocumentType{}
+					}
+				} else {
+					out.DocumentTypes = (out.DocumentTypes)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v19 DocumentType
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						(v19).UnmarshalEasyJSON(in)
+					}
+					out.DocumentTypes = append(out.DocumentTypes, v19)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments10(out *jwriter.Writer, in ListDocumentTypesResponse) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"document_types\":"
+		out.RawString(prefix[1:])
+		if in.DocumentTypes == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
+			out.RawString("null")
+		} else {
+			out.RawByte('[')
+			for v20, v21 := range in.DocumentTypes {
+				if v20 > 0 {
+					out.RawByte(',')
+				}
+				(v21).MarshalEasyJSON(out)
+			}
+			out.RawByte(']')
+		}
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v ListDocumentTypesResponse) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments10(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v ListDocumentTypesResponse) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments10(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *ListDocumentTypesResponse) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments10(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *ListDocumentTypesResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments10(l, v)
+}
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments11(in *jlexer.Lexer, out *ListCategoriesResponse) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1236,13 +1385,13 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments10(in *jlex
 					out.Categories = (out.Categories)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v16 Category
+					var v22 Category
 					if in.IsNull() {
 						in.Skip()
 					} else {
-						(v16).UnmarshalEasyJSON(in)
+						(v22).UnmarshalEasyJSON(in)
 					}
-					out.Categories = append(out.Categories, v16)
+					out.Categories = append(out.Categories, v22)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -1257,7 +1406,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments10(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments10(out *jwriter.Writer, in ListCategoriesResponse) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments11(out *jwriter.Writer, in ListCategoriesResponse) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1268,11 +1417,11 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments10(out *jwr
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v17, v18 := range in.Categories {
-				if v17 > 0 {
+			for v23, v24 := range in.Categories {
+				if v23 > 0 {
 					out.RawByte(',')
 				}
-				(v18).MarshalEasyJSON(out)
+				(v24).MarshalEasyJSON(out)
 			}
 			out.RawByte(']')
 		}
@@ -1283,27 +1432,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments10(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v ListCategoriesResponse) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments10(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments11(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v ListCategoriesResponse) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments10(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments11(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *ListCategoriesResponse) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments10(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments11(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *ListCategoriesResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments10(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments11(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments11(in *jlexer.Lexer, out *ListBookmarksResponse) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments12(in *jlexer.Lexer, out *ListBookmarksResponse) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1333,13 +1482,13 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments11(in *jlex
 					out.Items = (out.Items)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v19 BookmarkItem
+					var v25 BookmarkItem
 					if in.IsNull() {
 						in.Skip()
 					} else {
-						(v19).UnmarshalEasyJSON(in)
+						(v25).UnmarshalEasyJSON(in)
 					}
-					out.Items = append(out.Items, v19)
+					out.Items = append(out.Items, v25)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -1378,7 +1527,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments11(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments11(out *jwriter.Writer, in ListBookmarksResponse) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments12(out *jwriter.Writer, in ListBookmarksResponse) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1389,11 +1538,11 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments11(out *jwr
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v20, v21 := range in.Items {
-				if v20 > 0 {
+			for v26, v27 := range in.Items {
+				if v26 > 0 {
 					out.RawByte(',')
 				}
-				(v21).MarshalEasyJSON(out)
+				(v27).MarshalEasyJSON(out)
 			}
 			out.RawByte(']')
 		}
@@ -1424,27 +1573,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments11(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v ListBookmarksResponse) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments11(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments12(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v ListBookmarksResponse) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments11(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments12(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *ListBookmarksResponse) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments11(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments12(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *ListBookmarksResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments11(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments12(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments12(in *jlexer.Lexer, out *ListBookmarksQuery) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments13(in *jlexer.Lexer, out *ListBookmarksQuery) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1500,7 +1649,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments12(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments12(out *jwriter.Writer, in ListBookmarksQuery) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments13(out *jwriter.Writer, in ListBookmarksQuery) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1556,27 +1705,124 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments12(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v ListBookmarksQuery) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments12(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments13(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v ListBookmarksQuery) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments12(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments13(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *ListBookmarksQuery) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments12(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments13(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *ListBookmarksQuery) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments12(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments13(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments13(in *jlexer.Lexer, out *ListAuthorsResponse) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments14(in *jlexer.Lexer, out *ListAuthorshipTypesResponse) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "authorship_types":
+			if in.IsNull() {
+				in.Skip()
+				out.AuthorshipTypes = nil
+			} else {
+				in.Delim('[')
+				if out.AuthorshipTypes == nil {
+					if !in.IsDelim(']') {
+						out.AuthorshipTypes = make([]AuthorshipType, 0, 1)
+					} else {
+						out.AuthorshipTypes = []AuthorshipType{}
+					}
+				} else {
+					out.AuthorshipTypes = (out.AuthorshipTypes)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v28 AuthorshipType
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						(v28).UnmarshalEasyJSON(in)
+					}
+					out.AuthorshipTypes = append(out.AuthorshipTypes, v28)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments14(out *jwriter.Writer, in ListAuthorshipTypesResponse) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"authorship_types\":"
+		out.RawString(prefix[1:])
+		if in.AuthorshipTypes == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
+			out.RawString("null")
+		} else {
+			out.RawByte('[')
+			for v29, v30 := range in.AuthorshipTypes {
+				if v29 > 0 {
+					out.RawByte(',')
+				}
+				(v30).MarshalEasyJSON(out)
+			}
+			out.RawByte(']')
+		}
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v ListAuthorshipTypesResponse) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments14(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v ListAuthorshipTypesResponse) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments14(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *ListAuthorshipTypesResponse) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments14(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *ListAuthorshipTypesResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments14(l, v)
+}
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments15(in *jlexer.Lexer, out *ListAuthorsResponse) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1606,13 +1852,13 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments13(in *jlex
 					out.Authors = (out.Authors)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v22 Author
+					var v31 Author
 					if in.IsNull() {
 						in.Skip()
 					} else {
-						(v22).UnmarshalEasyJSON(in)
+						(v31).UnmarshalEasyJSON(in)
 					}
-					out.Authors = append(out.Authors, v22)
+					out.Authors = append(out.Authors, v31)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -1627,7 +1873,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments13(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments13(out *jwriter.Writer, in ListAuthorsResponse) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments15(out *jwriter.Writer, in ListAuthorsResponse) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1638,11 +1884,11 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments13(out *jwr
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v23, v24 := range in.Authors {
-				if v23 > 0 {
+			for v32, v33 := range in.Authors {
+				if v32 > 0 {
 					out.RawByte(',')
 				}
-				(v24).MarshalEasyJSON(out)
+				(v33).MarshalEasyJSON(out)
 			}
 			out.RawByte(']')
 		}
@@ -1653,27 +1899,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments13(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v ListAuthorsResponse) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments13(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments15(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v ListAuthorsResponse) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments13(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments15(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *ListAuthorsResponse) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments13(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments15(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *ListAuthorsResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments13(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments15(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments14(in *jlexer.Lexer, out *GetDocumentResponse) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments16(in *jlexer.Lexer, out *GetDocumentResponse) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1703,7 +1949,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments14(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments14(out *jwriter.Writer, in GetDocumentResponse) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments16(out *jwriter.Writer, in GetDocumentResponse) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1718,27 +1964,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments14(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v GetDocumentResponse) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments14(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments16(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v GetDocumentResponse) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments14(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments16(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *GetDocumentResponse) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments14(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments16(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *GetDocumentResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments14(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments16(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments15(in *jlexer.Lexer, out *GetDocumentRequest) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments17(in *jlexer.Lexer, out *GetDocumentRequest) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1770,7 +2016,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments15(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments15(out *jwriter.Writer, in GetDocumentRequest) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments17(out *jwriter.Writer, in GetDocumentRequest) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1785,27 +2031,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments15(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v GetDocumentRequest) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments15(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments17(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v GetDocumentRequest) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments15(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments17(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *GetDocumentRequest) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments15(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments17(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *GetDocumentRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments15(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments17(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments16(in *jlexer.Lexer, out *GetDocumentContentResponse) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments18(in *jlexer.Lexer, out *GetDocumentContentResponse) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1835,7 +2081,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments16(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments16(out *jwriter.Writer, in GetDocumentContentResponse) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments18(out *jwriter.Writer, in GetDocumentContentResponse) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1850,27 +2096,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments16(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v GetDocumentContentResponse) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments16(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments18(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v GetDocumentContentResponse) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments16(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments18(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *GetDocumentContentResponse) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments16(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments18(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *GetDocumentContentResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments16(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments18(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments17(in *jlexer.Lexer, out *GetDocumentContentRequest) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments19(in *jlexer.Lexer, out *GetDocumentContentRequest) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1902,7 +2148,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments17(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments17(out *jwriter.Writer, in GetDocumentContentRequest) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments19(out *jwriter.Writer, in GetDocumentContentRequest) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1917,27 +2163,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments17(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v GetDocumentContentRequest) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments17(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments19(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v GetDocumentContentRequest) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments17(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments19(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *GetDocumentContentRequest) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments17(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments19(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *GetDocumentContentRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments17(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments19(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments18(in *jlexer.Lexer, out *DocumentVersion) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments20(in *jlexer.Lexer, out *DocumentVersion) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -2027,7 +2273,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments18(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments18(out *jwriter.Writer, in DocumentVersion) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments20(out *jwriter.Writer, in DocumentVersion) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -2072,27 +2318,270 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments18(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v DocumentVersion) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments18(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments20(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v DocumentVersion) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments18(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments20(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *DocumentVersion) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments18(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments20(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *DocumentVersion) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments18(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments20(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments19(in *jlexer.Lexer, out *Document) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments21(in *jlexer.Lexer, out *DocumentType) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.ID = int(in.Int())
+			}
+		case "name":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Name = string(in.String())
+			}
+		case "created_at":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				if data := in.Raw(); in.Ok() {
+					in.AddError((out.CreatedAt).UnmarshalJSON(data))
+				}
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments21(out *jwriter.Writer, in DocumentType) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"id\":"
+		out.RawString(prefix[1:])
+		out.Int(int(in.ID))
+	}
+	{
+		const prefix string = ",\"name\":"
+		out.RawString(prefix)
+		out.String(string(in.Name))
+	}
+	{
+		const prefix string = ",\"created_at\":"
+		out.RawString(prefix)
+		out.Raw((in.CreatedAt).MarshalJSON())
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v DocumentType) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments21(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v DocumentType) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments21(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *DocumentType) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments21(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *DocumentType) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments21(l, v)
+}
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments22(in *jlexer.Lexer, out *DocumentParticipantRef) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "author_id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				if data := in.UnsafeBytes(); in.Ok() {
+					in.AddError((out.AuthorID).UnmarshalText(data))
+				}
+			}
+		case "type_id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.TypeID = int(in.Int())
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments22(out *jwriter.Writer, in DocumentParticipantRef) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"author_id\":"
+		out.RawString(prefix[1:])
+		out.RawText((in.AuthorID).MarshalText())
+	}
+	{
+		const prefix string = ",\"type_id\":"
+		out.RawString(prefix)
+		out.Int(int(in.TypeID))
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v DocumentParticipantRef) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments22(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v DocumentParticipantRef) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments22(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *DocumentParticipantRef) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments22(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *DocumentParticipantRef) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments22(l, v)
+}
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments23(in *jlexer.Lexer, out *DocumentParticipant) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "author":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				(out.Author).UnmarshalEasyJSON(in)
+			}
+		case "authorship_type":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				(out.AuthorshipType).UnmarshalEasyJSON(in)
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments23(out *jwriter.Writer, in DocumentParticipant) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"author\":"
+		out.RawString(prefix[1:])
+		(in.Author).MarshalEasyJSON(out)
+	}
+	{
+		const prefix string = ",\"authorship_type\":"
+		out.RawString(prefix)
+		(in.AuthorshipType).MarshalEasyJSON(out)
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v DocumentParticipant) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments23(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v DocumentParticipant) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments23(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *DocumentParticipant) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments23(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *DocumentParticipant) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments23(l, v)
+}
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments24(in *jlexer.Lexer, out *Document) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -2134,19 +2623,17 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments19(in *jlex
 					*out.Description = string(in.String())
 				}
 			}
-		case "author_id":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				if data := in.UnsafeBytes(); in.Ok() {
-					in.AddError((out.AuthorID).UnmarshalText(data))
-				}
-			}
 		case "category_id":
 			if in.IsNull() {
 				in.Skip()
 			} else {
 				out.CategoryID = int(in.Int())
+			}
+		case "document_type_id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.DocumentTypeID = int(in.Int())
 			}
 		case "publication_date":
 			if in.IsNull() {
@@ -2232,6 +2719,47 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments19(in *jlex
 					(*out.Category).UnmarshalEasyJSON(in)
 				}
 			}
+		case "document_type":
+			if in.IsNull() {
+				in.Skip()
+				out.DocumentType = nil
+			} else {
+				if out.DocumentType == nil {
+					out.DocumentType = new(DocumentType)
+				}
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.DocumentType).UnmarshalEasyJSON(in)
+				}
+			}
+		case "participants":
+			if in.IsNull() {
+				in.Skip()
+				out.Participants = nil
+			} else {
+				in.Delim('[')
+				if out.Participants == nil {
+					if !in.IsDelim(']') {
+						out.Participants = make([]DocumentParticipant, 0, 0)
+					} else {
+						out.Participants = []DocumentParticipant{}
+					}
+				} else {
+					out.Participants = (out.Participants)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v34 DocumentParticipant
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						(v34).UnmarshalEasyJSON(in)
+					}
+					out.Participants = append(out.Participants, v34)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
 		case "tags":
 			if in.IsNull() {
 				in.Skip()
@@ -2248,13 +2776,13 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments19(in *jlex
 					out.Tags = (out.Tags)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v25 Tag
+					var v35 Tag
 					if in.IsNull() {
 						in.Skip()
 					} else {
-						(v25).UnmarshalEasyJSON(in)
+						(v35).UnmarshalEasyJSON(in)
 					}
-					out.Tags = append(out.Tags, v25)
+					out.Tags = append(out.Tags, v35)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -2269,7 +2797,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments19(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments19(out *jwriter.Writer, in Document) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments24(out *jwriter.Writer, in Document) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -2288,15 +2816,15 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments19(out *jwr
 		out.RawString(prefix)
 		out.String(string(*in.Description))
 	}
-	{
-		const prefix string = ",\"author_id\":"
-		out.RawString(prefix)
-		out.RawText((in.AuthorID).MarshalText())
-	}
-	{
+	if in.CategoryID != 0 {
 		const prefix string = ",\"category_id\":"
 		out.RawString(prefix)
 		out.Int(int(in.CategoryID))
+	}
+	{
+		const prefix string = ",\"document_type_id\":"
+		out.RawString(prefix)
+		out.Int(int(in.DocumentTypeID))
 	}
 	{
 		const prefix string = ",\"publication_date\":"
@@ -2343,16 +2871,35 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments19(out *jwr
 		out.RawString(prefix)
 		(*in.Category).MarshalEasyJSON(out)
 	}
+	if in.DocumentType != nil {
+		const prefix string = ",\"document_type\":"
+		out.RawString(prefix)
+		(*in.DocumentType).MarshalEasyJSON(out)
+	}
+	if len(in.Participants) != 0 {
+		const prefix string = ",\"participants\":"
+		out.RawString(prefix)
+		{
+			out.RawByte('[')
+			for v36, v37 := range in.Participants {
+				if v36 > 0 {
+					out.RawByte(',')
+				}
+				(v37).MarshalEasyJSON(out)
+			}
+			out.RawByte(']')
+		}
+	}
 	if len(in.Tags) != 0 {
 		const prefix string = ",\"tags\":"
 		out.RawString(prefix)
 		{
 			out.RawByte('[')
-			for v26, v27 := range in.Tags {
-				if v26 > 0 {
+			for v38, v39 := range in.Tags {
+				if v38 > 0 {
 					out.RawByte(',')
 				}
-				(v27).MarshalEasyJSON(out)
+				(v39).MarshalEasyJSON(out)
 			}
 			out.RawByte(']')
 		}
@@ -2363,27 +2910,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments19(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v Document) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments19(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments24(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v Document) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments19(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments24(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *Document) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments19(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments24(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *Document) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments19(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments24(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments20(in *jlexer.Lexer, out *DeleteDocumentResponse) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments25(in *jlexer.Lexer, out *DeleteDocumentResponse) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -2413,7 +2960,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments20(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments20(out *jwriter.Writer, in DeleteDocumentResponse) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments25(out *jwriter.Writer, in DeleteDocumentResponse) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -2428,27 +2975,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments20(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v DeleteDocumentResponse) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments20(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments25(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v DeleteDocumentResponse) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments20(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments25(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *DeleteDocumentResponse) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments20(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments25(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *DeleteDocumentResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments20(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments25(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments21(in *jlexer.Lexer, out *DeleteDocumentRequest) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments26(in *jlexer.Lexer, out *DeleteDocumentRequest) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -2480,7 +3027,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments21(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments21(out *jwriter.Writer, in DeleteDocumentRequest) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments26(out *jwriter.Writer, in DeleteDocumentRequest) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -2495,27 +3042,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments21(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v DeleteDocumentRequest) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments21(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments26(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v DeleteDocumentRequest) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments21(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments26(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *DeleteDocumentRequest) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments21(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments26(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *DeleteDocumentRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments21(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments26(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments22(in *jlexer.Lexer, out *DeleteBookmarkResponse) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments27(in *jlexer.Lexer, out *DeleteBookmarkResponse) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -2545,7 +3092,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments22(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments22(out *jwriter.Writer, in DeleteBookmarkResponse) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments27(out *jwriter.Writer, in DeleteBookmarkResponse) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -2560,27 +3107,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments22(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v DeleteBookmarkResponse) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments22(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments27(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v DeleteBookmarkResponse) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments22(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments27(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *DeleteBookmarkResponse) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments22(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments27(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *DeleteBookmarkResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments22(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments27(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments23(in *jlexer.Lexer, out *DeleteBookmarkRequest) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments28(in *jlexer.Lexer, out *DeleteBookmarkRequest) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -2620,7 +3167,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments23(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments23(out *jwriter.Writer, in DeleteBookmarkRequest) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments28(out *jwriter.Writer, in DeleteBookmarkRequest) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -2640,27 +3187,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments23(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v DeleteBookmarkRequest) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments23(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments28(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v DeleteBookmarkRequest) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments23(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments28(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *DeleteBookmarkRequest) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments23(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments28(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *DeleteBookmarkRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments23(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments28(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments24(in *jlexer.Lexer, out *CreateTagResponse) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments29(in *jlexer.Lexer, out *CreateTagResponse) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -2690,7 +3237,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments24(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments24(out *jwriter.Writer, in CreateTagResponse) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments29(out *jwriter.Writer, in CreateTagResponse) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -2705,27 +3252,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments24(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v CreateTagResponse) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments24(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments29(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v CreateTagResponse) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments24(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments29(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *CreateTagResponse) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments24(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments29(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *CreateTagResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments24(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments29(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments25(in *jlexer.Lexer, out *CreateTagRequest) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments30(in *jlexer.Lexer, out *CreateTagRequest) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -2755,7 +3302,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments25(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments25(out *jwriter.Writer, in CreateTagRequest) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments30(out *jwriter.Writer, in CreateTagRequest) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -2770,27 +3317,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments25(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v CreateTagRequest) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments25(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments30(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v CreateTagRequest) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments25(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments30(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *CreateTagRequest) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments25(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments30(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *CreateTagRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments25(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments30(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments26(in *jlexer.Lexer, out *CreateDocumentResponse) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments31(in *jlexer.Lexer, out *CreateDocumentResponse) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -2820,7 +3367,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments26(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments26(out *jwriter.Writer, in CreateDocumentResponse) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments31(out *jwriter.Writer, in CreateDocumentResponse) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -2835,27 +3382,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments26(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v CreateDocumentResponse) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments26(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments31(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v CreateDocumentResponse) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments26(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments31(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *CreateDocumentResponse) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments26(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments31(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *CreateDocumentResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments26(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments31(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments27(in *jlexer.Lexer, out *CreateDocumentRequest) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments32(in *jlexer.Lexer, out *CreateDocumentRequest) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -2889,19 +3436,44 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments27(in *jlex
 					*out.Description = string(in.String())
 				}
 			}
-		case "author_id":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				if data := in.UnsafeBytes(); in.Ok() {
-					in.AddError((out.AuthorID).UnmarshalText(data))
-				}
-			}
 		case "category_id":
 			if in.IsNull() {
 				in.Skip()
 			} else {
 				out.CategoryID = int(in.Int())
+			}
+		case "document_type_id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.DocumentTypeID = int(in.Int())
+			}
+		case "participants":
+			if in.IsNull() {
+				in.Skip()
+				out.Participants = nil
+			} else {
+				in.Delim('[')
+				if out.Participants == nil {
+					if !in.IsDelim(']') {
+						out.Participants = make([]DocumentParticipantRef, 0, 2)
+					} else {
+						out.Participants = []DocumentParticipantRef{}
+					}
+				} else {
+					out.Participants = (out.Participants)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v40 DocumentParticipantRef
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						(v40).UnmarshalEasyJSON(in)
+					}
+					out.Participants = append(out.Participants, v40)
+					in.WantComma()
+				}
+				in.Delim(']')
 			}
 		case "publication_date":
 			if in.IsNull() {
@@ -2933,13 +3505,13 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments27(in *jlex
 					out.TagIDs = (out.TagIDs)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v28 int
+					var v41 int
 					if in.IsNull() {
 						in.Skip()
 					} else {
-						v28 = int(in.Int())
+						v41 = int(in.Int())
 					}
-					out.TagIDs = append(out.TagIDs, v28)
+					out.TagIDs = append(out.TagIDs, v41)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -2970,7 +3542,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments27(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments27(out *jwriter.Writer, in CreateDocumentRequest) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments32(out *jwriter.Writer, in CreateDocumentRequest) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -2984,15 +3556,29 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments27(out *jwr
 		out.RawString(prefix)
 		out.String(string(*in.Description))
 	}
-	{
-		const prefix string = ",\"author_id\":"
-		out.RawString(prefix)
-		out.RawText((in.AuthorID).MarshalText())
-	}
-	{
+	if in.CategoryID != 0 {
 		const prefix string = ",\"category_id\":"
 		out.RawString(prefix)
 		out.Int(int(in.CategoryID))
+	}
+	{
+		const prefix string = ",\"document_type_id\":"
+		out.RawString(prefix)
+		out.Int(int(in.DocumentTypeID))
+	}
+	if len(in.Participants) != 0 {
+		const prefix string = ",\"participants\":"
+		out.RawString(prefix)
+		{
+			out.RawByte('[')
+			for v42, v43 := range in.Participants {
+				if v42 > 0 {
+					out.RawByte(',')
+				}
+				(v43).MarshalEasyJSON(out)
+			}
+			out.RawByte(']')
+		}
 	}
 	{
 		const prefix string = ",\"publication_date\":"
@@ -3009,11 +3595,11 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments27(out *jwr
 		out.RawString(prefix)
 		{
 			out.RawByte('[')
-			for v29, v30 := range in.TagIDs {
-				if v29 > 0 {
+			for v44, v45 := range in.TagIDs {
+				if v44 > 0 {
 					out.RawByte(',')
 				}
-				out.Int(int(v30))
+				out.Int(int(v45))
 			}
 			out.RawByte(']')
 		}
@@ -3029,27 +3615,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments27(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v CreateDocumentRequest) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments27(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments32(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v CreateDocumentRequest) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments27(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments32(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *CreateDocumentRequest) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments27(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments32(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *CreateDocumentRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments27(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments32(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments28(in *jlexer.Lexer, out *CreateCategoryResponse) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments33(in *jlexer.Lexer, out *CreateCategoryResponse) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -3079,7 +3665,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments28(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments28(out *jwriter.Writer, in CreateCategoryResponse) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments33(out *jwriter.Writer, in CreateCategoryResponse) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -3094,27 +3680,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments28(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v CreateCategoryResponse) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments28(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments33(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v CreateCategoryResponse) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments28(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments33(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *CreateCategoryResponse) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments28(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments33(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *CreateCategoryResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments28(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments33(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments29(in *jlexer.Lexer, out *CreateCategoryRequest) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments34(in *jlexer.Lexer, out *CreateCategoryRequest) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -3144,7 +3730,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments29(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments29(out *jwriter.Writer, in CreateCategoryRequest) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments34(out *jwriter.Writer, in CreateCategoryRequest) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -3159,27 +3745,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments29(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v CreateCategoryRequest) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments29(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments34(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v CreateCategoryRequest) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments29(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments34(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *CreateCategoryRequest) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments29(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments34(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *CreateCategoryRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments29(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments34(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments30(in *jlexer.Lexer, out *CreateBookmarkResponse) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments35(in *jlexer.Lexer, out *CreateBookmarkResponse) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -3209,7 +3795,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments30(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments30(out *jwriter.Writer, in CreateBookmarkResponse) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments35(out *jwriter.Writer, in CreateBookmarkResponse) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -3224,27 +3810,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments30(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v CreateBookmarkResponse) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments30(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments35(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v CreateBookmarkResponse) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments30(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments35(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *CreateBookmarkResponse) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments30(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments35(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *CreateBookmarkResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments30(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments35(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments31(in *jlexer.Lexer, out *CreateBookmarkRequest) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments36(in *jlexer.Lexer, out *CreateBookmarkRequest) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -3332,7 +3918,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments31(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments31(out *jwriter.Writer, in CreateBookmarkRequest) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments36(out *jwriter.Writer, in CreateBookmarkRequest) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -3372,27 +3958,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments31(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v CreateBookmarkRequest) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments31(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments36(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v CreateBookmarkRequest) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments31(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments36(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *CreateBookmarkRequest) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments31(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments36(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *CreateBookmarkRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments31(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments36(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments32(in *jlexer.Lexer, out *CreateAuthorResponse) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments37(in *jlexer.Lexer, out *CreateAuthorResponse) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -3422,7 +4008,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments32(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments32(out *jwriter.Writer, in CreateAuthorResponse) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments37(out *jwriter.Writer, in CreateAuthorResponse) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -3437,27 +4023,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments32(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v CreateAuthorResponse) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments32(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments37(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v CreateAuthorResponse) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments32(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments37(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *CreateAuthorResponse) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments32(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments37(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *CreateAuthorResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments32(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments37(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments33(in *jlexer.Lexer, out *CreateAuthorRequest) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments38(in *jlexer.Lexer, out *CreateAuthorRequest) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -3487,7 +4073,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments33(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments33(out *jwriter.Writer, in CreateAuthorRequest) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments38(out *jwriter.Writer, in CreateAuthorRequest) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -3502,27 +4088,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments33(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v CreateAuthorRequest) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments33(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments38(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v CreateAuthorRequest) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments33(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments38(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *CreateAuthorRequest) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments33(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments38(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *CreateAuthorRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments33(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments38(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments34(in *jlexer.Lexer, out *Category) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments39(in *jlexer.Lexer, out *Category) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -3580,7 +4166,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments34(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments34(out *jwriter.Writer, in Category) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments39(out *jwriter.Writer, in Category) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -3610,27 +4196,27 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments34(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v Category) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments34(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments39(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v Category) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments34(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments39(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *Category) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments34(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments39(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *Category) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments34(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments39(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments35(in *jlexer.Lexer, out *BookmarkItem) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments40(in *jlexer.Lexer, out *BookmarkItem) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -3722,7 +4308,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments35(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments35(out *jwriter.Writer, in BookmarkItem) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments40(out *jwriter.Writer, in BookmarkItem) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -3767,27 +4353,116 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments35(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v BookmarkItem) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments35(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments40(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v BookmarkItem) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments35(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments40(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *BookmarkItem) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments35(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments40(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *BookmarkItem) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments35(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments40(l, v)
 }
-func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments36(in *jlexer.Lexer, out *Author) {
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments41(in *jlexer.Lexer, out *AuthorshipType) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.ID = int(in.Int())
+			}
+		case "title":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Title = string(in.String())
+			}
+		case "created_at":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				if data := in.Raw(); in.Ok() {
+					in.AddError((out.CreatedAt).UnmarshalJSON(data))
+				}
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments41(out *jwriter.Writer, in AuthorshipType) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"id\":"
+		out.RawString(prefix[1:])
+		out.Int(int(in.ID))
+	}
+	{
+		const prefix string = ",\"title\":"
+		out.RawString(prefix)
+		out.String(string(in.Title))
+	}
+	{
+		const prefix string = ",\"created_at\":"
+		out.RawString(prefix)
+		out.Raw((in.CreatedAt).MarshalJSON())
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v AuthorshipType) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments41(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v AuthorshipType) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments41(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *AuthorshipType) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments41(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *AuthorshipType) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments41(l, v)
+}
+func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments42(in *jlexer.Lexer, out *Author) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -3855,7 +4530,7 @@ func easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments36(in *jlex
 		in.Consumed()
 	}
 }
-func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments36(out *jwriter.Writer, in Author) {
+func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments42(out *jwriter.Writer, in Author) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -3890,23 +4565,23 @@ func easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments36(out *jwr
 // MarshalJSON supports json.Marshaler interface
 func (v Author) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments36(&w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments42(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v Author) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments36(w, v)
+	easyjsonD2b7633eEncodeGithubComArtmexbetRaibecasLibsDtoDocuments42(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *Author) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments36(&r, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments42(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *Author) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments36(l, v)
+	easyjsonD2b7633eDecodeGithubComArtmexbetRaibecasLibsDtoDocuments42(l, v)
 }

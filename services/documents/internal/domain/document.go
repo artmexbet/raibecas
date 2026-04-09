@@ -38,26 +38,62 @@ type Tag struct {
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
+// DocumentType represents a document kind.
+//
+//easyjson:json
+type DocumentType struct {
+	ID        int       `db:"id" json:"id"`
+	Name      string    `db:"name" json:"name"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+}
+
+// AuthorshipType represents a participant role.
+//
+//easyjson:json
+type AuthorshipType struct {
+	ID        int       `db:"id" json:"id"`
+	Title     string    `db:"title" json:"title"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+}
+
+// DocumentParticipant represents a linked participant with a role.
+//
+//easyjson:json
+type DocumentParticipant struct {
+	Author         Author         `json:"author"`
+	AuthorshipType AuthorshipType `json:"authorship_type"`
+}
+
+// DocumentParticipantRef represents participant input.
+//
+//easyjson:json
+type DocumentParticipantRef struct {
+	AuthorID uuid.UUID `json:"author_id"`
+	TypeID   int       `json:"type_id"`
+}
+
 // Document represents a scientific document
 //
 //easyjson:json
 type Document struct {
-	ID              uuid.UUID `db:"id" json:"id"`
-	Title           string    `db:"title" json:"title"`
-	Description     *string   `db:"description" json:"description,omitempty"`
-	AuthorID        uuid.UUID `db:"author_id" json:"author_id"`
-	CategoryID      int       `db:"category_id" json:"category_id"`
-	PublicationDate time.Time `db:"publication_date" json:"publication_date"`
-	ContentPath     string    `db:"content_path" json:"content_path"`
-	CoverPath       *string   `db:"cover_path" json:"cover_path,omitempty"`
-	CurrentVersion  int       `db:"current_version" json:"current_version"`
-	Indexed         bool      `db:"indexed" json:"indexed"`
-	CreatedAt       time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt       time.Time `db:"updated_at" json:"updated_at"`
-	Author          *Author   `json:"author,omitempty"`
-	Category        *Category `json:"category,omitempty"`
-	Tags            []Tag     `json:"tags,omitempty"`
-	CoverURL        *string   `db:"-" json:"cover_url,omitempty"`
+	ID              uuid.UUID             `db:"id" json:"id"`
+	Title           string                `db:"title" json:"title"`
+	Description     *string               `db:"description" json:"description,omitempty"`
+	CategoryID      *int                  `db:"category_id" json:"category_id,omitempty"`
+	DocumentTypeID  int                   `db:"document_type_id" json:"document_type_id"`
+	PublicationDate time.Time             `db:"publication_date" json:"publication_date"`
+	ContentPath     string                `db:"content_path" json:"content_path"`
+	CoverPath       *string               `db:"cover_path" json:"cover_path,omitempty"`
+	CurrentVersion  int                   `db:"current_version" json:"current_version"`
+	Indexed         bool                  `db:"indexed" json:"indexed"`
+	CreatedAt       time.Time             `db:"created_at" json:"created_at"`
+	UpdatedAt       time.Time             `db:"updated_at" json:"updated_at"`
+	Author          *Author               `json:"author,omitempty"`
+	Category        *Category             `json:"category,omitempty"`
+	DocumentType    *DocumentType         `json:"document_type,omitempty"`
+	Participants    []DocumentParticipant `json:"participants,omitempty"`
+	Tags            []Tag                 `json:"tags,omitempty"`
+	CoverURL        *string               `db:"-" json:"cover_url,omitempty"`
 }
 
 // DocumentVersion represents a version of a document
@@ -77,38 +113,41 @@ type DocumentVersion struct {
 //
 //easyjson:json
 type CreateDocumentRequest struct {
-	Title           string     `json:"title"`
-	Description     *string    `json:"description,omitempty"`
-	AuthorID        uuid.UUID  `json:"author_id"`
-	CategoryID      int        `json:"category_id"`
-	PublicationDate time.Time  `json:"publication_date"`
-	Content         string     `json:"content"`
-	TagIDs          []int      `json:"tag_ids,omitempty"`
-	CreatedBy       *uuid.UUID `json:"created_by,omitempty"`
+	Title           string                   `json:"title"`
+	Description     *string                  `json:"description,omitempty"`
+	CategoryID      *int                     `json:"category_id,omitempty"`
+	DocumentTypeID  int                      `json:"document_type_id"`
+	Participants    []DocumentParticipantRef `json:"participants,omitempty"`
+	PublicationDate time.Time                `json:"publication_date"`
+	Content         string                   `json:"content"`
+	TagIDs          []int                    `json:"tag_ids,omitempty"`
+	CreatedBy       *uuid.UUID               `json:"created_by,omitempty"`
 }
 
 // UpdateDocumentRequest represents a request to update a document
 //
 //easyjson:json
 type UpdateDocumentRequest struct {
-	Title           *string    `json:"title,omitempty"`
-	Description     *string    `json:"description,omitempty"`
-	AuthorID        *uuid.UUID `json:"author_id,omitempty"`
-	CategoryID      *int       `json:"category_id,omitempty"`
-	PublicationDate *time.Time `json:"publication_date,omitempty"`
-	Content         *string    `json:"content,omitempty"`
-	TagIDs          []int      `json:"tag_ids,omitempty"`
-	Changes         *string    `json:"changes,omitempty"`
-	UpdatedBy       *uuid.UUID `json:"updated_by,omitempty"`
-	CoverPath       *string    `json:"cover_path,omitempty"`
+	Title           *string                  `json:"title,omitempty"`
+	Description     *string                  `json:"description,omitempty"`
+	CategoryID      *int                     `json:"category_id,omitempty"`
+	DocumentTypeID  *int                     `json:"document_type_id,omitempty"`
+	Participants    []DocumentParticipantRef `json:"participants,omitempty"`
+	PublicationDate *time.Time               `json:"publication_date,omitempty"`
+	Content         *string                  `json:"content,omitempty"`
+	TagIDs          []int                    `json:"tag_ids,omitempty"`
+	Changes         *string                  `json:"changes,omitempty"`
+	UpdatedBy       *uuid.UUID               `json:"updated_by,omitempty"`
+	CoverPath       *string                  `json:"cover_path,omitempty"`
 }
 
 // ListDocumentsParams represents parameters for listing documents
 type ListDocumentsParams struct {
-	Limit      int
-	Offset     int
-	AuthorID   *uuid.UUID
-	CategoryID *int32
-	TagID      *int
-	Search     string
+	Limit          int
+	Offset         int
+	AuthorID       *uuid.UUID
+	CategoryID     *int32
+	DocumentTypeID *int32
+	TagID          *int32
+	Search         string
 }

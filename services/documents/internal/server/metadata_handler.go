@@ -142,6 +142,48 @@ func (h *MetadataHandler) HandleCreateCategory(msg *natsw.Message) error {
 	return msg.RespondEasyJSON(&response)
 }
 
+// HandleListDocumentTypes handles list document types requests.
+func (h *MetadataHandler) HandleListDocumentTypes(msg *natsw.Message) error {
+	documentTypes, err := h.service.ListDocumentTypes(msg.Ctx)
+	if err != nil {
+		h.logger.ErrorContext(msg.Ctx, "failed to list document types", "error", err)
+		return h.respondError(msg, dto.ErrCodeInternal)
+	}
+
+	dtoTypes := make([]documents.DocumentType, len(documentTypes))
+	for i, documentType := range documentTypes {
+		dtoTypes[i] = documents.DocumentType{
+			ID:        documentType.ID,
+			Name:      documentType.Name,
+			CreatedAt: documentType.CreatedAt,
+		}
+	}
+
+	response := documents.ListDocumentTypesResponse{DocumentTypes: dtoTypes}
+	return msg.RespondEasyJSON(&response)
+}
+
+// HandleListAuthorshipTypes handles list authorship types requests.
+func (h *MetadataHandler) HandleListAuthorshipTypes(msg *natsw.Message) error {
+	authorshipTypes, err := h.service.ListAuthorshipTypes(msg.Ctx)
+	if err != nil {
+		h.logger.ErrorContext(msg.Ctx, "failed to list authorship types", "error", err)
+		return h.respondError(msg, dto.ErrCodeInternal)
+	}
+
+	dtoTypes := make([]documents.AuthorshipType, len(authorshipTypes))
+	for i, authorshipType := range authorshipTypes {
+		dtoTypes[i] = documents.AuthorshipType{
+			ID:        authorshipType.ID,
+			Title:     authorshipType.Title,
+			CreatedAt: authorshipType.CreatedAt,
+		}
+	}
+
+	response := documents.ListAuthorshipTypesResponse{AuthorshipTypes: dtoTypes}
+	return msg.RespondEasyJSON(&response)
+}
+
 // HandleListTags handles list tags requests
 func (h *MetadataHandler) HandleListTags(msg *natsw.Message) error {
 	tags, err := h.service.ListTags(msg.Ctx)

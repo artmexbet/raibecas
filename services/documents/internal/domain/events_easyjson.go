@@ -39,6 +39,60 @@ func easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 					in.AddError((out.DocumentID).UnmarshalText(data))
 				}
 			}
+		case "title":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Title = string(in.String())
+			}
+		case "description":
+			if in.IsNull() {
+				in.Skip()
+				out.Description = nil
+			} else {
+				if out.Description == nil {
+					out.Description = new(string)
+				}
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					*out.Description = string(in.String())
+				}
+			}
+		case "category_id":
+			if in.IsNull() {
+				in.Skip()
+				out.CategoryID = nil
+			} else {
+				if out.CategoryID == nil {
+					out.CategoryID = new(int)
+				}
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					*out.CategoryID = int(in.Int())
+				}
+			}
+		case "document_type_id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.DocumentTypeID = int(in.Int())
+			}
+		case "document_type":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.DocumentType = string(in.String())
+			}
+		case "publication_date":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				if data := in.Raw(); in.Ok() {
+					in.AddError((out.PublicationDate).UnmarshalJSON(data))
+				}
+			}
 		case "old_version":
 			if in.IsNull() {
 				in.Skip()
@@ -71,6 +125,60 @@ func easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 					*out.Changes = string(in.String())
 				}
 			}
+		case "participants":
+			if in.IsNull() {
+				in.Skip()
+				out.Participants = nil
+			} else {
+				in.Delim('[')
+				if out.Participants == nil {
+					if !in.IsDelim(']') {
+						out.Participants = make([]DocumentEventParticipant, 0, 1)
+					} else {
+						out.Participants = []DocumentEventParticipant{}
+					}
+				} else {
+					out.Participants = (out.Participants)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v1 DocumentEventParticipant
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						(v1).UnmarshalEasyJSON(in)
+					}
+					out.Participants = append(out.Participants, v1)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
+		case "tags":
+			if in.IsNull() {
+				in.Skip()
+				out.Tags = nil
+			} else {
+				in.Delim('[')
+				if out.Tags == nil {
+					if !in.IsDelim(']') {
+						out.Tags = make([]DocumentEventTag, 0, 2)
+					} else {
+						out.Tags = []DocumentEventTag{}
+					}
+				} else {
+					out.Tags = (out.Tags)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v2 DocumentEventTag
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						(v2).UnmarshalEasyJSON(in)
+					}
+					out.Tags = append(out.Tags, v2)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
 		case "timestamp":
 			if in.IsNull() {
 				in.Skip()
@@ -99,6 +207,36 @@ func easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 		out.RawText((in.DocumentID).MarshalText())
 	}
 	{
+		const prefix string = ",\"title\":"
+		out.RawString(prefix)
+		out.String(string(in.Title))
+	}
+	if in.Description != nil {
+		const prefix string = ",\"description\":"
+		out.RawString(prefix)
+		out.String(string(*in.Description))
+	}
+	if in.CategoryID != nil {
+		const prefix string = ",\"category_id\":"
+		out.RawString(prefix)
+		out.Int(int(*in.CategoryID))
+	}
+	{
+		const prefix string = ",\"document_type_id\":"
+		out.RawString(prefix)
+		out.Int(int(in.DocumentTypeID))
+	}
+	{
+		const prefix string = ",\"document_type\":"
+		out.RawString(prefix)
+		out.String(string(in.DocumentType))
+	}
+	{
+		const prefix string = ",\"publication_date\":"
+		out.RawString(prefix)
+		out.Raw((in.PublicationDate).MarshalJSON())
+	}
+	{
 		const prefix string = ",\"old_version\":"
 		out.RawString(prefix)
 		out.Int(int(in.OldVersion))
@@ -117,6 +255,34 @@ func easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 		const prefix string = ",\"changes\":"
 		out.RawString(prefix)
 		out.String(string(*in.Changes))
+	}
+	if len(in.Participants) != 0 {
+		const prefix string = ",\"participants\":"
+		out.RawString(prefix)
+		{
+			out.RawByte('[')
+			for v3, v4 := range in.Participants {
+				if v3 > 0 {
+					out.RawByte(',')
+				}
+				(v4).MarshalEasyJSON(out)
+			}
+			out.RawByte(']')
+		}
+	}
+	if len(in.Tags) != 0 {
+		const prefix string = ",\"tags\":"
+		out.RawString(prefix)
+		{
+			out.RawByte('[')
+			for v5, v6 := range in.Tags {
+				if v5 > 0 {
+					out.RawByte(',')
+				}
+				(v6).MarshalEasyJSON(out)
+			}
+			out.RawByte(']')
+		}
 	}
 	{
 		const prefix string = ",\"timestamp\":"
@@ -251,7 +417,183 @@ func (v *DocumentIndexedEvent) UnmarshalJSON(data []byte) error {
 func (v *DocumentIndexedEvent) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain1(l, v)
 }
-func easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain2(in *jlexer.Lexer, out *DocumentDeletedEvent) {
+func easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain2(in *jlexer.Lexer, out *DocumentEventTag) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.ID = int(in.Int())
+			}
+		case "title":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Title = string(in.String())
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain2(out *jwriter.Writer, in DocumentEventTag) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"id\":"
+		out.RawString(prefix[1:])
+		out.Int(int(in.ID))
+	}
+	{
+		const prefix string = ",\"title\":"
+		out.RawString(prefix)
+		out.String(string(in.Title))
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v DocumentEventTag) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain2(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v DocumentEventTag) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain2(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *DocumentEventTag) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain2(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *DocumentEventTag) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain2(l, v)
+}
+func easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain3(in *jlexer.Lexer, out *DocumentEventParticipant) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "author_id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				if data := in.UnsafeBytes(); in.Ok() {
+					in.AddError((out.AuthorID).UnmarshalText(data))
+				}
+			}
+		case "name":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Name = string(in.String())
+			}
+		case "type_id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.TypeID = int(in.Int())
+			}
+		case "type_title":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.TypeTitle = string(in.String())
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain3(out *jwriter.Writer, in DocumentEventParticipant) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"author_id\":"
+		out.RawString(prefix[1:])
+		out.RawText((in.AuthorID).MarshalText())
+	}
+	{
+		const prefix string = ",\"name\":"
+		out.RawString(prefix)
+		out.String(string(in.Name))
+	}
+	{
+		const prefix string = ",\"type_id\":"
+		out.RawString(prefix)
+		out.Int(int(in.TypeID))
+	}
+	{
+		const prefix string = ",\"type_title\":"
+		out.RawString(prefix)
+		out.String(string(in.TypeTitle))
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v DocumentEventParticipant) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain3(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v DocumentEventParticipant) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain3(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *DocumentEventParticipant) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain3(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *DocumentEventParticipant) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain3(l, v)
+}
+func easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain4(in *jlexer.Lexer, out *DocumentDeletedEvent) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -291,7 +633,7 @@ func easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 		in.Consumed()
 	}
 }
-func easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain2(out *jwriter.Writer, in DocumentDeletedEvent) {
+func easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain4(out *jwriter.Writer, in DocumentDeletedEvent) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -311,27 +653,27 @@ func easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 // MarshalJSON supports json.Marshaler interface
 func (v DocumentDeletedEvent) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain2(&w, v)
+	easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain4(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v DocumentDeletedEvent) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain2(w, v)
+	easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain4(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *DocumentDeletedEvent) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain2(&r, v)
+	easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain4(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *DocumentDeletedEvent) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain2(l, v)
+	easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain4(l, v)
 }
-func easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain3(in *jlexer.Lexer, out *DocumentCreatedEvent) {
+func easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain5(in *jlexer.Lexer, out *DocumentCreatedEvent) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -359,19 +701,45 @@ func easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 			} else {
 				out.Title = string(in.String())
 			}
-		case "author_id":
+		case "description":
 			if in.IsNull() {
 				in.Skip()
+				out.Description = nil
 			} else {
-				if data := in.UnsafeBytes(); in.Ok() {
-					in.AddError((out.AuthorID).UnmarshalText(data))
+				if out.Description == nil {
+					out.Description = new(string)
+				}
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					*out.Description = string(in.String())
 				}
 			}
 		case "category_id":
 			if in.IsNull() {
 				in.Skip()
+				out.CategoryID = nil
 			} else {
-				out.CategoryID = int(in.Int())
+				if out.CategoryID == nil {
+					out.CategoryID = new(int)
+				}
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					*out.CategoryID = int(in.Int())
+				}
+			}
+		case "document_type_id":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.DocumentTypeID = int(in.Int())
+			}
+		case "document_type":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.DocumentType = string(in.String())
 			}
 		case "publication_date":
 			if in.IsNull() {
@@ -393,6 +761,60 @@ func easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 			} else {
 				out.Version = int(in.Int())
 			}
+		case "participants":
+			if in.IsNull() {
+				in.Skip()
+				out.Participants = nil
+			} else {
+				in.Delim('[')
+				if out.Participants == nil {
+					if !in.IsDelim(']') {
+						out.Participants = make([]DocumentEventParticipant, 0, 1)
+					} else {
+						out.Participants = []DocumentEventParticipant{}
+					}
+				} else {
+					out.Participants = (out.Participants)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v7 DocumentEventParticipant
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						(v7).UnmarshalEasyJSON(in)
+					}
+					out.Participants = append(out.Participants, v7)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
+		case "tags":
+			if in.IsNull() {
+				in.Skip()
+				out.Tags = nil
+			} else {
+				in.Delim('[')
+				if out.Tags == nil {
+					if !in.IsDelim(']') {
+						out.Tags = make([]DocumentEventTag, 0, 2)
+					} else {
+						out.Tags = []DocumentEventTag{}
+					}
+				} else {
+					out.Tags = (out.Tags)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v8 DocumentEventTag
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						(v8).UnmarshalEasyJSON(in)
+					}
+					out.Tags = append(out.Tags, v8)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
 		case "timestamp":
 			if in.IsNull() {
 				in.Skip()
@@ -411,7 +833,7 @@ func easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 		in.Consumed()
 	}
 }
-func easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain3(out *jwriter.Writer, in DocumentCreatedEvent) {
+func easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain5(out *jwriter.Writer, in DocumentCreatedEvent) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -425,15 +847,25 @@ func easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 		out.RawString(prefix)
 		out.String(string(in.Title))
 	}
-	{
-		const prefix string = ",\"author_id\":"
+	if in.Description != nil {
+		const prefix string = ",\"description\":"
 		out.RawString(prefix)
-		out.RawText((in.AuthorID).MarshalText())
+		out.String(string(*in.Description))
 	}
-	{
+	if in.CategoryID != nil {
 		const prefix string = ",\"category_id\":"
 		out.RawString(prefix)
-		out.Int(int(in.CategoryID))
+		out.Int(int(*in.CategoryID))
+	}
+	{
+		const prefix string = ",\"document_type_id\":"
+		out.RawString(prefix)
+		out.Int(int(in.DocumentTypeID))
+	}
+	{
+		const prefix string = ",\"document_type\":"
+		out.RawString(prefix)
+		out.String(string(in.DocumentType))
 	}
 	{
 		const prefix string = ",\"publication_date\":"
@@ -450,6 +882,34 @@ func easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 		out.RawString(prefix)
 		out.Int(int(in.Version))
 	}
+	if len(in.Participants) != 0 {
+		const prefix string = ",\"participants\":"
+		out.RawString(prefix)
+		{
+			out.RawByte('[')
+			for v9, v10 := range in.Participants {
+				if v9 > 0 {
+					out.RawByte(',')
+				}
+				(v10).MarshalEasyJSON(out)
+			}
+			out.RawByte(']')
+		}
+	}
+	if len(in.Tags) != 0 {
+		const prefix string = ",\"tags\":"
+		out.RawString(prefix)
+		{
+			out.RawByte('[')
+			for v11, v12 := range in.Tags {
+				if v11 > 0 {
+					out.RawByte(',')
+				}
+				(v12).MarshalEasyJSON(out)
+			}
+			out.RawByte(']')
+		}
+	}
 	{
 		const prefix string = ",\"timestamp\":"
 		out.RawString(prefix)
@@ -461,23 +921,23 @@ func easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 // MarshalJSON supports json.Marshaler interface
 func (v DocumentCreatedEvent) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain3(&w, v)
+	easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain5(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v DocumentCreatedEvent) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain3(w, v)
+	easyjson692db02bEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain5(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *DocumentCreatedEvent) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain3(&r, v)
+	easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain5(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *DocumentCreatedEvent) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain3(l, v)
+	easyjson692db02bDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDomain5(l, v)
 }

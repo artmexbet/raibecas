@@ -14,26 +14,26 @@ import (
 	"github.com/artmexbet/raibecas/services/documents/internal/postgres/queries"
 )
 
-// DocumentRepository implements repository.DocumentRepository using PostgreSQL
+// DocumentRepository implements repository.DocumentRepository using PostgreSQL.
 type DocumentRepository struct {
 	queries *queries.Queries
 }
 
-// NewDocumentRepository creates a new PostgreSQL document repository
+// NewDocumentRepository creates a new PostgreSQL document repository.
 func NewDocumentRepository(queries *queries.Queries) *DocumentRepository {
 	return &DocumentRepository{queries: queries}
 }
 
-// Create creates a new document
+// Create creates a new document.
 func (r *DocumentRepository) Create(ctx context.Context, doc *domain.Document) error {
 	created, err := r.queries.CreateDocument(ctx, queries.CreateDocumentParams{
 		Title:           doc.Title,
 		Description:     doc.Description,
-		AuthorID:        doc.AuthorID,
-		CategoryID:      int32(doc.CategoryID),
+		CategoryID:      intPtrToInt32Ptr(doc.CategoryID),
 		PublicationDate: timeToDate(doc.PublicationDate),
 		ContentPath:     doc.ContentPath,
 		CurrentVersion:  int32(doc.CurrentVersion),
+		DocumentTypeID:  int32(doc.DocumentTypeID),
 	})
 	if err != nil {
 		return fmt.Errorf("create document: %w", err)
@@ -45,7 +45,7 @@ func (r *DocumentRepository) Create(ctx context.Context, doc *domain.Document) e
 	return nil
 }
 
-// GetByID retrieves a document by ID
+// GetByID retrieves a document by ID.
 func (r *DocumentRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Document, error) {
 	row, err := r.queries.GetDocumentByID(ctx, id)
 	if err != nil {
@@ -55,69 +55,24 @@ func (r *DocumentRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain
 		return nil, fmt.Errorf("get document by id: %w", err)
 	}
 
-	// Convert row to domain with embedded entities
-	doc := &domain.Document{
-		ID:              row.ID,
-		Title:           row.Title,
-		Description:     row.Description,
-		AuthorID:        row.AuthorID,
-		CategoryID:      int(row.CategoryID),
-		PublicationDate: row.PublicationDate.Time,
-		ContentPath:     row.ContentPath,
-		CoverPath:       row.CoverPath,
-		CurrentVersion:  int(row.CurrentVersion),
-		Indexed:         row.Indexed,
-		CreatedAt:       row.CreatedAt,
-		UpdatedAt:       row.UpdatedAt,
-	}
-
-	// Add author if present
-	if row.Author.ID != uuid.Nil {
-		doc.Author = &domain.Author{
-			ID:        row.Author.ID,
-			Name:      row.Author.Name,
-			Bio:       row.Author.Bio,
-			CreatedAt: row.Author.CreatedAt,
-			UpdatedAt: row.Author.UpdatedAt,
-		}
-	}
-
-	// Add category if present
-	if row.Category.ID != 0 {
-		doc.Category = &domain.Category{
-			ID:          int(row.Category.ID),
-			Title:       row.Category.Title,
-			Description: row.Category.Description,
-			CreatedAt:   row.Category.CreatedAt,
-		}
-	}
-
-	// Load tags
-	tags, err := r.queries.GetDocumentTags(ctx, id)
+	doc, err := r.toDomainDocumentFromRow(ctx, row)
 	if err != nil {
-		return nil, fmt.Errorf("get document tags: %w", err)
-	}
-
-	doc.Tags = make([]domain.Tag, len(tags))
-	for i, tag := range tags {
-		doc.Tags[i] = domain.Tag{
-			ID:        int(tag.ID),
-			Title:     tag.Title,
-			CreatedAt: tag.CreatedAt,
-		}
+		return nil, err
 	}
 
 	return doc, nil
 }
 
-// List retrieves documents with filters
+// List retrieves documents with filters.
 func (r *DocumentRepository) List(ctx context.Context, params domain.ListDocumentsParams) ([]domain.Document, error) {
 	rows, err := r.queries.ListDocuments(ctx, queries.ListDocumentsParams{
-		Limit:      int32(params.Limit),
-		Offset:     int32(params.Offset),
-		AuthorID:   params.AuthorID,
-		CategoryID: params.CategoryID,
-		Search:     convertStringToPtr(params.Search),
+		Limit:          int32(params.Limit),
+		Offset:         int32(params.Offset),
+		AuthorID:       params.AuthorID,
+		CategoryID:     params.CategoryID,
+		DocumentTypeID: params.DocumentTypeID,
+		TagID:          params.TagID,
+		Search:         convertStringToPtr(params.Search),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list documents: %w", err)
@@ -125,68 +80,24 @@ func (r *DocumentRepository) List(ctx context.Context, params domain.ListDocumen
 
 	result := make([]domain.Document, len(rows))
 	for i, row := range rows {
-		doc := domain.Document{
-			ID:              row.ID,
-			Title:           row.Title,
-			Description:     row.Description,
-			AuthorID:        row.AuthorID,
-			CategoryID:      int(row.CategoryID),
-			PublicationDate: row.PublicationDate.Time,
-			ContentPath:     row.ContentPath,
-			CoverPath:       row.CoverPath,
-			CurrentVersion:  int(row.CurrentVersion),
-			Indexed:         row.Indexed,
-			CreatedAt:       row.CreatedAt,
-			UpdatedAt:       row.UpdatedAt,
-		}
-
-		// Add author if present
-		if row.Author.ID != uuid.Nil {
-			doc.Author = &domain.Author{
-				ID:        row.Author.ID,
-				Name:      row.Author.Name,
-				Bio:       row.Author.Bio,
-				CreatedAt: row.Author.CreatedAt,
-				UpdatedAt: row.Author.UpdatedAt,
-			}
-		}
-
-		// Add category if present
-		if row.Category.ID != 0 {
-			doc.Category = &domain.Category{
-				ID:          int(row.Category.ID),
-				Title:       row.Category.Title,
-				Description: row.Category.Description,
-				CreatedAt:   row.Category.CreatedAt,
-			}
-		}
-
-		// Load tags for this document
-		tags, err := r.queries.GetDocumentTags(ctx, row.ID)
+		doc, err := r.toDomainDocumentFromListRow(ctx, row)
 		if err != nil {
-			return nil, fmt.Errorf("get document tags for %s: %w", row.ID, err)
+			return nil, err
 		}
-
-		doc.Tags = make([]domain.Tag, len(tags))
-		for j, tag := range tags {
-			doc.Tags[j] = domain.Tag{
-				ID:        int(tag.ID),
-				Title:     tag.Title,
-				CreatedAt: tag.CreatedAt,
-			}
-		}
-
-		result[i] = doc
+		result[i] = *doc
 	}
+
 	return result, nil
 }
 
-// Count counts documents
+// Count counts documents.
 func (r *DocumentRepository) Count(ctx context.Context, params domain.ListDocumentsParams) (int, error) {
 	count, err := r.queries.CountDocuments(ctx, queries.CountDocumentsParams{
-		AuthorID:   params.AuthorID,
-		CategoryID: params.CategoryID,
-		Search:     convertStringToPtr(params.Search),
+		AuthorID:       params.AuthorID,
+		CategoryID:     params.CategoryID,
+		DocumentTypeID: params.DocumentTypeID,
+		TagID:          params.TagID,
+		Search:         convertStringToPtr(params.Search),
 	})
 	if err != nil {
 		return 0, fmt.Errorf("count documents: %w", err)
@@ -194,21 +105,21 @@ func (r *DocumentRepository) Count(ctx context.Context, params domain.ListDocume
 	return int(count), nil
 }
 
-// Update updates a document
+// Update updates a document.
 func (r *DocumentRepository) Update(ctx context.Context, doc *domain.Document) error {
-	categoryID := int32(doc.CategoryID)
 	currentVersion := int32(doc.CurrentVersion)
+	documentTypeID := int32(doc.DocumentTypeID)
 
 	updated, err := r.queries.UpdateDocument(ctx, queries.UpdateDocumentParams{
 		ID:              doc.ID,
 		Title:           &doc.Title,
 		Description:     doc.Description,
-		AuthorID:        &doc.AuthorID,
-		CategoryID:      &categoryID,
+		CategoryID:      intPtrToInt32Ptr(doc.CategoryID),
 		PublicationDate: timeToDate(doc.PublicationDate),
 		ContentPath:     &doc.ContentPath,
 		CurrentVersion:  &currentVersion,
 		CoverPath:       doc.CoverPath,
+		DocumentTypeID:  &documentTypeID,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -216,11 +127,12 @@ func (r *DocumentRepository) Update(ctx context.Context, doc *domain.Document) e
 		}
 		return fmt.Errorf("update document: %w", err)
 	}
+	_ = updated
 	doc.UpdatedAt = updated.UpdatedAt
 	return nil
 }
 
-// Delete deletes a document
+// Delete deletes a document.
 func (r *DocumentRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	if err := r.queries.DeleteDocument(ctx, id); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -231,7 +143,7 @@ func (r *DocumentRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// UpdateIndexedStatus updates indexed status
+// UpdateIndexedStatus updates indexed status.
 func (r *DocumentRepository) UpdateIndexedStatus(ctx context.Context, id uuid.UUID, indexed bool) error {
 	if err := r.queries.UpdateDocumentIndexed(ctx, queries.UpdateDocumentIndexedParams{
 		ID:      id,
@@ -245,26 +157,148 @@ func (r *DocumentRepository) UpdateIndexedStatus(ctx context.Context, id uuid.UU
 	return nil
 }
 
-// toDomain converts to domain model
-//
-// nolint:unused
-func (r *DocumentRepository) toDomain(doc *queries.Document) *domain.Document {
-	return &domain.Document{
-		ID:              doc.ID,
-		Title:           doc.Title,
-		Description:     doc.Description,
-		AuthorID:        doc.AuthorID,
-		CategoryID:      int(doc.CategoryID),
-		PublicationDate: doc.PublicationDate.Time,
-		ContentPath:     doc.ContentPath,
-		CurrentVersion:  int(doc.CurrentVersion),
-		Indexed:         doc.Indexed,
-		CreatedAt:       doc.CreatedAt,
-		UpdatedAt:       doc.UpdatedAt,
+// AddDocumentAuthor stores a document participant relation.
+func (r *DocumentRepository) AddDocumentAuthor(ctx context.Context, documentID, authorID uuid.UUID, typeID int) error {
+	if err := r.queries.AddDocumentAuthor(ctx, queries.AddDocumentAuthorParams{
+		DocumentID: documentID,
+		AuthorID:   authorID,
+		TypeID:     int32(typeID),
+	}); err != nil {
+		return fmt.Errorf("add document author: %w", err)
 	}
+	return nil
 }
 
-// Helper functions
+// ClearDocumentAuthors removes all participant relations for a document.
+func (r *DocumentRepository) ClearDocumentAuthors(ctx context.Context, documentID uuid.UUID) error {
+	if err := r.queries.ClearDocumentAuthors(ctx, documentID); err != nil {
+		return fmt.Errorf("clear document authors: %w", err)
+	}
+	return nil
+}
+
+func (r *DocumentRepository) toDomainDocumentFromRow(ctx context.Context, row queries.GetDocumentByIDRow) (*domain.Document, error) {
+	base := queries.Document{
+		ID:              row.ID,
+		Title:           row.Title,
+		Description:     row.Description,
+		CategoryID:      row.CategoryID,
+		PublicationDate: row.PublicationDate,
+		ContentPath:     row.ContentPath,
+		CurrentVersion:  row.CurrentVersion,
+		Indexed:         row.Indexed,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
+		CoverPath:       row.CoverPath,
+		DocumentTypeID:  row.DocumentTypeID,
+	}
+	return r.toDomainDocument(ctx, row.ID, base, row.Category, row.DocumentType)
+}
+
+func (r *DocumentRepository) toDomainDocumentFromListRow(ctx context.Context, row queries.ListDocumentsRow) (*domain.Document, error) {
+	base := queries.Document{
+		ID:              row.ID,
+		Title:           row.Title,
+		Description:     row.Description,
+		CategoryID:      row.CategoryID,
+		PublicationDate: row.PublicationDate,
+		ContentPath:     row.ContentPath,
+		CurrentVersion:  row.CurrentVersion,
+		Indexed:         row.Indexed,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
+		CoverPath:       row.CoverPath,
+		DocumentTypeID:  row.DocumentTypeID,
+	}
+	return r.toDomainDocument(ctx, row.ID, base, row.Category, row.DocumentType)
+}
+
+func (r *DocumentRepository) toDomainDocument(
+	ctx context.Context,
+	documentID uuid.UUID,
+	row queries.Document,
+	category queries.Category,
+	documentType queries.DocumentType,
+) (*domain.Document, error) {
+	doc := &domain.Document{
+		ID:              row.ID,
+		Title:           row.Title,
+		Description:     row.Description,
+		CategoryID:      int32PtrToIntPtr(row.CategoryID),
+		DocumentTypeID:  int(documentType.ID),
+		PublicationDate: row.PublicationDate.Time,
+		ContentPath:     row.ContentPath,
+		CoverPath:       row.CoverPath,
+		CurrentVersion:  int(row.CurrentVersion),
+		Indexed:         row.Indexed,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
+	}
+
+	if category.ID != 0 {
+		doc.Category = &domain.Category{
+			ID:          int(category.ID),
+			Title:       category.Title,
+			Description: category.Description,
+			CreatedAt:   category.CreatedAt,
+		}
+	}
+
+	if documentType.ID != 0 {
+		doc.DocumentType = &domain.DocumentType{
+			ID:        int(documentType.ID),
+			Name:      documentType.Name,
+			CreatedAt: documentType.CreatedAt,
+		}
+		doc.DocumentTypeID = int(documentType.ID)
+	}
+
+	participants, err := r.queries.GetDocumentAuthors(ctx, documentID)
+	if err != nil {
+		return nil, fmt.Errorf("get document participants: %w", err)
+	}
+	if len(participants) > 0 {
+		doc.Participants = make([]domain.DocumentParticipant, len(participants))
+		for i, participant := range participants {
+			doc.Participants[i] = domain.DocumentParticipant{
+				Author: domain.Author{
+					ID:        participant.AuthorID,
+					Name:      participant.AuthorName,
+					Bio:       participant.AuthorBio,
+					CreatedAt: participant.AuthorCreatedAt,
+					UpdatedAt: participant.AuthorUpdatedAt,
+				},
+				AuthorshipType: domain.AuthorshipType{
+					ID:        int(participant.AuthorshipTypeID),
+					Title:     participant.AuthorshipTypeTitle,
+					CreatedAt: participant.AuthorshipTypeCreatedAt,
+				},
+			}
+		}
+
+		primaryAuthor := doc.Participants[0].Author
+		doc.Author = &primaryAuthor
+	}
+
+	tags, err := r.queries.GetDocumentTags(ctx, documentID)
+	if err != nil {
+		return nil, fmt.Errorf("get document tags: %w", err)
+	}
+	if len(tags) > 0 {
+		doc.Tags = make([]domain.Tag, len(tags))
+		for i, tag := range tags {
+			doc.Tags[i] = domain.Tag{
+				ID:        int(tag.ID),
+				Title:     tag.Title,
+				CreatedAt: tag.CreatedAt,
+			}
+		}
+	}
+
+	return doc, nil
+}
+
+// Helper functions.
 func timeToDate(t time.Time) pgtype.Date {
 	return pgtype.Date{Time: t, Valid: true}
 }
@@ -274,4 +308,20 @@ func convertStringToPtr(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+func intPtrToInt32Ptr(value *int) *int32 {
+	if value == nil {
+		return nil
+	}
+	converted := int32(*value)
+	return &converted
+}
+
+func int32PtrToIntPtr(value *int32) *int {
+	if value == nil {
+		return nil
+	}
+	converted := int(*value)
+	return &converted
 }

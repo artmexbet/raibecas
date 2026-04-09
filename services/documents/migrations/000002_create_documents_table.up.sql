@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title VARCHAR(500) NOT NULL,
     description TEXT,
-    author_id UUID NOT NULL REFERENCES authors(id),
     category_id INT NOT NULL REFERENCES categories(id),
     publication_date DATE NOT NULL,
     content_path VARCHAR(500) NOT NULL,
@@ -21,7 +20,6 @@ CREATE TABLE IF NOT EXISTS document_tags (
 );
 
 -- Create indexes
-CREATE INDEX IF NOT EXISTS idx_documents_author ON documents(author_id);
 CREATE INDEX IF NOT EXISTS idx_documents_category ON documents(category_id);
 CREATE INDEX IF NOT EXISTS idx_documents_publication_date ON documents(publication_date);
 CREATE INDEX IF NOT EXISTS idx_documents_indexed ON documents(indexed);

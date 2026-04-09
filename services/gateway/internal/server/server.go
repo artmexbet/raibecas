@@ -163,6 +163,14 @@ func (s *Server) setupProtectedRoutes() {
 	categories.Get("/", s.listCategories)
 	categories.Post("/", adminOnly, s.createCategory)
 
+	// Document types routes
+	documentTypes := protected.Group("/api/v1/document-types")
+	documentTypes.Get("/", s.listDocumentTypes)
+
+	// Authorship types routes
+	authorshipTypes := protected.Group("/api/v1/authorship-types")
+	authorshipTypes.Get("/", s.listAuthorshipTypes)
+
 	// Tags routes
 	tags := protected.Group("/api/v1/tags")
 	tags.Get("/", s.listTags)

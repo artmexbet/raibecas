@@ -13,6 +13,28 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addDocumentAuthor = `-- name: AddDocumentAuthor :exec
+INSERT INTO document_authors (document_id, author_id, type_id)
+VALUES ($1, $2, $3)
+ON CONFLICT DO NOTHING
+`
+
+type AddDocumentAuthorParams struct {
+	DocumentID uuid.UUID
+	AuthorID   uuid.UUID
+	TypeID     int32
+}
+
+// AddDocumentAuthor
+//
+//	INSERT INTO document_authors (document_id, author_id, type_id)
+//	VALUES ($1, $2, $3)
+//	ON CONFLICT DO NOTHING
+func (q *Queries) AddDocumentAuthor(ctx context.Context, arg AddDocumentAuthorParams) error {
+	_, err := q.db.Exec(ctx, addDocumentAuthor, arg.DocumentID, arg.AuthorID, arg.TypeID)
+	return err
+}
+
 const addDocumentTag = `-- name: AddDocumentTag :exec
 INSERT INTO document_tags (document_id, tag_id)
 VALUES ($1, $2)
@@ -34,6 +56,20 @@ func (q *Queries) AddDocumentTag(ctx context.Context, arg AddDocumentTagParams) 
 	return err
 }
 
+const clearDocumentAuthors = `-- name: ClearDocumentAuthors :exec
+DELETE FROM document_authors
+WHERE document_id = $1
+`
+
+// ClearDocumentAuthors
+//
+//	DELETE FROM document_authors
+//	WHERE document_id = $1
+func (q *Queries) ClearDocumentAuthors(ctx context.Context, documentID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearDocumentAuthors, documentID)
+	return err
+}
+
 const clearDocumentTags = `-- name: ClearDocumentTags :exec
 DELETE FROM document_tags
 WHERE document_id = $1
@@ -52,7 +88,12 @@ const countDocuments = `-- name: CountDocuments :one
 SELECT COUNT(*) FROM documents
 WHERE (
     CASE
-        WHEN $1::uuid IS NOT NULL THEN author_id = $1::uuid
+        WHEN $1::uuid IS NOT NULL THEN EXISTS (
+            SELECT 1
+            FROM document_authors da
+            WHERE da.document_id = documents.id
+              AND da.author_id = $1::uuid
+        )
         ELSE TRUE
     END
 ) AND (
@@ -62,17 +103,54 @@ WHERE (
     END
 ) AND (
     CASE
-        WHEN $3::text IS NOT NULL AND $3::text != ''
-        THEN to_tsvector('russian', title || ' ' || COALESCE(description, '')) @@ plainto_tsquery('russian', $3::text)
+        WHEN $3::int IS NOT NULL THEN document_type_id = $3::int
+        ELSE TRUE
+    END
+) AND (
+    CASE
+        WHEN $4::int IS NOT NULL THEN EXISTS (
+            SELECT 1
+            FROM document_tags dt
+            WHERE dt.document_id = documents.id
+              AND dt.tag_id = $4::int
+        )
+        ELSE TRUE
+    END
+) AND (
+    CASE
+        WHEN $5::text IS NOT NULL AND $5::text != ''
+        THEN (
+            to_tsvector('russian', title || ' ' || COALESCE(description, '') || ' ' || COALESCE((SELECT name FROM document_types WHERE id = documents.document_type_id), '')) @@ plainto_tsquery('russian', $5::text)
+            OR EXISTS (
+                SELECT 1
+                FROM document_authors da
+                JOIN authors a ON a.id = da.author_id
+                JOIN authorship_types at ON at.id = da.type_id
+                WHERE da.document_id = documents.id
+                  AND (
+                      a.name ILIKE '%' || $5::text || '%'
+                      OR at.title ILIKE '%' || $5::text || '%'
+                  )
+            )
+            OR EXISTS (
+                SELECT 1
+                FROM document_tags dt
+                JOIN tags t ON t.id = dt.tag_id
+                WHERE dt.document_id = documents.id
+                  AND t.title ILIKE '%' || $5::text || '%'
+            )
+        )
         ELSE TRUE
     END
 )
 `
 
 type CountDocumentsParams struct {
-	AuthorID   *uuid.UUID
-	CategoryID *int32
-	Search     *string
+	AuthorID       *uuid.UUID
+	CategoryID     *int32
+	DocumentTypeID *int32
+	TagID          *int32
+	Search         *string
 }
 
 // CountDocuments
@@ -80,7 +158,12 @@ type CountDocumentsParams struct {
 //	SELECT COUNT(*) FROM documents
 //	WHERE (
 //	    CASE
-//	        WHEN $1::uuid IS NOT NULL THEN author_id = $1::uuid
+//	        WHEN $1::uuid IS NOT NULL THEN EXISTS (
+//	            SELECT 1
+//	            FROM document_authors da
+//	            WHERE da.document_id = documents.id
+//	              AND da.author_id = $1::uuid
+//	        )
 //	        ELSE TRUE
 //	    END
 //	) AND (
@@ -90,13 +173,54 @@ type CountDocumentsParams struct {
 //	    END
 //	) AND (
 //	    CASE
-//	        WHEN $3::text IS NOT NULL AND $3::text != ''
-//	        THEN to_tsvector('russian', title || ' ' || COALESCE(description, '')) @@ plainto_tsquery('russian', $3::text)
+//	        WHEN $3::int IS NOT NULL THEN document_type_id = $3::int
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $4::int IS NOT NULL THEN EXISTS (
+//	            SELECT 1
+//	            FROM document_tags dt
+//	            WHERE dt.document_id = documents.id
+//	              AND dt.tag_id = $4::int
+//	        )
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $5::text IS NOT NULL AND $5::text != ''
+//	        THEN (
+//	            to_tsvector('russian', title || ' ' || COALESCE(description, '') || ' ' || COALESCE((SELECT name FROM document_types WHERE id = documents.document_type_id), '')) @@ plainto_tsquery('russian', $5::text)
+//	            OR EXISTS (
+//	                SELECT 1
+//	                FROM document_authors da
+//	                JOIN authors a ON a.id = da.author_id
+//	                JOIN authorship_types at ON at.id = da.type_id
+//	                WHERE da.document_id = documents.id
+//	                  AND (
+//	                      a.name ILIKE '%' || $5::text || '%'
+//	                      OR at.title ILIKE '%' || $5::text || '%'
+//	                  )
+//	            )
+//	            OR EXISTS (
+//	                SELECT 1
+//	                FROM document_tags dt
+//	                JOIN tags t ON t.id = dt.tag_id
+//	                WHERE dt.document_id = documents.id
+//	                  AND t.title ILIKE '%' || $5::text || '%'
+//	            )
+//	        )
 //	        ELSE TRUE
 //	    END
 //	)
 func (q *Queries) CountDocuments(ctx context.Context, arg CountDocumentsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countDocuments, arg.AuthorID, arg.CategoryID, arg.Search)
+	row := q.db.QueryRow(ctx, countDocuments,
+		arg.AuthorID,
+		arg.CategoryID,
+		arg.DocumentTypeID,
+		arg.TagID,
+		arg.Search,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -170,23 +294,23 @@ const createDocument = `-- name: CreateDocument :one
 INSERT INTO documents (
     title,
     description,
-    author_id,
     category_id,
     publication_date,
     content_path,
-    current_version
+    current_version,
+    document_type_id
 ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, title, description, author_id, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path
+RETURNING id, title, description, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path, document_type_id
 `
 
 type CreateDocumentParams struct {
 	Title           string
 	Description     *string
-	AuthorID        uuid.UUID
-	CategoryID      int32
+	CategoryID      *int32
 	PublicationDate pgtype.Date
 	ContentPath     string
 	CurrentVersion  int32
+	DocumentTypeID  int32
 }
 
 // CreateDocument
@@ -194,29 +318,28 @@ type CreateDocumentParams struct {
 //	INSERT INTO documents (
 //	    title,
 //	    description,
-//	    author_id,
 //	    category_id,
 //	    publication_date,
 //	    content_path,
-//	    current_version
+//	    current_version,
+//	    document_type_id
 //	) VALUES ($1, $2, $3, $4, $5, $6, $7)
-//	RETURNING id, title, description, author_id, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path
+//	RETURNING id, title, description, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path, document_type_id
 func (q *Queries) CreateDocument(ctx context.Context, arg CreateDocumentParams) (Document, error) {
 	row := q.db.QueryRow(ctx, createDocument,
 		arg.Title,
 		arg.Description,
-		arg.AuthorID,
 		arg.CategoryID,
 		arg.PublicationDate,
 		arg.ContentPath,
 		arg.CurrentVersion,
+		arg.DocumentTypeID,
 	)
 	var i Document
 	err := row.Scan(
 		&i.ID,
 		&i.Title,
 		&i.Description,
-		&i.AuthorID,
 		&i.CategoryID,
 		&i.PublicationDate,
 		&i.ContentPath,
@@ -225,7 +348,26 @@ func (q *Queries) CreateDocument(ctx context.Context, arg CreateDocumentParams) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CoverPath,
+		&i.DocumentTypeID,
 	)
+	return i, err
+}
+
+const createDocumentType = `-- name: CreateDocumentType :one
+INSERT INTO document_types (name)
+VALUES ($1)
+RETURNING id, name, created_at
+`
+
+// CreateDocumentType
+//
+//	INSERT INTO document_types (name)
+//	VALUES ($1)
+//	RETURNING id, name, created_at
+func (q *Queries) CreateDocumentType(ctx context.Context, name string) (DocumentType, error) {
+	row := q.db.QueryRow(ctx, createDocumentType, name)
+	var i DocumentType
+	err := row.Scan(&i.ID, &i.Name, &i.CreatedAt)
 	return i, err
 }
 
@@ -359,14 +501,105 @@ func (q *Queries) GetCategoryByID(ctx context.Context, id int32) (Category, erro
 	return i, err
 }
 
+const getDocumentAuthors = `-- name: GetDocumentAuthors :many
+SELECT
+    da.document_id,
+    a.id AS author_id,
+    a.name AS author_name,
+    a.bio AS author_bio,
+    a.created_at AS author_created_at,
+    a.updated_at AS author_updated_at,
+    at.id AS authorship_type_id,
+    at.title AS authorship_type_title,
+    at.created_at AS authorship_type_created_at
+FROM document_authors da
+INNER JOIN authors a ON a.id = da.author_id
+INNER JOIN authorship_types at ON at.id = da.type_id
+WHERE da.document_id = $1
+ORDER BY
+    CASE at.title
+        WHEN 'автор' THEN 0
+        WHEN 'редактор' THEN 1
+        WHEN 'рецензент' THEN 2
+        ELSE 10
+    END,
+    a.name
+`
+
+type GetDocumentAuthorsRow struct {
+	DocumentID              uuid.UUID
+	AuthorID                uuid.UUID
+	AuthorName              string
+	AuthorBio               *string
+	AuthorCreatedAt         time.Time
+	AuthorUpdatedAt         time.Time
+	AuthorshipTypeID        int32
+	AuthorshipTypeTitle     string
+	AuthorshipTypeCreatedAt time.Time
+}
+
+// GetDocumentAuthors
+//
+//	SELECT
+//	    da.document_id,
+//	    a.id AS author_id,
+//	    a.name AS author_name,
+//	    a.bio AS author_bio,
+//	    a.created_at AS author_created_at,
+//	    a.updated_at AS author_updated_at,
+//	    at.id AS authorship_type_id,
+//	    at.title AS authorship_type_title,
+//	    at.created_at AS authorship_type_created_at
+//	FROM document_authors da
+//	INNER JOIN authors a ON a.id = da.author_id
+//	INNER JOIN authorship_types at ON at.id = da.type_id
+//	WHERE da.document_id = $1
+//	ORDER BY
+//	    CASE at.title
+//	        WHEN 'автор' THEN 0
+//	        WHEN 'редактор' THEN 1
+//	        WHEN 'рецензент' THEN 2
+//	        ELSE 10
+//	    END,
+//	    a.name
+func (q *Queries) GetDocumentAuthors(ctx context.Context, documentID uuid.UUID) ([]GetDocumentAuthorsRow, error) {
+	rows, err := q.db.Query(ctx, getDocumentAuthors, documentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetDocumentAuthorsRow{}
+	for rows.Next() {
+		var i GetDocumentAuthorsRow
+		if err := rows.Scan(
+			&i.DocumentID,
+			&i.AuthorID,
+			&i.AuthorName,
+			&i.AuthorBio,
+			&i.AuthorCreatedAt,
+			&i.AuthorUpdatedAt,
+			&i.AuthorshipTypeID,
+			&i.AuthorshipTypeTitle,
+			&i.AuthorshipTypeCreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getDocumentByID = `-- name: GetDocumentByID :one
 SELECT
-    documents.id, documents.title, documents.description, documents.author_id, documents.category_id, documents.publication_date, documents.content_path, documents.current_version, documents.indexed, documents.created_at, documents.updated_at, documents.cover_path,
-    authors.id, authors.name, authors.bio, authors.created_at, authors.updated_at,
-    categories.id, categories.title, categories.description, categories.created_at
+    documents.id, documents.title, documents.description, documents.category_id, documents.publication_date, documents.content_path, documents.current_version, documents.indexed, documents.created_at, documents.updated_at, documents.cover_path, documents.document_type_id,
+    categories.id, categories.title, categories.description, categories.created_at,
+    document_types.id, document_types.name, document_types.created_at
 FROM documents
-LEFT JOIN authors ON documents.author_id = authors.id
 LEFT JOIN categories ON documents.category_id = categories.id
+LEFT JOIN document_types ON documents.document_type_id = document_types.id
 WHERE documents.id = $1
 `
 
@@ -374,8 +607,7 @@ type GetDocumentByIDRow struct {
 	ID              uuid.UUID
 	Title           string
 	Description     *string
-	AuthorID        uuid.UUID
-	CategoryID      int32
+	CategoryID      *int32
 	PublicationDate pgtype.Date
 	ContentPath     string
 	CurrentVersion  int32
@@ -383,19 +615,20 @@ type GetDocumentByIDRow struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	CoverPath       *string
-	Author          Author
+	DocumentTypeID  int32
 	Category        Category
+	DocumentType    DocumentType
 }
 
 // GetDocumentByID
 //
 //	SELECT
-//	    documents.id, documents.title, documents.description, documents.author_id, documents.category_id, documents.publication_date, documents.content_path, documents.current_version, documents.indexed, documents.created_at, documents.updated_at, documents.cover_path,
-//	    authors.id, authors.name, authors.bio, authors.created_at, authors.updated_at,
-//	    categories.id, categories.title, categories.description, categories.created_at
+//	    documents.id, documents.title, documents.description, documents.category_id, documents.publication_date, documents.content_path, documents.current_version, documents.indexed, documents.created_at, documents.updated_at, documents.cover_path, documents.document_type_id,
+//	    categories.id, categories.title, categories.description, categories.created_at,
+//	    document_types.id, document_types.name, document_types.created_at
 //	FROM documents
-//	LEFT JOIN authors ON documents.author_id = authors.id
 //	LEFT JOIN categories ON documents.category_id = categories.id
+//	LEFT JOIN document_types ON documents.document_type_id = document_types.id
 //	WHERE documents.id = $1
 func (q *Queries) GetDocumentByID(ctx context.Context, id uuid.UUID) (GetDocumentByIDRow, error) {
 	row := q.db.QueryRow(ctx, getDocumentByID, id)
@@ -404,7 +637,6 @@ func (q *Queries) GetDocumentByID(ctx context.Context, id uuid.UUID) (GetDocumen
 		&i.ID,
 		&i.Title,
 		&i.Description,
-		&i.AuthorID,
 		&i.CategoryID,
 		&i.PublicationDate,
 		&i.ContentPath,
@@ -413,15 +645,14 @@ func (q *Queries) GetDocumentByID(ctx context.Context, id uuid.UUID) (GetDocumen
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CoverPath,
-		&i.Author.ID,
-		&i.Author.Name,
-		&i.Author.Bio,
-		&i.Author.CreatedAt,
-		&i.Author.UpdatedAt,
+		&i.DocumentTypeID,
 		&i.Category.ID,
 		&i.Category.Title,
 		&i.Category.Description,
 		&i.Category.CreatedAt,
+		&i.DocumentType.ID,
+		&i.DocumentType.Name,
+		&i.DocumentType.CreatedAt,
 	)
 	return i, err
 }
@@ -457,6 +688,22 @@ func (q *Queries) GetDocumentTags(ctx context.Context, documentID uuid.UUID) ([]
 		return nil, err
 	}
 	return items, nil
+}
+
+const getDocumentTypeByID = `-- name: GetDocumentTypeByID :one
+SELECT id, name, created_at FROM document_types
+WHERE id = $1
+`
+
+// GetDocumentTypeByID
+//
+//	SELECT id, name, created_at FROM document_types
+//	WHERE id = $1
+func (q *Queries) GetDocumentTypeByID(ctx context.Context, id int32) (DocumentType, error) {
+	row := q.db.QueryRow(ctx, getDocumentTypeByID, id)
+	var i DocumentType
+	err := row.Scan(&i.ID, &i.Name, &i.CreatedAt)
+	return i, err
 }
 
 const getDocumentVersion = `-- name: GetDocumentVersion :one
@@ -539,6 +786,35 @@ func (q *Queries) ListAuthors(ctx context.Context) ([]Author, error) {
 	return items, nil
 }
 
+const listAuthorshipTypes = `-- name: ListAuthorshipTypes :many
+SELECT id, title, created_at FROM authorship_types
+ORDER BY id
+`
+
+// ListAuthorshipTypes
+//
+//	SELECT id, title, created_at FROM authorship_types
+//	ORDER BY id
+func (q *Queries) ListAuthorshipTypes(ctx context.Context) ([]AuthorshipType, error) {
+	rows, err := q.db.Query(ctx, listAuthorshipTypes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AuthorshipType{}
+	for rows.Next() {
+		var i AuthorshipType
+		if err := rows.Scan(&i.ID, &i.Title, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCategories = `-- name: ListCategories :many
 SELECT id, title, description, created_at FROM categories
 ORDER BY title
@@ -563,6 +839,35 @@ func (q *Queries) ListCategories(ctx context.Context) ([]Category, error) {
 			&i.Description,
 			&i.CreatedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDocumentTypes = `-- name: ListDocumentTypes :many
+SELECT id, name, created_at FROM document_types
+ORDER BY name
+`
+
+// ListDocumentTypes
+//
+//	SELECT id, name, created_at FROM document_types
+//	ORDER BY name
+func (q *Queries) ListDocumentTypes(ctx context.Context) ([]DocumentType, error) {
+	rows, err := q.db.Query(ctx, listDocumentTypes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DocumentType{}
+	for rows.Next() {
+		var i DocumentType
+		if err := rows.Scan(&i.ID, &i.Name, &i.CreatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -614,15 +919,20 @@ func (q *Queries) ListDocumentVersions(ctx context.Context, documentID uuid.UUID
 
 const listDocuments = `-- name: ListDocuments :many
 SELECT
-    d.id, d.title, d.description, d.author_id, d.category_id, d.publication_date, d.content_path, d.current_version, d.indexed, d.created_at, d.updated_at, d.cover_path,
-    a.id, a.name, a.bio, a.created_at, a.updated_at,
-    c.id, c.title, c.description, c.created_at
+    d.id, d.title, d.description, d.category_id, d.publication_date, d.content_path, d.current_version, d.indexed, d.created_at, d.updated_at, d.cover_path, d.document_type_id,
+    c.id, c.title, c.description, c.created_at,
+    dt.id, dt.name, dt.created_at
 FROM documents d
-LEFT JOIN authors a ON d.author_id = a.id
 LEFT JOIN categories c ON d.category_id = c.id
+LEFT JOIN document_types dt ON d.document_type_id = dt.id
 WHERE (
     CASE
-        WHEN $3::uuid IS NOT NULL THEN d.author_id = $3::uuid
+        WHEN $3::uuid IS NOT NULL THEN EXISTS (
+            SELECT 1
+            FROM document_authors da
+            WHERE da.document_id = d.id
+              AND da.author_id = $3::uuid
+        )
         ELSE TRUE
     END
 ) AND (
@@ -632,8 +942,43 @@ WHERE (
     END
 ) AND (
     CASE
-        WHEN $5::text IS NOT NULL AND $5::text != ''
-        THEN to_tsvector('russian', d.title || ' ' || COALESCE(d.description, '')) @@ plainto_tsquery('russian', $5::text)
+        WHEN $5::int IS NOT NULL THEN d.document_type_id = $5::int
+        ELSE TRUE
+    END
+) AND (
+    CASE
+        WHEN $6::int IS NOT NULL THEN EXISTS (
+            SELECT 1
+            FROM document_tags dtt
+            WHERE dtt.document_id = d.id
+              AND dtt.tag_id = $6::int
+        )
+        ELSE TRUE
+    END
+) AND (
+    CASE
+        WHEN $7::text IS NOT NULL AND $7::text != ''
+        THEN (
+            to_tsvector('russian', d.title || ' ' || COALESCE(d.description, '') || ' ' || COALESCE(dt.name, '')) @@ plainto_tsquery('russian', $7::text)
+            OR EXISTS (
+                SELECT 1
+                FROM document_authors da
+                JOIN authors sa ON sa.id = da.author_id
+                JOIN authorship_types sat ON sat.id = da.type_id
+                WHERE da.document_id = d.id
+                  AND (
+                      sa.name ILIKE '%' || $7::text || '%'
+                      OR sat.title ILIKE '%' || $7::text || '%'
+                  )
+            )
+            OR EXISTS (
+                SELECT 1
+                FROM document_tags dtt
+                JOIN tags tt ON tt.id = dtt.tag_id
+                WHERE dtt.document_id = d.id
+                  AND tt.title ILIKE '%' || $7::text || '%'
+            )
+        )
         ELSE TRUE
     END
 )
@@ -642,19 +987,20 @@ LIMIT $1 OFFSET $2
 `
 
 type ListDocumentsParams struct {
-	Limit      int32
-	Offset     int32
-	AuthorID   *uuid.UUID
-	CategoryID *int32
-	Search     *string
+	Limit          int32
+	Offset         int32
+	AuthorID       *uuid.UUID
+	CategoryID     *int32
+	DocumentTypeID *int32
+	TagID          *int32
+	Search         *string
 }
 
 type ListDocumentsRow struct {
 	ID              uuid.UUID
 	Title           string
 	Description     *string
-	AuthorID        uuid.UUID
-	CategoryID      int32
+	CategoryID      *int32
 	PublicationDate pgtype.Date
 	ContentPath     string
 	CurrentVersion  int32
@@ -662,22 +1008,28 @@ type ListDocumentsRow struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	CoverPath       *string
-	Author          Author
+	DocumentTypeID  int32
 	Category        Category
+	DocumentType    DocumentType
 }
 
 // ListDocuments
 //
 //	SELECT
-//	    d.id, d.title, d.description, d.author_id, d.category_id, d.publication_date, d.content_path, d.current_version, d.indexed, d.created_at, d.updated_at, d.cover_path,
-//	    a.id, a.name, a.bio, a.created_at, a.updated_at,
-//	    c.id, c.title, c.description, c.created_at
+//	    d.id, d.title, d.description, d.category_id, d.publication_date, d.content_path, d.current_version, d.indexed, d.created_at, d.updated_at, d.cover_path, d.document_type_id,
+//	    c.id, c.title, c.description, c.created_at,
+//	    dt.id, dt.name, dt.created_at
 //	FROM documents d
-//	LEFT JOIN authors a ON d.author_id = a.id
 //	LEFT JOIN categories c ON d.category_id = c.id
+//	LEFT JOIN document_types dt ON d.document_type_id = dt.id
 //	WHERE (
 //	    CASE
-//	        WHEN $3::uuid IS NOT NULL THEN d.author_id = $3::uuid
+//	        WHEN $3::uuid IS NOT NULL THEN EXISTS (
+//	            SELECT 1
+//	            FROM document_authors da
+//	            WHERE da.document_id = d.id
+//	              AND da.author_id = $3::uuid
+//	        )
 //	        ELSE TRUE
 //	    END
 //	) AND (
@@ -687,8 +1039,43 @@ type ListDocumentsRow struct {
 //	    END
 //	) AND (
 //	    CASE
-//	        WHEN $5::text IS NOT NULL AND $5::text != ''
-//	        THEN to_tsvector('russian', d.title || ' ' || COALESCE(d.description, '')) @@ plainto_tsquery('russian', $5::text)
+//	        WHEN $5::int IS NOT NULL THEN d.document_type_id = $5::int
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $6::int IS NOT NULL THEN EXISTS (
+//	            SELECT 1
+//	            FROM document_tags dtt
+//	            WHERE dtt.document_id = d.id
+//	              AND dtt.tag_id = $6::int
+//	        )
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $7::text IS NOT NULL AND $7::text != ''
+//	        THEN (
+//	            to_tsvector('russian', d.title || ' ' || COALESCE(d.description, '') || ' ' || COALESCE(dt.name, '')) @@ plainto_tsquery('russian', $7::text)
+//	            OR EXISTS (
+//	                SELECT 1
+//	                FROM document_authors da
+//	                JOIN authors sa ON sa.id = da.author_id
+//	                JOIN authorship_types sat ON sat.id = da.type_id
+//	                WHERE da.document_id = d.id
+//	                  AND (
+//	                      sa.name ILIKE '%' || $7::text || '%'
+//	                      OR sat.title ILIKE '%' || $7::text || '%'
+//	                  )
+//	            )
+//	            OR EXISTS (
+//	                SELECT 1
+//	                FROM document_tags dtt
+//	                JOIN tags tt ON tt.id = dtt.tag_id
+//	                WHERE dtt.document_id = d.id
+//	                  AND tt.title ILIKE '%' || $7::text || '%'
+//	            )
+//	        )
 //	        ELSE TRUE
 //	    END
 //	)
@@ -700,6 +1087,8 @@ func (q *Queries) ListDocuments(ctx context.Context, arg ListDocumentsParams) ([
 		arg.Offset,
 		arg.AuthorID,
 		arg.CategoryID,
+		arg.DocumentTypeID,
+		arg.TagID,
 		arg.Search,
 	)
 	if err != nil {
@@ -713,7 +1102,6 @@ func (q *Queries) ListDocuments(ctx context.Context, arg ListDocumentsParams) ([
 			&i.ID,
 			&i.Title,
 			&i.Description,
-			&i.AuthorID,
 			&i.CategoryID,
 			&i.PublicationDate,
 			&i.ContentPath,
@@ -722,15 +1110,14 @@ func (q *Queries) ListDocuments(ctx context.Context, arg ListDocumentsParams) ([
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.CoverPath,
-			&i.Author.ID,
-			&i.Author.Name,
-			&i.Author.Bio,
-			&i.Author.CreatedAt,
-			&i.Author.UpdatedAt,
+			&i.DocumentTypeID,
 			&i.Category.ID,
 			&i.Category.Title,
 			&i.Category.Description,
 			&i.Category.CreatedAt,
+			&i.DocumentType.ID,
+			&i.DocumentType.Name,
+			&i.DocumentType.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -795,27 +1182,27 @@ UPDATE documents
 SET
     title = COALESCE($2, title),
     description = COALESCE($3, description),
-    author_id = COALESCE($4, author_id),
-    category_id = COALESCE($5, category_id),
-    publication_date = COALESCE($6, publication_date),
-    content_path = COALESCE($7, content_path),
-    current_version = COALESCE($8, current_version),
-    cover_path = COALESCE($9, cover_path),
+    category_id = COALESCE($4, category_id),
+    publication_date = COALESCE($5, publication_date),
+    content_path = COALESCE($6, content_path),
+    current_version = COALESCE($7, current_version),
+    cover_path = COALESCE($8, cover_path),
+    document_type_id = COALESCE($9, document_type_id),
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, title, description, author_id, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path
+RETURNING id, title, description, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path, document_type_id
 `
 
 type UpdateDocumentParams struct {
 	ID              uuid.UUID
 	Title           *string
 	Description     *string
-	AuthorID        *uuid.UUID
 	CategoryID      *int32
 	PublicationDate pgtype.Date
 	ContentPath     *string
 	CurrentVersion  *int32
 	CoverPath       *string
+	DocumentTypeID  *int32
 }
 
 // UpdateDocument
@@ -824,33 +1211,32 @@ type UpdateDocumentParams struct {
 //	SET
 //	    title = COALESCE($2, title),
 //	    description = COALESCE($3, description),
-//	    author_id = COALESCE($4, author_id),
-//	    category_id = COALESCE($5, category_id),
-//	    publication_date = COALESCE($6, publication_date),
-//	    content_path = COALESCE($7, content_path),
-//	    current_version = COALESCE($8, current_version),
-//	    cover_path = COALESCE($9, cover_path),
+//	    category_id = COALESCE($4, category_id),
+//	    publication_date = COALESCE($5, publication_date),
+//	    content_path = COALESCE($6, content_path),
+//	    current_version = COALESCE($7, current_version),
+//	    cover_path = COALESCE($8, cover_path),
+//	    document_type_id = COALESCE($9, document_type_id),
 //	    updated_at = NOW()
 //	WHERE id = $1
-//	RETURNING id, title, description, author_id, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path
+//	RETURNING id, title, description, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path, document_type_id
 func (q *Queries) UpdateDocument(ctx context.Context, arg UpdateDocumentParams) (Document, error) {
 	row := q.db.QueryRow(ctx, updateDocument,
 		arg.ID,
 		arg.Title,
 		arg.Description,
-		arg.AuthorID,
 		arg.CategoryID,
 		arg.PublicationDate,
 		arg.ContentPath,
 		arg.CurrentVersion,
 		arg.CoverPath,
+		arg.DocumentTypeID,
 	)
 	var i Document
 	err := row.Scan(
 		&i.ID,
 		&i.Title,
 		&i.Description,
-		&i.AuthorID,
 		&i.CategoryID,
 		&i.PublicationDate,
 		&i.ContentPath,
@@ -859,6 +1245,7 @@ func (q *Queries) UpdateDocument(ctx context.Context, arg UpdateDocumentParams) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CoverPath,
+		&i.DocumentTypeID,
 	)
 	return i, err
 }

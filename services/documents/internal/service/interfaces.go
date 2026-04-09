@@ -35,6 +35,8 @@ type DocumentRepository interface {
 	Update(ctx context.Context, doc *domain.Document) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	UpdateIndexedStatus(ctx context.Context, id uuid.UUID, indexed bool) error
+	AddDocumentAuthor(ctx context.Context, documentID, authorID uuid.UUID, typeID int) error
+	ClearDocumentAuthors(ctx context.Context, documentID uuid.UUID) error
 }
 
 // BookmarkRepository defines the interface for bookmark persistence.
@@ -70,6 +72,13 @@ type MetadataRepository interface {
 	ListCategories(ctx context.Context) ([]domain.Category, error)
 	CreateCategory(ctx context.Context, title string) (*domain.Category, error)
 	GetCategoryByID(ctx context.Context, id int) (*domain.Category, error)
+
+	// Document types
+	ListDocumentTypes(ctx context.Context) ([]domain.DocumentType, error)
+	GetDocumentTypeByID(ctx context.Context, id int) (*domain.DocumentType, error)
+
+	// Authorship types
+	ListAuthorshipTypes(ctx context.Context) ([]domain.AuthorshipType, error)
 
 	// Tags
 	ListTags(ctx context.Context) ([]domain.Tag, error)

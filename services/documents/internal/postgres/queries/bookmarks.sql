@@ -25,8 +25,8 @@ LIMIT 1;
 SELECT b.*
 FROM document_bookmarks b
 JOIN documents d ON d.id = b.document_id
-JOIN authors a ON a.id = d.author_id
-JOIN categories c ON c.id = d.category_id
+LEFT JOIN categories c ON c.id = d.category_id
+LEFT JOIN document_types dtp ON dtp.id = d.document_type_id
 WHERE b.user_id = $1
   AND (
     CASE
@@ -40,10 +40,21 @@ WHERE b.user_id = $1
       THEN (
         d.title ILIKE '%' || sqlc.narg('search')::text || '%'
         OR COALESCE(d.description, '') ILIKE '%' || sqlc.narg('search')::text || '%'
-        OR a.name ILIKE '%' || sqlc.narg('search')::text || '%'
-        OR c.title ILIKE '%' || sqlc.narg('search')::text || '%'
+        OR COALESCE(c.title, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+        OR COALESCE(dtp.name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
         OR COALESCE(b.quote_text, '') ILIKE '%' || sqlc.narg('search')::text || '%'
         OR COALESCE(b.quote_context, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+        OR EXISTS (
+          SELECT 1
+          FROM document_authors da
+          JOIN authors sa ON sa.id = da.author_id
+          JOIN authorship_types sat ON sat.id = da.type_id
+          WHERE da.document_id = d.id
+            AND (
+              sa.name ILIKE '%' || sqlc.narg('search')::text || '%'
+              OR sat.title ILIKE '%' || sqlc.narg('search')::text || '%'
+            )
+        )
         OR EXISTS (
           SELECT 1
           FROM document_tags dt
@@ -62,8 +73,8 @@ LIMIT $2 OFFSET $3;
 SELECT COUNT(*)
 FROM document_bookmarks b
 JOIN documents d ON d.id = b.document_id
-JOIN authors a ON a.id = d.author_id
-JOIN categories c ON c.id = d.category_id
+LEFT JOIN categories c ON c.id = d.category_id
+LEFT JOIN document_types dtp ON dtp.id = d.document_type_id
 WHERE b.user_id = $1
   AND (
     CASE
@@ -77,10 +88,21 @@ WHERE b.user_id = $1
       THEN (
         d.title ILIKE '%' || sqlc.narg('search')::text || '%'
         OR COALESCE(d.description, '') ILIKE '%' || sqlc.narg('search')::text || '%'
-        OR a.name ILIKE '%' || sqlc.narg('search')::text || '%'
-        OR c.title ILIKE '%' || sqlc.narg('search')::text || '%'
+        OR COALESCE(c.title, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+        OR COALESCE(dtp.name, '') ILIKE '%' || sqlc.narg('search')::text || '%'
         OR COALESCE(b.quote_text, '') ILIKE '%' || sqlc.narg('search')::text || '%'
         OR COALESCE(b.quote_context, '') ILIKE '%' || sqlc.narg('search')::text || '%'
+        OR EXISTS (
+          SELECT 1
+          FROM document_authors da
+          JOIN authors sa ON sa.id = da.author_id
+          JOIN authorship_types sat ON sat.id = da.type_id
+          WHERE da.document_id = d.id
+            AND (
+              sa.name ILIKE '%' || sqlc.narg('search')::text || '%'
+              OR sat.title ILIKE '%' || sqlc.narg('search')::text || '%'
+            )
+        )
         OR EXISTS (
           SELECT 1
           FROM document_tags dt

@@ -39,12 +39,14 @@ const (
 	SubjectDocumentsCoverUpload = "documents.cover.upload"
 
 	// Metadata subjects
-	SubjectAuthorsList      = "documents.authors.list"
-	SubjectAuthorsCreate    = "documents.authors.create"
-	SubjectCategoriesList   = "documents.categories.list"
-	SubjectCategoriesCreate = "documents.categories.create"
-	SubjectTagsList         = "documents.tags.list"
-	SubjectTagsCreate       = "documents.tags.create"
+	SubjectAuthorsList         = "documents.authors.list"
+	SubjectAuthorsCreate       = "documents.authors.create"
+	SubjectCategoriesList      = "documents.categories.list"
+	SubjectCategoriesCreate    = "documents.categories.create"
+	SubjectDocumentTypesList   = "documents.types.list"
+	SubjectAuthorshipTypesList = "documents.authorship-types.list"
+	SubjectTagsList            = "documents.tags.list"
+	SubjectTagsCreate          = "documents.tags.create"
 
 	// Default timeout for NATS requests
 	defaultTimeout = 5 * time.Second
@@ -72,12 +74,13 @@ func NewNATSDocumentConnector(client *natsw.Client, timeout time.Duration) *NATS
 func (c *NATSDocumentConnector) ListDocuments(ctx context.Context, query domain.ListDocumentsQuery) (*domain.ListDocumentsResponse, error) {
 	// Convert to dto type
 	dtoQuery := documents.ListDocumentsQuery{
-		Page:       query.Page,
-		Limit:      query.Limit,
-		AuthorID:   query.AuthorID,
-		CategoryID: query.CategoryID,
-		TagID:      query.TagID,
-		Search:     query.Search,
+		Page:           query.Page,
+		Limit:          query.Limit,
+		AuthorID:       query.AuthorID,
+		CategoryID:     query.CategoryID,
+		DocumentTypeID: query.DocumentTypeID,
+		TagID:          query.TagID,
+		Search:         query.Search,
 	}
 
 	reqData, err := dtoQuery.MarshalJSON()
@@ -291,8 +294,9 @@ func (c *NATSDocumentConnector) CreateDocument(ctx context.Context, req domain.C
 	dtoReq := documents.CreateDocumentRequest{
 		Title:           req.Title,
 		Description:     req.Description,
-		AuthorID:        req.AuthorID,
-		CategoryID:      req.CategoryID,
+		CategoryID:      intValue(req.CategoryID),
+		DocumentTypeID:  req.DocumentTypeID,
+		Participants:    toDTOParticipantRefs(req.Participants),
 		PublicationDate: req.PublicationDate,
 		TagIDs:          req.TagIDs,
 		Content:         req.Content, // Передаем контент вместе с остальными данными
@@ -336,8 +340,9 @@ func (c *NATSDocumentConnector) UpdateDocument(ctx context.Context, req domain.U
 		ID:              req.ID,
 		Title:           req.Title,
 		Description:     req.Description,
-		AuthorID:        req.AuthorID,
-		CategoryID:      req.CategoryID,
+		CategoryID:      intValue(req.CategoryID),
+		DocumentTypeID:  req.DocumentTypeID,
+		Participants:    toDTOParticipantRefs(req.Participants),
 		PublicationDate: req.PublicationDate,
 		TagIDs:          req.TagIDs,
 	}
@@ -410,6 +415,8 @@ func convertDocument(dto documents.Document) domain.Document {
 		ID:              dto.ID,
 		Title:           dto.Title,
 		Description:     dto.Description,
+		DocumentType:    nil,
+		Participants:    nil,
 		PublicationDate: dto.PublicationDate,
 		CoverURL:        dto.CoverURL,
 		Additional: domain.Additional{
@@ -441,6 +448,29 @@ func convertDocument(dto documents.Document) domain.Document {
 			doc.Tags[i] = domain.Tag{
 				ID:    tag.ID,
 				Title: tag.Title,
+			}
+		}
+	}
+
+	if dto.DocumentType != nil {
+		doc.DocumentType = &domain.DocumentType{
+			ID:   dto.DocumentType.ID,
+			Name: dto.DocumentType.Name,
+		}
+	}
+
+	if len(dto.Participants) > 0 {
+		doc.Participants = make([]domain.DocumentParticipant, len(dto.Participants))
+		for i, participant := range dto.Participants {
+			doc.Participants[i] = domain.DocumentParticipant{
+				Author: domain.Author{
+					ID:   participant.Author.ID,
+					Name: participant.Author.Name,
+				},
+				AuthorshipType: domain.AuthorshipType{
+					ID:    participant.AuthorshipType.ID,
+					Title: participant.AuthorshipType.Title,
+				},
 			}
 		}
 	}
@@ -705,6 +735,81 @@ func (c *NATSDocumentConnector) ListTags(ctx context.Context) (*domain.ListTagsR
 	return &domain.ListTagsResponse{
 		Tags: tags,
 	}, nil
+}
+
+// ListDocumentTypes retrieves all document types.
+func (c *NATSDocumentConnector) ListDocumentTypes(ctx context.Context) (*domain.ListDocumentTypesResponse, error) {
+	msg := nats.NewMsg(SubjectDocumentTypesList)
+	msg.Data = []byte("{}")
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send list document types request: %w", err)
+	}
+
+	var dtoResponse documents.ListDocumentTypesResponse
+	if err := dtoResponse.UnmarshalJSON(respMsg.Data); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal list document types response: %w", err)
+	}
+
+	documentTypes := make([]domain.DocumentType, len(dtoResponse.DocumentTypes))
+	for i, dtoType := range dtoResponse.DocumentTypes {
+		documentTypes[i] = domain.DocumentType{ID: dtoType.ID, Name: dtoType.Name}
+	}
+
+	return &domain.ListDocumentTypesResponse{DocumentTypes: documentTypes}, nil
+}
+
+// ListAuthorshipTypes retrieves all authorship types.
+func (c *NATSDocumentConnector) ListAuthorshipTypes(ctx context.Context) (*domain.ListAuthorshipTypesResponse, error) {
+	msg := nats.NewMsg(SubjectAuthorshipTypesList)
+	msg.Data = []byte("{}")
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send list authorship types request: %w", err)
+	}
+
+	var dtoResponse documents.ListAuthorshipTypesResponse
+	if err := dtoResponse.UnmarshalJSON(respMsg.Data); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal list authorship types response: %w", err)
+	}
+
+	authorshipTypes := make([]domain.AuthorshipType, len(dtoResponse.AuthorshipTypes))
+	for i, dtoType := range dtoResponse.AuthorshipTypes {
+		authorshipTypes[i] = domain.AuthorshipType{ID: dtoType.ID, Title: dtoType.Title}
+	}
+
+	return &domain.ListAuthorshipTypesResponse{AuthorshipTypes: authorshipTypes}, nil
+}
+
+func toDTOParticipantRefs(participants []domain.DocumentParticipantRef) []documents.DocumentParticipantRef {
+	if len(participants) == 0 {
+		return nil
+	}
+	result := make([]documents.DocumentParticipantRef, 0, len(participants))
+	for _, participant := range participants {
+		authorID, err := uuid.Parse(participant.AuthorID)
+		if err != nil {
+			continue
+		}
+		result = append(result, documents.DocumentParticipantRef{AuthorID: authorID, TypeID: participant.TypeID})
+	}
+	return result
+}
+
+func intValue[T ~int | *int](value T) int {
+	switch v := any(value).(type) {
+	case int:
+		return v
+	case *int:
+		if v == nil {
+			return 0
+		}
+		return *v
+	default:
+		return 0
+	}
 }
 
 // CreateTag creates a new tag

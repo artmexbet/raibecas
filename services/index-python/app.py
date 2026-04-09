@@ -52,6 +52,9 @@ class App:
         await self.nats_connector.subscribe(const.DOCUMENT_CREATED_SUBJECT, self.document_created_handler)
         logger.info("subscribed to %s", const.DOCUMENT_CREATED_SUBJECT)
 
+        await self.nats_connector.subscribe(const.DOCUMENT_UPDATED_SUBJECT, self.document_updated_handler)
+        logger.info("subscribed to %s", const.DOCUMENT_UPDATED_SUBJECT)
+
     async def _keep_alive(self) -> None:
         try:
             while True:
@@ -76,24 +79,29 @@ class App:
 
     async def document_created_handler(self, msg: Msg) -> None:
         """Handles corpus.document.created events from the documents service."""
-        logger.info("received document.created event")
+        await self._handle_document_event(msg, source=const.DOCUMENT_CREATED_SUBJECT)
+
+    async def document_updated_handler(self, msg: Msg) -> None:
+        """Handles corpus.document.updated events from the documents service."""
+        await self._handle_document_event(msg, source=const.DOCUMENT_UPDATED_SUBJECT)
+
+    async def _handle_document_event(self, msg: Msg, source: str) -> None:
+        logger.info("received %s event", source)
         try:
             payload = json.loads(msg.data.decode())
 
             document_id = payload.get("document_id")
             title = payload.get("title", "")
             content_path = payload.get("content_path")
-            author_id = payload.get("author_id")
-            category_id = payload.get("category_id")
-            version = payload.get("version", 1)
+            version = payload.get("version") or payload.get("new_version") or 1
 
             if not content_path:
-                logger.error("document_created event missing content_path: %s", payload)
+                logger.error("document event missing content_path: %s", payload)
                 return
 
             logger.info(
-                "indexing document from MinIO: document_id=%s title=%s path=%s",
-                document_id, title, content_path,
+                "indexing document from MinIO: document_id=%s title=%s path=%s source=%s",
+                document_id, title, content_path, source,
             )
 
             text = await self.minio_loader.load(content_path)
@@ -103,18 +111,13 @@ class App:
                 path=content_path,
                 content=text,
                 document_id=str(document_id) if document_id else None,
-                metadata={
-                    "author_id": str(author_id) if author_id else "",
-                    "category_id": str(category_id) if category_id else "",
-                    "version": str(version),
-                    "source": "corpus.document.created",
-                },
+                metadata=self._event_metadata(payload, version, source),
             )
 
             await self._process_document(request, text)
-            logger.info("successfully indexed document: document_id=%s", document_id)
+            logger.info("successfully indexed document: document_id=%s source=%s", document_id, source)
         except Exception as exc:  # pylint: disable=broad-except
-            logger.exception("failed to handle document_created event: %s", exc)
+            logger.exception("failed to handle %s event: %s", source, exc)
 
     async def _process_document(self, request: DocumentIndexRequest, text: str) -> None:
         document_id = request.document_id or str(uuid.uuid4())
@@ -146,6 +149,45 @@ class App:
             "path": request.path,
             **request.metadata,
         }
+
+    @staticmethod
+    def _event_metadata(payload: Dict[str, Any], version: Any, source: str) -> Dict[str, str]:
+        participants = payload.get("participants") or []
+        tags = payload.get("tags") or []
+
+        def _safe_string(value: Any) -> str:
+            return "" if value is None else str(value)
+
+        participant_names = [str(item.get("name", "")).strip() for item in participants if isinstance(item, dict) and item.get("name")]
+        participant_roles = [str(item.get("type_title", "")).strip() for item in participants if isinstance(item, dict) and item.get("type_title")]
+        tag_titles = [str(item.get("title", "")).strip() for item in tags if isinstance(item, dict) and item.get("title")]
+
+        metadata = {
+            "category_id": _safe_string(payload.get("category_id")),
+            "document_type_id": _safe_string(payload.get("document_type_id")),
+            "document_type": _safe_string(payload.get("document_type")),
+            "publication_date": _safe_string(payload.get("publication_date")),
+            "description": _safe_string(payload.get("description")),
+            "version": _safe_string(version),
+            "source": source,
+            "participant_names": " | ".join(participant_names),
+            "participant_roles": " | ".join(participant_roles),
+            "tag_titles": " | ".join(tag_titles),
+        }
+
+        for index, participant in enumerate(participants):
+            if isinstance(participant, dict):
+                metadata[f"participant_{index}_author_id"] = _safe_string(participant.get("author_id"))
+                metadata[f"participant_{index}_name"] = _safe_string(participant.get("name"))
+                metadata[f"participant_{index}_type_id"] = _safe_string(participant.get("type_id"))
+                metadata[f"participant_{index}_type_title"] = _safe_string(participant.get("type_title"))
+
+        for index, tag in enumerate(tags):
+            if isinstance(tag, dict):
+                metadata[f"tag_{index}_id"] = _safe_string(tag.get("id"))
+                metadata[f"tag_{index}_title"] = _safe_string(tag.get("title"))
+
+        return metadata
 
     def run(self) -> None:
         asyncio.run(self.__run())
