@@ -1,0 +1,28 @@
+sequenceDiagram
+    actor User as Исследователь
+    participant WS as WebSocket<br/>(Gateway)
+    participant Chat as Chat-сервис
+    participant Qdrant as Qdrant<br/>(векторная БД)
+    participant Ollama as Ollama LLM<br/>(gemma3:4b)
+
+    Note over User,Ollama: Подготовка корпуса (происходит при загрузке документа)
+    Note over Qdrant: Текст → чанки → эмбеддинги → хранятся в Qdrant
+
+    Note over User,Ollama: Диалог с текстом (в реальном времени)
+
+    User->>WS: "Как Райбекас определяет категорию «вещь»?"
+    WS->>Chat: передаёт вопрос
+
+    Chat->>Ollama: embed(вопрос) → вектор запроса
+    Ollama-->>Chat: [0.23, -0.11, 0.87, ...]
+
+    Chat->>Qdrant: поиск ближайших векторов (top-5)
+    Qdrant-->>Chat: 5 релевантных фрагментов текста + источники
+
+    Chat->>Ollama: prompt = системный_контекст +<br/>фрагменты + вопрос пользователя
+    Note over Ollama: Генерация ответа<br/>строго на основе предоставленных фрагментов
+
+    Ollama-->>Chat: streaming ответ (токен за токеном)
+    Chat-->>WS: streaming → WebSocket
+    WS-->>User: текст ответа + список источников с цитатами
+
