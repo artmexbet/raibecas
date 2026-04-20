@@ -15,8 +15,8 @@ const countBookmarksByUser = `-- name: CountBookmarksByUser :one
 SELECT COUNT(*)
 FROM document_bookmarks b
 JOIN documents d ON d.id = b.document_id
-JOIN authors a ON a.id = d.author_id
-JOIN categories c ON c.id = d.category_id
+LEFT JOIN categories c ON c.id = d.category_id
+LEFT JOIN document_types dtp ON dtp.id = d.document_type_id
 WHERE b.user_id = $1
   AND (
     CASE
@@ -30,10 +30,21 @@ WHERE b.user_id = $1
       THEN (
         d.title ILIKE '%' || $3::text || '%'
         OR COALESCE(d.description, '') ILIKE '%' || $3::text || '%'
-        OR a.name ILIKE '%' || $3::text || '%'
-        OR c.title ILIKE '%' || $3::text || '%'
+        OR COALESCE(c.title, '') ILIKE '%' || $3::text || '%'
+        OR COALESCE(dtp.name, '') ILIKE '%' || $3::text || '%'
         OR COALESCE(b.quote_text, '') ILIKE '%' || $3::text || '%'
         OR COALESCE(b.quote_context, '') ILIKE '%' || $3::text || '%'
+        OR EXISTS (
+          SELECT 1
+          FROM document_authors da
+          JOIN authors sa ON sa.id = da.author_id
+          JOIN authorship_types sat ON sat.id = da.type_id
+          WHERE da.document_id = d.id
+            AND (
+              sa.name ILIKE '%' || $3::text || '%'
+              OR sat.title ILIKE '%' || $3::text || '%'
+            )
+        )
         OR EXISTS (
           SELECT 1
           FROM document_tags dt
@@ -58,8 +69,8 @@ type CountBookmarksByUserParams struct {
 //	SELECT COUNT(*)
 //	FROM document_bookmarks b
 //	JOIN documents d ON d.id = b.document_id
-//	JOIN authors a ON a.id = d.author_id
-//	JOIN categories c ON c.id = d.category_id
+//	LEFT JOIN categories c ON c.id = d.category_id
+//	LEFT JOIN document_types dtp ON dtp.id = d.document_type_id
 //	WHERE b.user_id = $1
 //	  AND (
 //	    CASE
@@ -73,10 +84,21 @@ type CountBookmarksByUserParams struct {
 //	      THEN (
 //	        d.title ILIKE '%' || $3::text || '%'
 //	        OR COALESCE(d.description, '') ILIKE '%' || $3::text || '%'
-//	        OR a.name ILIKE '%' || $3::text || '%'
-//	        OR c.title ILIKE '%' || $3::text || '%'
+//	        OR COALESCE(c.title, '') ILIKE '%' || $3::text || '%'
+//	        OR COALESCE(dtp.name, '') ILIKE '%' || $3::text || '%'
 //	        OR COALESCE(b.quote_text, '') ILIKE '%' || $3::text || '%'
 //	        OR COALESCE(b.quote_context, '') ILIKE '%' || $3::text || '%'
+//	        OR EXISTS (
+//	          SELECT 1
+//	          FROM document_authors da
+//	          JOIN authors sa ON sa.id = da.author_id
+//	          JOIN authorship_types sat ON sat.id = da.type_id
+//	          WHERE da.document_id = d.id
+//	            AND (
+//	              sa.name ILIKE '%' || $3::text || '%'
+//	              OR sat.title ILIKE '%' || $3::text || '%'
+//	            )
+//	        )
 //	        OR EXISTS (
 //	          SELECT 1
 //	          FROM document_tags dt
@@ -249,8 +271,8 @@ const listBookmarksByUser = `-- name: ListBookmarksByUser :many
 SELECT b.id, b.user_id, b.document_id, b.kind, b.quote_text, b.quote_context, b.page_label, b.created_at, b.updated_at
 FROM document_bookmarks b
 JOIN documents d ON d.id = b.document_id
-JOIN authors a ON a.id = d.author_id
-JOIN categories c ON c.id = d.category_id
+LEFT JOIN categories c ON c.id = d.category_id
+LEFT JOIN document_types dtp ON dtp.id = d.document_type_id
 WHERE b.user_id = $1
   AND (
     CASE
@@ -264,10 +286,21 @@ WHERE b.user_id = $1
       THEN (
         d.title ILIKE '%' || $5::text || '%'
         OR COALESCE(d.description, '') ILIKE '%' || $5::text || '%'
-        OR a.name ILIKE '%' || $5::text || '%'
-        OR c.title ILIKE '%' || $5::text || '%'
+        OR COALESCE(c.title, '') ILIKE '%' || $5::text || '%'
+        OR COALESCE(dtp.name, '') ILIKE '%' || $5::text || '%'
         OR COALESCE(b.quote_text, '') ILIKE '%' || $5::text || '%'
         OR COALESCE(b.quote_context, '') ILIKE '%' || $5::text || '%'
+        OR EXISTS (
+          SELECT 1
+          FROM document_authors da
+          JOIN authors sa ON sa.id = da.author_id
+          JOIN authorship_types sat ON sat.id = da.type_id
+          WHERE da.document_id = d.id
+            AND (
+              sa.name ILIKE '%' || $5::text || '%'
+              OR sat.title ILIKE '%' || $5::text || '%'
+            )
+        )
         OR EXISTS (
           SELECT 1
           FROM document_tags dt
@@ -296,8 +329,8 @@ type ListBookmarksByUserParams struct {
 //	SELECT b.id, b.user_id, b.document_id, b.kind, b.quote_text, b.quote_context, b.page_label, b.created_at, b.updated_at
 //	FROM document_bookmarks b
 //	JOIN documents d ON d.id = b.document_id
-//	JOIN authors a ON a.id = d.author_id
-//	JOIN categories c ON c.id = d.category_id
+//	LEFT JOIN categories c ON c.id = d.category_id
+//	LEFT JOIN document_types dtp ON dtp.id = d.document_type_id
 //	WHERE b.user_id = $1
 //	  AND (
 //	    CASE
@@ -311,10 +344,21 @@ type ListBookmarksByUserParams struct {
 //	      THEN (
 //	        d.title ILIKE '%' || $5::text || '%'
 //	        OR COALESCE(d.description, '') ILIKE '%' || $5::text || '%'
-//	        OR a.name ILIKE '%' || $5::text || '%'
-//	        OR c.title ILIKE '%' || $5::text || '%'
+//	        OR COALESCE(c.title, '') ILIKE '%' || $5::text || '%'
+//	        OR COALESCE(dtp.name, '') ILIKE '%' || $5::text || '%'
 //	        OR COALESCE(b.quote_text, '') ILIKE '%' || $5::text || '%'
 //	        OR COALESCE(b.quote_context, '') ILIKE '%' || $5::text || '%'
+//	        OR EXISTS (
+//	          SELECT 1
+//	          FROM document_authors da
+//	          JOIN authors sa ON sa.id = da.author_id
+//	          JOIN authorship_types sat ON sat.id = da.type_id
+//	          WHERE da.document_id = d.id
+//	            AND (
+//	              sa.name ILIKE '%' || $5::text || '%'
+//	              OR sat.title ILIKE '%' || $5::text || '%'
+//	            )
+//	        )
 //	        OR EXISTS (
 //	          SELECT 1
 //	          FROM document_tags dt

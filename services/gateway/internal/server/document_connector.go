@@ -51,6 +51,12 @@ type DocumentServiceConnector interface {
 	// CreateCategory creates a new category
 	CreateCategory(ctx context.Context, req domain.CreateCategoryRequest, userRole string) (*domain.CreateCategoryResponse, error)
 
+	// ListDocumentTypes retrieves all document types
+	ListDocumentTypes(ctx context.Context) (*domain.ListDocumentTypesResponse, error)
+
+	// ListAuthorshipTypes retrieves all authorship types
+	ListAuthorshipTypes(ctx context.Context) (*domain.ListAuthorshipTypesResponse, error)
+
 	// ListTags retrieves all tags
 	ListTags(ctx context.Context) (*domain.ListTagsResponse, error)
 

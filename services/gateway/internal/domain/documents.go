@@ -12,12 +12,13 @@ import (
 
 // ListDocumentsQuery represents query parameters for listing documents
 type ListDocumentsQuery struct {
-	Page       int       `query:"page" validate:"omitempty,min=1"`
-	Limit      int       `query:"limit" validate:"omitempty,min=1,max=100"`
-	AuthorID   uuid.UUID `query:"authorId" validate:"omitempty,uuid"`
-	CategoryID int       `query:"categoryId" validate:"omitempty,min=1"`
-	TagID      int       `query:"tagId" validate:"omitempty,min=1"`
-	Search     string    `query:"search" validate:"omitempty,min=1,max=255"`
+	Page           int       `query:"page" validate:"omitempty,min=1"`
+	Limit          int       `query:"limit" validate:"omitempty,min=1,max=100"`
+	AuthorID       uuid.UUID `query:"authorId" validate:"omitempty,uuid"`
+	CategoryID     int       `query:"categoryId" validate:"omitempty,min=1"`
+	DocumentTypeID int       `query:"documentTypeId" validate:"omitempty,min=1"`
+	TagID          int       `query:"tagId" validate:"omitempty,min=1"`
+	Search         string    `query:"search" validate:"omitempty,min=1,max=255"`
 }
 
 // ListDocumentsResponse represents the response for listing documents
@@ -31,13 +32,14 @@ type ListDocumentsResponse struct {
 
 // CreateDocumentRequest represents a document creation request
 type CreateDocumentRequest struct {
-	Title           string    `json:"title" validate:"required,min=1,max=255"`
-	Description     *string   `json:"description" validate:"omitempty,max=1000"`
-	AuthorID        uuid.UUID `json:"authorId" validate:"required,uuid"`
-	CategoryID      int       `json:"categoryId" validate:"required,min=1"`
-	PublicationDate time.Time `json:"publicationDate" validate:"required"`
-	TagIDs          []int     `json:"tagIds" validate:"omitempty,dive,min=1"`
-	Content         string    `json:"content" validate:"omitempty"`
+	Title           string                   `json:"title" validate:"required,min=1,max=255"`
+	Description     *string                  `json:"description" validate:"omitempty,max=4000"`
+	CategoryID      int                      `json:"categoryId,omitempty" validate:"omitempty,min=1"`
+	DocumentTypeID  int                      `json:"documentTypeId" validate:"required,min=1"`
+	Participants    []DocumentParticipantRef `json:"participants" validate:"required,min=1,dive"`
+	PublicationDate time.Time                `json:"publicationDate" validate:"required"`
+	TagIDs          []int                    `json:"tagIds" validate:"omitempty,dive,min=1"`
+	Content         string                   `json:"content" validate:"omitempty"`
 }
 
 // CreateDocumentResponse represents a document creation response
@@ -52,13 +54,14 @@ type GetDocumentResponse struct {
 
 // UpdateDocumentRequest represents a document update request
 type UpdateDocumentRequest struct {
-	ID              uuid.UUID  `json:"id" validate:"required,uuid"`
-	Title           *string    `json:"title" validate:"omitempty,min=1,max=255"`
-	Description     *string    `json:"description" validate:"omitempty,max=1000"`
-	AuthorID        *uuid.UUID `json:"authorId" validate:"omitempty,uuid"`
-	CategoryID      *int       `json:"categoryId" validate:"omitempty,min=1"`
-	PublicationDate *time.Time `json:"publicationDate" validate:"omitempty"`
-	TagIDs          []int      `json:"tagIds" validate:"omitempty,dive,min=1"`
+	ID              uuid.UUID                `json:"id" validate:"required,uuid"`
+	Title           *string                  `json:"title" validate:"omitempty,min=1,max=255"`
+	Description     *string                  `json:"description" validate:"omitempty,max=4000"`
+	CategoryID      int                      `json:"categoryId,omitempty" validate:"omitempty,min=1"`
+	DocumentTypeID  *int                     `json:"documentTypeId,omitempty" validate:"omitempty,min=1"`
+	Participants    []DocumentParticipantRef `json:"participants,omitempty" validate:"omitempty,min=1,dive"`
+	PublicationDate *time.Time               `json:"publicationDate" validate:"omitempty"`
+	TagIDs          []int                    `json:"tagIds" validate:"omitempty,dive,min=1"`
 }
 
 // UpdateDocumentResponse represents a document update response
@@ -98,6 +101,16 @@ type CreateCategoryResponse struct {
 // ListCategoriesResponse represents the response for listing categories
 type ListCategoriesResponse struct {
 	Categories []Category `json:"categories"`
+}
+
+// ListDocumentTypesResponse represents the response for listing document types.
+type ListDocumentTypesResponse struct {
+	DocumentTypes []DocumentType `json:"documentTypes"`
+}
+
+// ListAuthorshipTypesResponse represents the response for listing authorship types.
+type ListAuthorshipTypesResponse struct {
+	AuthorshipTypes []AuthorshipType `json:"authorshipTypes"`
 }
 
 // Tag metadata DTOs

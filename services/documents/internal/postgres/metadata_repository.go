@@ -139,6 +139,58 @@ func (r *MetadataRepository) GetCategoryByID(ctx context.Context, id int) (*doma
 	}, nil
 }
 
+// ListDocumentTypes retrieves all document types.
+func (r *MetadataRepository) ListDocumentTypes(ctx context.Context) ([]domain.DocumentType, error) {
+	rows, err := r.queries.ListDocumentTypes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list document types: %w", err)
+	}
+
+	types := make([]domain.DocumentType, len(rows))
+	for i, row := range rows {
+		types[i] = domain.DocumentType{
+			ID:        int(row.ID),
+			Name:      row.Name,
+			CreatedAt: row.CreatedAt,
+		}
+	}
+
+	return types, nil
+}
+
+// GetDocumentTypeByID retrieves a document type by ID.
+func (r *MetadataRepository) GetDocumentTypeByID(ctx context.Context, id int) (*domain.DocumentType, error) {
+	row, err := r.queries.GetDocumentTypeByID(ctx, int32(id))
+	if err != nil {
+		return nil, fmt.Errorf("get document type: %w", err)
+	}
+
+	return &domain.DocumentType{
+		ID:        int(row.ID),
+		Name:      row.Name,
+		CreatedAt: row.CreatedAt,
+	}, nil
+}
+
+// ListAuthorshipTypes retrieves all authorship types.
+func (r *MetadataRepository) ListAuthorshipTypes(ctx context.Context) ([]domain.AuthorshipType, error) {
+	rows, err := r.queries.ListAuthorshipTypes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list authorship types: %w", err)
+	}
+
+	types := make([]domain.AuthorshipType, len(rows))
+	for i, row := range rows {
+		types[i] = domain.AuthorshipType{
+			ID:        int(row.ID),
+			Title:     row.Title,
+			CreatedAt: row.CreatedAt,
+		}
+	}
+
+	return types, nil
+}
+
 // ListTags retrieves all tags
 func (r *MetadataRepository) ListTags(ctx context.Context) ([]domain.Tag, error) {
 	rows, err := r.queries.ListTags(ctx)

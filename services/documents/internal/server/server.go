@@ -19,12 +19,14 @@ const (
 	subjectDocumentsCoverUpload = "documents.cover.upload"
 
 	// Metadata subjects
-	subjectAuthorsList      = "documents.authors.list"
-	subjectAuthorsCreate    = "documents.authors.create"
-	subjectCategoriesList   = "documents.categories.list"
-	subjectCategoriesCreate = "documents.categories.create"
-	subjectTagsList         = "documents.tags.list"
-	subjectTagsCreate       = "documents.tags.create"
+	subjectAuthorsList        = "documents.authors.list"
+	subjectAuthorsCreate      = "documents.authors.create"
+	subjectCategoriesList     = "documents.categories.list"
+	subjectCategoriesCreate   = "documents.categories.create"
+	subjectDocumentTypesList  = "documents.types.list"
+	subjectAuthorshipTypesList = "documents.authorship-types.list"
+	subjectTagsList           = "documents.tags.list"
+	subjectTagsCreate         = "documents.tags.create"
 )
 
 // Server represents the NATS server with subscriptions
@@ -68,6 +70,8 @@ func (s *Server) Start() error {
 	s.client.Subscribe(subjectAuthorsCreate, s.metadataHandler.HandleCreateAuthor)
 	s.client.Subscribe(subjectCategoriesList, s.metadataHandler.HandleListCategories)
 	s.client.Subscribe(subjectCategoriesCreate, s.metadataHandler.HandleCreateCategory)
+	s.client.Subscribe(subjectDocumentTypesList, s.metadataHandler.HandleListDocumentTypes)
+	s.client.Subscribe(subjectAuthorshipTypesList, s.metadataHandler.HandleListAuthorshipTypes)
 	s.client.Subscribe(subjectTagsList, s.metadataHandler.HandleListTags)
 	s.client.Subscribe(subjectTagsCreate, s.metadataHandler.HandleCreateTag)
 

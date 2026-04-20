@@ -12,6 +12,8 @@
     <file url="file://$PROJECT_DIR$/services/documents/migrations/000002_create_documents_table.up.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/services/documents/migrations/000003_create_document_versions_table.up.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/services/documents/migrations/000004_seed_data.up.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/services/documents/migrations/000007_extend_documents_metadata.up.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/services/documents/migrations/000008_drop_legacy_document_author.up.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/services/users/migrations/000001_create_users_table.up.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/services/users/migrations/000002_create_registration_requests_table.up.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/services/users/migrations/000003_create_outbox_table.up.sql" dialect="PostgreSQL" />

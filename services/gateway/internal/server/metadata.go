@@ -137,6 +137,34 @@ func (s *Server) createCategory(c *fiber.Ctx) error {
 	return c.Status(http.StatusCreated).JSON(response)
 }
 
+// listDocumentTypes handles GET /document-types - list all document types.
+func (s *Server) listDocumentTypes(c *fiber.Ctx) error {
+	response, err := s.documentConnector.ListDocumentTypes(c.UserContext())
+	if err != nil {
+		slog.Error("failed to list document types", "error", err)
+		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to retrieve document types",
+		})
+	}
+
+	return c.Status(http.StatusOK).JSON(response)
+}
+
+// listAuthorshipTypes handles GET /authorship-types - list all authorship types.
+func (s *Server) listAuthorshipTypes(c *fiber.Ctx) error {
+	response, err := s.documentConnector.ListAuthorshipTypes(c.UserContext())
+	if err != nil {
+		slog.Error("failed to list authorship types", "error", err)
+		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to retrieve authorship types",
+		})
+	}
+
+	return c.Status(http.StatusOK).JSON(response)
+}
+
 // listTags handles GET /tags - list all tags
 func (s *Server) listTags(c *fiber.Ctx) error {
 	// Call document service via connector

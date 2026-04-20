@@ -24,6 +24,34 @@ func (_m *MockDocumentRepository) EXPECT() *MockDocumentRepository_Expecter {
 	return &MockDocumentRepository_Expecter{mock: &_m.Mock}
 }
 
+// AddDocumentAuthor provides a mock function with given fields: ctx, documentID, authorID, typeID
+func (_m *MockDocumentRepository) AddDocumentAuthor(ctx context.Context, documentID uuid.UUID, authorID uuid.UUID, typeID int) error {
+	ret := _m.Called(ctx, documentID, authorID, typeID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AddDocumentAuthor")
+	}
+
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID, uuid.UUID, int) error); ok {
+		return rf(ctx, documentID, authorID, typeID)
+	}
+	return ret.Error(0)
+}
+
+// ClearDocumentAuthors provides a mock function with given fields: ctx, documentID
+func (_m *MockDocumentRepository) ClearDocumentAuthors(ctx context.Context, documentID uuid.UUID) error {
+	ret := _m.Called(ctx, documentID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ClearDocumentAuthors")
+	}
+
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) error); ok {
+		return rf(ctx, documentID)
+	}
+	return ret.Error(0)
+}
+
 // Count provides a mock function with given fields: ctx, params
 func (_m *MockDocumentRepository) Count(ctx context.Context, params domain.ListDocumentsParams) (int, error) {
 	ret := _m.Called(ctx, params)
