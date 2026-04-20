@@ -1,0 +1,49 @@
+graph TD
+    Browser["🖥️ Браузер пользователя"]
+    Gateway["API-шлюз\n(Go + Fiber)"]
+    NATS[("NATS\nброкер сообщений")]
+
+    subgraph Services["Основные сервисы (Go)"]
+        Auth["Аутентификация\nJWT + HttpOnly cookies"]
+        Docs["Документы и корпус\nCRUD + MinIO"]
+        Users["Пользователи\nФрагменты · Заметки"]
+        Chat["Чат-сервис\nWebSocket"]
+    end
+
+    subgraph ML["ML-пайплайн (Python)"]
+        Indexer["Индексация\nChunking → Embeddings"]
+        Ollama["Ollama LLM\ngemma3:4b"]
+    end
+
+    subgraph Storage["Хранилища данных"]
+        PG[("PostgreSQL\nосновная БД")]
+        Qdrant[("Qdrant\nвекторная БД")]
+        Redis[("Redis\nкэш / сессии")]
+    end
+
+    Browser -->|"HTTP / WebSocket"| Gateway
+    Gateway <-->|"Request-Reply"| NATS
+    NATS <--> Auth
+    NATS <--> Docs
+    NATS <--> Users
+    NATS <--> Chat
+
+    Docs -->|"corpus.document.created"| NATS
+    NATS -->|"событие"| Indexer
+    Indexer --> Ollama
+    Indexer --> Qdrant
+
+    Chat --> Qdrant
+    Chat --> Ollama
+
+    Auth --> PG
+    Docs --> PG
+    Users --> PG
+    Gateway --> Redis
+
+    style Browser fill:#e8f4f8
+    style Gateway fill:#ffd700,color:#000
+    style NATS fill:#ff6b35,color:#fff
+    style ML fill:#e8f8e8
+    style Storage fill:#f8f0e8
+
