@@ -1,0 +1,32 @@
+%% Слайд 6 — Зачем это гуманитарию
+flowchart LR
+    subgraph researcher ["Исследователь"]
+        R1["«Что значит\nнайти нужное место?»"]
+        R2["«Что достойно\nсохранить как фрагмент?»"]
+        R3["«Какие метаданные\nнесут смысл?»"]
+    end
+
+    subgraph system ["Система"]
+        S1["Семантический поиск\nпо векторам смысла"]
+        S2["UUID-фрагменты\nс устойчивой ссылкой"]
+        S3["Структура документа:\nавтор, год, теги"]
+    end
+
+    R1 --> S1
+    R2 --> S2
+    R3 --> S3
+
+    subgraph shift ["Что меняется"]
+        direction TB
+        Before["Раньше:\nнавигация по корпусу\n= часы чтения"]
+        After["Теперь:\nнавигацию берёт инструмент\n→ исследователь тратит время\nна интерпретацию"]
+        Before -->|"правильный инструмент"| After
+    end
+
+    system --> shift
+
+    style researcher fill:#e8f0fe,stroke:#aab
+    style system fill:#fff8e1,stroke:#aab
+    style shift fill:#e8f5e9,stroke:#aab
+    style After fill:#c8e6c9,stroke:#aab
+

@@ -1,0 +1,23 @@
+%% Слайд 4 (решение 3) — NATS как шина: WebSocket только на Gateway
+sequenceDiagram
+    actor User
+    participant Gateway
+    participant NATS
+    participant Chat as Chat Service
+
+    User->>Gateway: Открывает чат (WebSocket)
+    Gateway->>Gateway: Держит соединение с браузером
+
+    User->>Gateway: Вопрос: "Что такое диалектика?"
+    Gateway->>NATS: Публикует chat.query.{user_id}
+    NATS->>Chat: Доставляет запрос
+
+    Note over Chat: Сервис перезапускается
+
+    Chat->>NATS: После рестарта: подписывается заново
+    NATS->>Chat: (следующие запросы доставятся)
+
+    Chat-->>NATS: Стримит токены ответа
+    NATS-->>Gateway: Доставляет токены
+    Gateway-->>User: ✅ Ответ через тот же WebSocket
+

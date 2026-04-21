@@ -1,0 +1,21 @@
+%% Слайд 4 (решение 2) — Outbox Pattern: атомарная запись
+sequenceDiagram
+    participant Docs as Documents Service
+    participant DB as PostgreSQL\n(транзакция)
+    participant Outbox as Outbox Worker
+    participant NATS
+    participant Indexer as index-python
+
+    Docs->>DB: BEGIN транзакция
+    Docs->>DB: INSERT document
+    Docs->>DB: INSERT outbox_events\n(corpus.document.created)
+    Docs->>DB: COMMIT ✅
+
+    Note over DB: Либо всё сохранилось,\nлибо ничего
+
+    Outbox->>DB: SELECT необработанные события
+    DB-->>Outbox: событие
+    Outbox->>NATS: Публикует corpus.document.created
+    NATS->>Indexer: Событие доставлено ✅
+    Outbox->>DB: Помечает событие как доставленное
+

@@ -1,0 +1,19 @@
+%% Слайд 5 — RAG: как работает чатбот
+flowchart LR
+    Q["❓ Вопрос исследователя\n«Как Райбекас понимает\nсоотношение вещи\nи её свойств?»"]
+
+    subgraph local ["Локальный сервер"]
+        E["⚙️ Векторизация вопроса\n(embedding model)"]
+        S["🔍 Поиск по смыслу\nв Qdrant\n(топ-5 фрагментов)"]
+        C["📋 Сборка контекста:\nфрагменты + вопрос"]
+        L["🤖 Локальная LLM\n(Ollama / Gemma)"]
+    end
+
+    A["✅ Ответ с цитатами\nи ссылками на источники"]
+
+    Q --> E --> S --> C --> L --> A
+
+    style local fill:#fff8e1,stroke:#aaa
+    style L fill:#ffe082,stroke:#aaa
+    style A fill:#e8f5e9,stroke:#aaa
+
