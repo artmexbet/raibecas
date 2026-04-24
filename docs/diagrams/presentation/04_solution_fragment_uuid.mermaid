@@ -1,0 +1,19 @@
+%% Слайд 4 (решение 1) — UUID-фрагменты: стабильная ссылка
+sequenceDiagram
+    actor User
+    participant System
+    participant DB as PostgreSQL
+
+    User->>System: Выделяет фрагмент\n"вещь есть то, что..."
+    System->>System: Генерирует UUID +\nSHA256(текст фрагмента)
+    System->>DB: INSERT fragment\n(uuid, hash, offsets, текст)
+    System-->>User: Ссылка: /fragments/a3f9...
+
+    Note over DB: Документ обновлён
+
+    User->>System: Открывает /fragments/a3f9...
+    System->>DB: SELECT by uuid
+    DB-->>System: фрагмент + сохранённый текст
+    System->>System: Ищет текст fuzzy-поиском\n(контекст ±200 символов)
+    System-->>User: ✅ Правильный фрагмент найден\n(с пометкой "текст изменён")
+

@@ -1,0 +1,15 @@
+%% Слайд 4 (проблема 2) — Документ "зависает": событие теряется
+sequenceDiagram
+    participant Docs as Documents Service
+    participant NATS
+    participant Indexer as index-python
+
+    Docs->>Docs: Сохраняет документ в PostgreSQL ✅
+    Docs->>NATS: Публикует событие\ncorpus.document.created
+
+    Note over Indexer: В этот момент сервис перезапускается
+
+    NATS--xIndexer: ❌ Событие потеряно
+
+    Note over Docs,Indexer: Документ в базе есть.\nВ Qdrant — нет.\nSemantic search его не найдёт.
+

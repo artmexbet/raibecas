@@ -1,0 +1,15 @@
+%% Слайд 4 (проблема 1) — Ссылки ломались: смещение по позиции
+sequenceDiagram
+    actor User
+    participant System
+
+    User->>System: Выделяет фрагмент\n"вещь есть то, что..."
+    System->>System: Сохраняет позицию:\nstart=1523, end=1789
+    System-->>User: Ссылка: /fragments?start=1523
+
+    Note over System: Документ обновлён (вставлен абзац)
+
+    User->>System: Открывает ссылку
+    System->>System: Ищет текст по start=1523
+    System-->>User: ❌ Другой текст на этой позиции
+

@@ -1,0 +1,26 @@
+%% Слайд 4 (мотивация) — Зачем нужна асинхронность: индексация «за кулисами»
+sequenceDiagram
+    actor User
+    participant Gateway
+    participant Docs as Documents Service
+    participant NATS
+    participant Indexer as index-python\n(ML-компонент)
+    participant Qdrant
+
+    User->>Gateway: Загружает документ
+    Gateway->>Docs: POST /documents
+    Docs->>Docs: Сохраняет в PostgreSQL
+    Docs-->>Gateway: ✅ 201 Created
+    Gateway-->>User: «Документ принят»
+
+    Note over User: Пользователь уже работает дальше
+
+    Docs->>NATS: corpus.document.created
+    NATS->>Indexer: событие
+    Indexer->>Indexer: Разбивка на фрагменты
+    loop Каждый фрагмент
+        Indexer->>Indexer: Векторизация (embedding)
+        Indexer->>Qdrant: Записывает вектор
+    end
+    Note over Indexer,Qdrant: Индексация завершена — документ\nдоступен для семантического поиска
+

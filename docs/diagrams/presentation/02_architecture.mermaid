@@ -1,0 +1,51 @@
+%% Слайд 3 — Архитектура системы (упрощённая, для доклада)
+graph LR
+    Browser["🌐 Браузер\n(React)"]
+
+    subgraph local ["Локальный сервер (собственное железо)"]
+        Gateway["🚪 Gateway\n(единственная точка входа)"]
+
+        subgraph services ["Go-сервисы"]
+            Auth["🔐 Auth"]
+            Docs["📄 Documents"]
+            Users["👤 Users"]
+            Chat["💬 Chat"]
+        end
+
+        NATS[("📨 NATS\nброкер сообщений")]
+
+        subgraph ml ["ML-компонент (Python)"]
+            Indexer["⚙️ Индексация\n(разбивка + векторизация)"]
+            Ollama["🤖 Ollama\n(локальные LLM)"]
+        end
+
+        subgraph storage ["Хранилища"]
+            PG[("🐘 PostgreSQL")]
+            Qdrant[("🔍 Qdrant\nвекторная БД")]
+            MinIO[("📦 MinIO\nфайлы")]
+        end
+    end
+
+    Browser -->|"HTTP / WebSocket"| Gateway
+    Gateway <-->|"Request-Reply"| NATS
+    NATS <--> Auth
+    NATS <--> Docs
+    NATS <--> Users
+    NATS <--> Chat
+    NATS -->|"события"| Indexer
+    Indexer --> Ollama
+    Indexer --> Qdrant
+    Chat --> Ollama
+    Chat --> Qdrant
+    Auth --> PG
+    Docs --> PG
+    Docs --> MinIO
+    Users --> PG
+
+    style local fill:#f0f4ff,stroke:#aab
+    style services fill:#e8f0fe,stroke:#aab
+    style ml fill:#fff3e0,stroke:#aab
+    style storage fill:#e8f5e9,stroke:#aab
+    style Ollama fill:#ffe082,stroke:#aab
+    style NATS fill:#b3e5fc,stroke:#aab
+

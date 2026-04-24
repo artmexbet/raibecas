@@ -1,0 +1,15 @@
+%% Слайд 4 (проблема 3) — WebSocket падает при перезапуске chat-сервиса
+sequenceDiagram
+    actor User
+    participant Gateway
+    participant Chat as Chat Service\n(WebSocket напрямую)
+
+    User->>Gateway: Открывает чат
+    Gateway->>Chat: Устанавливает WebSocket-соединение
+    User->>Chat: Задаёт вопрос...
+
+    Note over Chat: Сервис перезапускается (деплой / краш)
+
+    Chat--xUser: ❌ Соединение оборвано
+    Note over User: Нужно вручную обновить страницу
+
