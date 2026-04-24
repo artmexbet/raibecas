@@ -5,18 +5,5 @@
     <file url="file://$PROJECT_DIR$/.idea/queries/Query_1.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
     <file url="file://$PROJECT_DIR$/.idea/queries/Query_2.sql" value="c4bc29c8-c250-4120-9592-fffb109c2424" />
     <file url="file://$PROJECT_DIR$/.idea/queries/Query_3.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
-    <file url="file://$PROJECT_DIR$/.idea/queries/Query_4.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
-    <file url="file://$PROJECT_DIR$/deploy/init.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
-    <file url="file://$PROJECT_DIR$/services/auth/migrations/002_create_registration_requests_table.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
-    <file url="file://$PROJECT_DIR$/services/documents/migrations/000001_create_reference_tables.up.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
-    <file url="file://$PROJECT_DIR$/services/documents/migrations/000002_create_documents_table.up.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
-    <file url="file://$PROJECT_DIR$/services/documents/migrations/000003_create_document_versions_table.up.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
-    <file url="file://$PROJECT_DIR$/services/documents/migrations/000004_seed_data.up.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
-    <file url="file://$PROJECT_DIR$/services/documents/migrations/000007_extend_documents_metadata.up.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
-    <file url="file://$PROJECT_DIR$/services/documents/migrations/000008_drop_legacy_document_author.up.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
-    <file url="file://$PROJECT_DIR$/services/users/migrations/000001_create_users_table.up.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
-    <file url="file://$PROJECT_DIR$/services/users/migrations/000002_create_registration_requests_table.up.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
-    <file url="file://$PROJECT_DIR$/services/users/migrations/000003_create_outbox_table.up.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
-    <file url="file://$PROJECT_DIR$/services/users/migrations/000004_add_role_enum.up.sql" value="f1581b25-343b-41d7-87ec-914b95e61782" />
   </component>
 </project>
