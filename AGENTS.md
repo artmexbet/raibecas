@@ -6,7 +6,10 @@
 
 ## Skills
 
-Скиллы лежат в .agents/skills
+Скиллы лежат в `.agents/skills`:
+- `use-modern-go` — паттерны современного Go (используй при работе с Go-сервисами)
+- `frontend-design` — дизайн-система фронтенда
+- `vercel-react-best-practices` — best practices React (рендеринг, async, bundle)
 
 ## Architecture
 
@@ -48,7 +51,7 @@ cd services/gateway
 $env:ENVIRONMENT="development"
 go run cmd/gateway/main.go
 
-# Lint
+# Lint (внимание: Makefile ссылается на services\index, не на services\documents)
 make lint
 
 # Ollama модели (нужны для index-python)
@@ -59,10 +62,24 @@ make setup   # ollama pull embeddinggemma:300m && ollama pull gemma3:4b
 
 ### NATS Request-Reply (синхронный RPC)
 
-Gateway → сервис через `natsw.Client.RequestMsg`. Все топики — в `services/gateway/internal/connector/nats_connector.go`:
+Gateway → сервис через `natsw.Client.RequestMsg`. Все топики — в `services/gateway/internal/connector/`:
+
+**auth** (`auth_connector.go`):
+- `auth.{login,logout,logout_all,validate,refresh,change_password}`
+
+**users** (`users_connector.go`):
+- `users.{list,get,update,delete}`
+- `users.registration.{create,list,approve,reject}`
+
+**documents** (`nats_connector.go`):
 - `documents.{list,get,create,update,delete}`
-- `auth.{login,logout,validate,refresh,change_password}`
-- `users.*`
+- `documents.get.content`
+- `documents.cover.upload`
+- `documents.bookmarks.{list,create,delete}`
+- `documents.authors.{list,create}`
+- `documents.categories.{list,create}`
+- `documents.tags.{list,create}`
+- `documents.types.list`, `documents.authorship-types.list`
 
 ### NATS Events (асинхронные события)
 
@@ -101,6 +118,8 @@ services/{name}/
 │   └── server/       — HTTP (только gateway)
 └── migrations/       — SQL миграции
 ```
+
+**chat-service** отличается: содержит `internal/neuro/` (интеграция с Ollama) и `internal/qdrant-wrapper/` (поиск по векторам). RAG-логика сосредоточена в chat-service, а не в index-python.
 
 ## Tracing
 
