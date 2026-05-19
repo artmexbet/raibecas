@@ -119,6 +119,7 @@ type CreateDocumentRequest struct {
 	Content         string                   `json:"content,omitempty"`
 	TagIDs          []int                    `json:"tag_ids,omitempty"`
 	CreatedBy       *uuid.UUID               `json:"created_by,omitempty"`
+	IsPublic        bool                     `json:"is_public"`
 }
 
 // CreateDocumentResponse represents a document creation response
@@ -171,6 +172,21 @@ type UpdateDocumentRequest struct {
 	TagIDs          []int                    `json:"tag_ids,omitempty"`
 	Changes         *string                  `json:"changes,omitempty"`
 	UpdatedBy       *uuid.UUID               `json:"updated_by,omitempty"`
+	IsPublic        *bool                    `json:"is_public,omitempty"`
+}
+
+// ReindexDocumentRequest represents a request to reindex a document
+//
+//easyjson:json
+type ReindexDocumentRequest struct {
+	ID uuid.UUID `json:"id"`
+}
+
+// ReindexDocumentResponse represents a response to a reindex request
+//
+//easyjson:json
+type ReindexDocumentResponse struct {
+	Success bool `json:"success"`
 }
 
 // UpdateDocumentResponse represents a document update response
@@ -221,6 +237,7 @@ type Document struct {
 	ContentPath     string                `json:"content_path"`
 	CurrentVersion  int                   `json:"current_version"`
 	Indexed         bool                  `json:"indexed"`
+	IsPublic        bool                  `json:"is_public"`
 	CoverURL        *string               `json:"cover_url,omitempty"`
 	CreatedAt       time.Time             `json:"created_at"`
 	UpdatedAt       time.Time             `json:"updated_at"`

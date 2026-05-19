@@ -42,7 +42,7 @@ func (s *Server) listDocuments(c *fiber.Ctx) error {
 	}
 
 	// Call document service via connector
-	response, err := s.documentConnector.ListDocuments(c.UserContext(), query)
+	response, err := s.documentConnector.ListDocuments(c.UserContext(), query, getUserRole(c))
 	if err != nil {
 		slog.Error("failed to list documents", "error", err)
 		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
@@ -105,7 +105,7 @@ func (s *Server) getDocument(c *fiber.Ctx) error {
 	}
 
 	// Call document service via connector
-	response, err := s.documentConnector.GetDocument(c.UserContext(), id)
+	response, err := s.documentConnector.GetDocument(c.UserContext(), id, getUserRole(c))
 	if err != nil {
 		slog.Error("failed to get document", "id", id, "error", err)
 		return c.Status(http.StatusNotFound).JSON(domain.ErrorResponse{
@@ -115,6 +115,30 @@ func (s *Server) getDocument(c *fiber.Ctx) error {
 	}
 
 	return c.Status(http.StatusOK).JSON(response)
+}
+
+// reindexDocument handles POST /documents/:id/reindex - trigger reindexing of a document
+func (s *Server) reindexDocument(c *fiber.Ctx) error {
+	idStr := c.Params("id")
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		slog.Error("invalid document ID", "id", idStr, "error", err)
+		return c.Status(http.StatusBadRequest).JSON(domain.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Invalid document ID format",
+		})
+	}
+
+	if err := s.documentConnector.ReindexDocument(c.UserContext(), id, getUserRole(c)); err != nil {
+		slog.Error("failed to reindex document", "id", id, "error", err)
+		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to reindex document",
+		})
+	}
+
+	return c.Status(http.StatusOK).JSON(domain.ReindexDocumentResponse{Success: true})
 }
 
 // updateDocument handles PUT /documents/:id - update an existing document

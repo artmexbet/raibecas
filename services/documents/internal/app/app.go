@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 
 	"github.com/artmexbet/raibecas/libs/natsw"
 	"github.com/artmexbet/raibecas/libs/telemetry"
@@ -25,6 +26,11 @@ import (
 	"github.com/artmexbet/raibecas/services/documents/migrations"
 )
 
+const (
+	// JetStream stream for indexing events
+	indexingStreamName = "INDEXING"
+)
+
 // App represents the application
 type App struct {
 	cfg        *config.Config
@@ -34,6 +40,7 @@ type App struct {
 	storage    *storage.MinIOStorage
 	natsConn   *nats.Conn
 	natsClient *natsw.Client
+	jsCtx      *natsw.JetStreamContext
 	server     *server.Server
 	shutdown   func(context.Context) error
 }
@@ -125,6 +132,24 @@ func New(ctx context.Context) (*App, error) {
 	)
 	app.natsClient = natsClient
 
+	// Initialize JetStream context
+	jsCtx, err := natsClient.JetStream()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize jetstream: %w", err)
+	}
+	app.jsCtx = jsCtx
+
+	// Ensure INDEXING stream exists for indexing events
+	if _, err := jsCtx.EnsureStream(ctx, natsw.StreamConfig{
+		Name:      indexingStreamName,
+		Subjects:  []string{"indexing.document.*"},
+		Storage:   jetstream.FileStorage,
+		Retention: jetstream.WorkQueuePolicy,
+		MaxAge:    24 * time.Hour,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to ensure indexing stream: %w", err)
+	}
+
 	// Initialize publisher
 	publisher := natsPublisher.NewPublisher(natsClient, logger)
 
@@ -152,7 +177,7 @@ func New(ctx context.Context) (*App, error) {
 	metadataHandler := server.NewMetadataHandler(docService, logger)
 
 	// Initialize server
-	srv := server.New(natsClient, docHandler, metadataHandler)
+	srv := server.New(natsClient, jsCtx, docHandler, metadataHandler)
 	app.server = srv
 
 	return app, nil

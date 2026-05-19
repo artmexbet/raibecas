@@ -6,8 +6,9 @@ INSERT INTO documents (
     publication_date,
     content_path,
     current_version,
-    document_type_id
-) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    document_type_id,
+    is_public
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: GetDocumentByID :one
@@ -56,6 +57,11 @@ WHERE (
             WHERE dtt.document_id = d.id
               AND dtt.tag_id = sqlc.narg('tag_id')::int
         )
+        ELSE TRUE
+    END
+) AND (
+    CASE
+        WHEN sqlc.narg('is_public')::boolean IS NOT NULL THEN d.is_public = sqlc.narg('is_public')::boolean
         ELSE TRUE
     END
 ) AND (
@@ -122,6 +128,11 @@ WHERE (
     END
 ) AND (
     CASE
+        WHEN sqlc.narg('is_public')::boolean IS NOT NULL THEN is_public = sqlc.narg('is_public')::boolean
+        ELSE TRUE
+    END
+) AND (
+    CASE
         WHEN sqlc.narg('search')::text IS NOT NULL AND sqlc.narg('search')::text != ''
         THEN (
             to_tsvector('russian', title || ' ' || COALESCE(description, '') || ' ' || COALESCE((SELECT name FROM document_types WHERE id = documents.document_type_id), '')) @@ plainto_tsquery('russian', sqlc.narg('search')::text)
@@ -166,6 +177,11 @@ RETURNING *;
 -- name: UpdateDocumentIndexed :exec
 UPDATE documents
 SET indexed = $2
+WHERE id = $1;
+
+-- name: UpdateDocumentPublic :exec
+UPDATE documents
+SET is_public = $2
 WHERE id = $1;
 
 -- name: DeleteDocument :exec

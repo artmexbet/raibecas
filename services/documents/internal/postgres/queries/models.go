@@ -41,6 +41,7 @@ type Document struct {
 	ContentPath     string
 	CurrentVersion  int32
 	Indexed         bool
+	IsPublic        bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	CoverPath       *string
