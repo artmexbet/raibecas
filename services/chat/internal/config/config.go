@@ -89,12 +89,25 @@ func (d *Database) GetDSN() string {
 	)
 }
 
+// TelemetryConfig holds telemetry configuration
+type TelemetryConfig struct {
+	Enabled        bool          `env:"ENABLED" env-default:"true"`
+	ServiceName    string        `env:"SERVICE_NAME" env-default:"chat"`
+	ServiceVersion string        `env:"SERVICE_VERSION" env-default:"1.0.0"`
+	OTLPEndpoint   string        `env:"OTLP_ENDPOINT" env-default:"localhost:4318"`
+	ExportTimeout  time.Duration `env:"EXPORT_TIMEOUT" env-default:"30s"`
+	BatchTimeout   time.Duration `env:"BATCH_TIMEOUT" env-default:"5s"`
+	MaxQueueSize   int           `env:"MAX_QUEUE_SIZE" env-default:"2048"`
+	MaxExportBatch int           `env:"MAX_EXPORT_BATCH" env-default:"512"`
+}
+
 type Config struct {
-	Qdrant   Qdrant   `yaml:"qdrant" env-prefix:"QDRANT_"`
-	Ollama   Ollama   `yaml:"ollama" env-prefix:"OLLAMA_"`
-	Redis    Redis    `yaml:"redis" env-prefix:"REDIS_"`
-	NATS     NATS     `yaml:"nats" env-prefix:"NATS_"`
-	Database Database `yaml:"database" env-prefix:"CHAT_DB_"`
+	Qdrant    Qdrant          `yaml:"qdrant" env-prefix:"QDRANT_"`
+	Ollama    Ollama          `yaml:"ollama" env-prefix:"OLLAMA_"`
+	Redis     Redis           `yaml:"redis" env-prefix:"REDIS_"`
+	NATS      NATS            `yaml:"nats" env-prefix:"NATS_"`
+	Database  Database        `yaml:"database" env-prefix:"CHAT_DB_"`
+	Telemetry TelemetryConfig `yaml:"telemetry" env-prefix:"TELEMETRY_"`
 
 	HTTP    HTTP `yaml:"http" env-prefix:"HTTP_"`
 	UseHTTP bool `yaml:"use_http" env:"USE_HTTP" env-default:"false"`

@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
+	"go.opentelemetry.io/otel/trace/noop"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/artmexbet/raibecas/services/auth/internal/domain"
@@ -37,7 +39,7 @@ func TestAuthService_Login_Success(t *testing.T) {
 	mockTokenStore.EXPECT().StoreRefreshToken(mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour, mockTokenStore)
-	authService := NewAuthService(mockUsers, jwtManager)
+	authService := NewAuthService(mockUsers, jwtManager, noop.NewTracerProvider().Tracer("test"), slog.Default())
 
 	// Test
 	req := domain.LoginRequest{
@@ -93,7 +95,7 @@ func TestAuthService_Login_InvalidPassword(t *testing.T) {
 	}, nil)
 
 	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour, mockTokenStore)
-	authService := NewAuthService(mockUsers, jwtManager)
+	authService := NewAuthService(mockUsers, jwtManager, noop.NewTracerProvider().Tracer("test"), slog.Default())
 
 	// Test
 	req := domain.LoginRequest{
@@ -128,7 +130,7 @@ func TestAuthService_Login_UserNotActive(t *testing.T) {
 	}, nil)
 
 	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour, mockTokenStore)
-	authService := NewAuthService(mockUsers, jwtManager)
+	authService := NewAuthService(mockUsers, jwtManager, noop.NewTracerProvider().Tracer("test"), slog.Default())
 
 	// Test
 	req := domain.LoginRequest{
@@ -158,7 +160,7 @@ func TestAuthService_Logout(t *testing.T) {
 	mockTokenStore.EXPECT().BlacklistAccessToken(mock.Anything, accessTokenJTI, mock.Anything).Return(nil)
 
 	jwtManager := jwt.NewManager("test-secret", "test-issuer", 15*time.Minute, 7*24*time.Hour, mockTokenStore)
-	authService := NewAuthService(mockUsers, jwtManager)
+	authService := NewAuthService(mockUsers, jwtManager, noop.NewTracerProvider().Tracer("test"), slog.Default())
 
 	// Test
 	err := authService.Logout(context.Background(), tokenID, accessTokenJTI)

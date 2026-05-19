@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
 )
@@ -50,14 +51,14 @@ type MinIOConfig struct {
 
 // TelemetryConfig holds telemetry configuration
 type TelemetryConfig struct {
-	Enabled        bool   `env:"ENABLED" env-default:"true"`
-	ServiceName    string `env:"SERVICE_NAME" env-default:"documents"`
-	ServiceVersion string `env:"SERVICE_VERSION" env-default:"1.0.0"`
-	OTLPEndpoint   string `env:"OTLP_ENDPOINT" env-default:"localhost:4318"`
-	ExportTimeout  string `env:"EXPORT_TIMEOUT" env-default:"30s"`
-	BatchTimeout   string `env:"BATCH_TIMEOUT" env-default:"5s"`
-	MaxQueueSize   int    `env:"MAX_QUEUE_SIZE" env-default:"2048"`
-	MaxExportBatch int    `env:"MAX_EXPORT_BATCH" env-default:"512"`
+	Enabled        bool          `env:"ENABLED" env-default:"true"`
+	ServiceName    string        `env:"SERVICE_NAME" env-default:"documents"`
+	ServiceVersion string        `env:"SERVICE_VERSION" env-default:"1.0.0"`
+	OTLPEndpoint   string        `env:"OTLP_ENDPOINT" env-default:"localhost:4318"`
+	ExportTimeout  time.Duration `env:"EXPORT_TIMEOUT" env-default:"30s"`
+	BatchTimeout   time.Duration `env:"BATCH_TIMEOUT" env-default:"5s"`
+	MaxQueueSize   int           `env:"MAX_QUEUE_SIZE" env-default:"2048"`
+	MaxExportBatch int           `env:"MAX_EXPORT_BATCH" env-default:"512"`
 }
 
 // Load reads configuration from environment variables

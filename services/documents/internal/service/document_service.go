@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/artmexbet/raibecas/services/documents/internal/domain"
 )
@@ -21,6 +23,7 @@ type DocumentService struct {
 	storage      Storage
 	publisher    EventPublisher
 	logger       *slog.Logger
+	tracer       trace.Tracer
 }
 
 // NewDocumentService creates a new document service.
@@ -33,6 +36,7 @@ func NewDocumentService(
 	storage Storage,
 	publisher EventPublisher,
 	logger *slog.Logger,
+	tracer trace.Tracer,
 ) *DocumentService {
 	return &DocumentService{
 		docRepo:      docRepo,
@@ -43,11 +47,17 @@ func NewDocumentService(
 		storage:      storage,
 		publisher:    publisher,
 		logger:       logger,
+		tracer:       tracer,
 	}
 }
 
 // CreateDocument creates a new document.
 func (s *DocumentService) CreateDocument(ctx context.Context, req domain.CreateDocumentRequest) (*domain.Document, error) {
+	ctx, span := s.tracer.Start(ctx, "documents.service.create",
+		trace.WithAttributes(attribute.String("document.title", req.Title)),
+	)
+	defer span.End()
+
 	if req.Title == "" || req.Content == "" {
 		return nil, fmt.Errorf("%w: title and content are required", ErrInvalidInput)
 	}
@@ -116,6 +126,11 @@ func (s *DocumentService) CreateDocument(ctx context.Context, req domain.CreateD
 
 // GetDocument retrieves a document by ID.
 func (s *DocumentService) GetDocument(ctx context.Context, id uuid.UUID) (*domain.Document, error) {
+	ctx, span := s.tracer.Start(ctx, "documents.service.get",
+		trace.WithAttributes(attribute.String("document.id", id.String())),
+	)
+	defer span.End()
+
 	doc, err := s.docRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get document: %w", err)
@@ -126,6 +141,11 @@ func (s *DocumentService) GetDocument(ctx context.Context, id uuid.UUID) (*domai
 
 // GetDocumentContent retrieves document content.
 func (s *DocumentService) GetDocumentContent(ctx context.Context, id uuid.UUID) ([]byte, error) {
+	ctx, span := s.tracer.Start(ctx, "documents.service.get_content",
+		trace.WithAttributes(attribute.String("document.id", id.String())),
+	)
+	defer span.End()
+
 	doc, err := s.docRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get document: %w", err)
@@ -140,6 +160,9 @@ func (s *DocumentService) GetDocumentContent(ctx context.Context, id uuid.UUID) 
 
 // ListDocuments retrieves documents with filters.
 func (s *DocumentService) ListDocuments(ctx context.Context, params domain.ListDocumentsParams) ([]domain.Document, int, error) {
+	ctx, span := s.tracer.Start(ctx, "documents.service.list")
+	defer span.End()
+
 	docs, err := s.docRepo.List(ctx, params)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list documents: %w", err)
@@ -160,6 +183,11 @@ func (s *DocumentService) ListDocuments(ctx context.Context, params domain.ListD
 
 // UpdateDocument updates a document.
 func (s *DocumentService) UpdateDocument(ctx context.Context, id uuid.UUID, req domain.UpdateDocumentRequest) (*domain.Document, error) {
+	ctx, span := s.tracer.Start(ctx, "documents.service.update",
+		trace.WithAttributes(attribute.String("document.id", id.String())),
+	)
+	defer span.End()
+
 	doc, err := s.docRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get document: %w", err)
@@ -245,6 +273,11 @@ func (s *DocumentService) UpdateDocument(ctx context.Context, id uuid.UUID, req 
 
 // DeleteDocument deletes a document.
 func (s *DocumentService) DeleteDocument(ctx context.Context, id uuid.UUID) error {
+	ctx, span := s.tracer.Start(ctx, "documents.service.delete",
+		trace.WithAttributes(attribute.String("document.id", id.String())),
+	)
+	defer span.End()
+
 	doc, err := s.docRepo.GetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("get document: %w", err)
@@ -290,6 +323,11 @@ func (s *DocumentService) MarkDocumentIndexed(ctx context.Context, id uuid.UUID,
 
 // ReindexDocument resets indexed=false and re-publishes corpus.document.updated to trigger the indexer.
 func (s *DocumentService) ReindexDocument(ctx context.Context, id uuid.UUID) error {
+	ctx, span := s.tracer.Start(ctx, "documents.service.reindex",
+		trace.WithAttributes(attribute.String("document.id", id.String())),
+	)
+	defer span.End()
+
 	doc, err := s.docRepo.GetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("get document: %w", err)
@@ -361,6 +399,14 @@ func (s *DocumentService) CreateTag(ctx context.Context, title string) (*domain.
 
 // UploadCover saves a cover image for a document and returns the presigned URL.
 func (s *DocumentService) UploadCover(ctx context.Context, id uuid.UUID, data []byte, contentType string) (string, error) {
+	ctx, span := s.tracer.Start(ctx, "documents.service.upload_cover",
+		trace.WithAttributes(
+			attribute.String("document.id", id.String()),
+			attribute.String("cover.content_type", contentType),
+		),
+	)
+	defer span.End()
+
 	doc, err := s.docRepo.GetByID(ctx, id)
 	if err != nil {
 		return "", fmt.Errorf("get document: %w", err)

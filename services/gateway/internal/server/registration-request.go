@@ -1,6 +1,8 @@
 package server
 
 import (
+	"log/slog"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
@@ -12,26 +14,29 @@ func (s *Server) createRegistrationRequest(c *fiber.Ctx) error {
 	var req domain.CreateRegistrationRequestRequest
 
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error":   "invalid_request",
-			"message": "Invalid request body",
+		return c.Status(fiber.StatusBadRequest).JSON(domain.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
 		})
 	}
 
 	// Validate request
 	if err := s.validator.Struct(req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error":   "validation_failed",
-			"message": err.Error(),
+		return c.Status(fiber.StatusBadRequest).JSON(domain.ErrorResponse{
+			Error:   "validation_error",
+			Message: "Invalid request data",
+			Details: parseValidationErrors(err),
 		})
 	}
 
 	// Call users service via NATS
 	resp, err := s.userConnector.CreateRegistrationRequest(c.UserContext(), req)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error":   "service_error",
-			"message": err.Error(),
+		slog.Error("failed to create registration request", "error", err)
+		status, errorCode, message := mapConnectorError(err, "Failed to create registration request")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -44,9 +49,9 @@ func (s *Server) listRegistrationRequests(c *fiber.Ctx) error {
 
 	// Parse query parameters
 	if err := c.QueryParser(&query); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error":   "invalid_request",
-			"message": "Invalid query parameters",
+		return c.Status(fiber.StatusBadRequest).JSON(domain.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid query parameters",
 		})
 	}
 
@@ -60,18 +65,21 @@ func (s *Server) listRegistrationRequests(c *fiber.Ctx) error {
 
 	// Validate query
 	if err := s.validator.Struct(query); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error":   "validation_failed",
-			"message": err.Error(),
+		return c.Status(fiber.StatusBadRequest).JSON(domain.ErrorResponse{
+			Error:   "validation_error",
+			Message: "Invalid query parameters",
+			Details: parseValidationErrors(err),
 		})
 	}
 
 	// Call users service via NATS
 	resp, err := s.userConnector.ListRegistrationRequests(c.UserContext(), query)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error":   "service_error",
-			"message": err.Error(),
+		slog.Error("failed to list registration requests", "error", err)
+		status, errorCode, message := mapConnectorError(err, "Failed to retrieve registration requests")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -84,18 +92,18 @@ func (s *Server) approveRegistrationRequest(c *fiber.Ctx) error {
 	idParam := c.Params("id")
 	requestID, err := uuid.Parse(idParam)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error":   "invalid_id",
-			"message": "Invalid registration request ID format",
+		return c.Status(fiber.StatusBadRequest).JSON(domain.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid registration request ID format",
 		})
 	}
 
 	// Get authenticated user (approver)
 	authUser, ok := getAuthUser(c)
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error":   "unauthorized",
-			"message": "Authentication required",
+		return c.Status(fiber.StatusUnauthorized).JSON(domain.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "Authentication required",
 		})
 	}
 
@@ -108,9 +116,11 @@ func (s *Server) approveRegistrationRequest(c *fiber.Ctx) error {
 	// Call users service via NATS
 	resp, err := s.userConnector.ApproveRegistrationRequest(c.UserContext(), requestID, authUser.ID, body.Role)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error":   "service_error",
-			"message": err.Error(),
+		slog.Error("failed to approve registration request", "request_id", requestID, "error", err)
+		status, errorCode, message := mapConnectorError(err, "Failed to approve registration request")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -123,18 +133,18 @@ func (s *Server) rejectRegistrationRequest(c *fiber.Ctx) error {
 	idParam := c.Params("id")
 	requestID, err := uuid.Parse(idParam)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error":   "invalid_id",
-			"message": "Invalid registration request ID format",
+		return c.Status(fiber.StatusBadRequest).JSON(domain.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid registration request ID format",
 		})
 	}
 
 	// Get authenticated user (approver)
 	authUser, ok := getAuthUser(c)
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error":   "unauthorized",
-			"message": "Authentication required",
+		return c.Status(fiber.StatusUnauthorized).JSON(domain.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "Authentication required",
 		})
 	}
 
@@ -147,9 +157,11 @@ func (s *Server) rejectRegistrationRequest(c *fiber.Ctx) error {
 	// Call users service via NATS
 	resp, err := s.userConnector.RejectRegistrationRequest(c.UserContext(), requestID, authUser.ID, body.Reason)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error":   "service_error",
-			"message": err.Error(),
+		slog.Error("failed to reject registration request", "request_id", requestID, "error", err)
+		status, errorCode, message := mapConnectorError(err, "Failed to reject registration request")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 

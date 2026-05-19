@@ -45,9 +45,10 @@ func (s *Server) listDocuments(c *fiber.Ctx) error {
 	response, err := s.documentConnector.ListDocuments(c.UserContext(), query, getUserRole(c))
 	if err != nil {
 		slog.Error("failed to list documents", "error", err)
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to retrieve documents",
+		status, errorCode, message := mapConnectorError(err, "Failed to retrieve documents")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -81,9 +82,10 @@ func (s *Server) createDocument(c *fiber.Ctx) error {
 	response, err := s.documentConnector.CreateDocument(c.UserContext(), req, getUserRole(c))
 	if err != nil {
 		slog.Error("failed to create document", "error", err)
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to create document",
+		status, errorCode, message := mapConnectorError(err, "Failed to create document")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -108,9 +110,10 @@ func (s *Server) getDocument(c *fiber.Ctx) error {
 	response, err := s.documentConnector.GetDocument(c.UserContext(), id, getUserRole(c))
 	if err != nil {
 		slog.Error("failed to get document", "id", id, "error", err)
-		return c.Status(http.StatusNotFound).JSON(domain.ErrorResponse{
-			Error:   "not_found",
-			Message: "Document not found",
+		status, errorCode, message := mapConnectorError(err, "Failed to retrieve document")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -132,9 +135,10 @@ func (s *Server) reindexDocument(c *fiber.Ctx) error {
 
 	if err := s.documentConnector.ReindexDocument(c.UserContext(), id, getUserRole(c)); err != nil {
 		slog.Error("failed to reindex document", "id", id, "error", err)
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to reindex document",
+		status, errorCode, message := mapConnectorError(err, "Failed to reindex document")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -181,9 +185,10 @@ func (s *Server) updateDocument(c *fiber.Ctx) error {
 	response, err := s.documentConnector.UpdateDocument(c.UserContext(), req, getUserRole(c))
 	if err != nil {
 		slog.Error("failed to update document", "id", id, "error", err)
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to update document",
+		status, errorCode, message := mapConnectorError(err, "Failed to update document")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -207,9 +212,10 @@ func (s *Server) deleteDocument(c *fiber.Ctx) error {
 	// Call document service via connector
 	if err := s.documentConnector.DeleteDocument(c.UserContext(), id, getUserRole(c)); err != nil {
 		slog.Error("failed to delete document", "id", id, "error", err)
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to delete document",
+		status, errorCode, message := mapConnectorError(err, "Failed to delete document")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -286,9 +292,10 @@ func (s *Server) uploadCover(c *fiber.Ctx) error {
 	coverURL, err := s.documentConnector.UploadCover(c.UserContext(), id, data, contentType, getUserRole(c))
 	if err != nil {
 		slog.Error("failed to upload cover", "id", id, "error", err)
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to upload cover",
+		status, errorCode, message := mapConnectorError(err, "Failed to upload cover")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 

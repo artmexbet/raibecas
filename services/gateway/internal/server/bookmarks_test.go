@@ -54,7 +54,7 @@ func TestCreateBookmarkRequiresAuth(t *testing.T) {
 	}
 }
 
-func TestMapBookmarkConnectorError(t *testing.T) {
+func TestMapConnectorError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -72,7 +72,7 @@ func TestMapBookmarkConnectorError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			status, code, _ := mapBookmarkConnectorError(tt.err, "fallback")
+			status, code, _ := mapConnectorError(tt.err, "fallback")
 			if status != tt.status || code != tt.code {
 				t.Fatalf("expected (%d, %s), got (%d, %s)", tt.status, tt.code, status, code)
 			}

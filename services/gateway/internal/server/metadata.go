@@ -6,8 +6,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/artmexbet/raibecas/libs/dto"
-
 	"github.com/artmexbet/raibecas/services/gateway/internal/domain"
 )
 
@@ -17,9 +15,10 @@ func (s *Server) listAuthors(c *fiber.Ctx) error {
 	response, err := s.documentConnector.ListAuthors(c.UserContext())
 	if err != nil {
 		slog.Error("failed to list authors", "error", err)
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to retrieve authors",
+		status, errorCode, message := mapConnectorError(err, "Failed to retrieve authors")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -56,18 +55,10 @@ func (s *Server) createAuthor(c *fiber.Ctx) error {
 	response, err := s.documentConnector.CreateAuthor(c.UserContext(), req, userRole)
 	if err != nil {
 		slog.Error("failed to create author", "error", err)
-
-		// Check if it's an unauthorized error
-		if err.Error() == string(dto.ErrCodeUnauthorized) {
-			return c.Status(http.StatusForbidden).JSON(domain.ErrorResponse{
-				Error:   "forbidden",
-				Message: "Insufficient permissions to create author",
-			})
-		}
-
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to create author",
+		status, errorCode, message := mapConnectorError(err, "Failed to create author")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -80,9 +71,10 @@ func (s *Server) listCategories(c *fiber.Ctx) error {
 	response, err := s.documentConnector.ListCategories(c.UserContext())
 	if err != nil {
 		slog.Error("failed to list categories", "error", err)
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to retrieve categories",
+		status, errorCode, message := mapConnectorError(err, "Failed to retrieve categories")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -119,18 +111,10 @@ func (s *Server) createCategory(c *fiber.Ctx) error {
 	response, err := s.documentConnector.CreateCategory(c.UserContext(), req, userRole)
 	if err != nil {
 		slog.Error("failed to create category", "error", err)
-
-		// Check if it's an unauthorized error
-		if err.Error() == string(dto.ErrCodeUnauthorized) {
-			return c.Status(http.StatusForbidden).JSON(domain.ErrorResponse{
-				Error:   "forbidden",
-				Message: "Insufficient permissions to create category",
-			})
-		}
-
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to create category",
+		status, errorCode, message := mapConnectorError(err, "Failed to create category")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -142,9 +126,10 @@ func (s *Server) listDocumentTypes(c *fiber.Ctx) error {
 	response, err := s.documentConnector.ListDocumentTypes(c.UserContext())
 	if err != nil {
 		slog.Error("failed to list document types", "error", err)
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to retrieve document types",
+		status, errorCode, message := mapConnectorError(err, "Failed to retrieve document types")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -156,9 +141,10 @@ func (s *Server) listAuthorshipTypes(c *fiber.Ctx) error {
 	response, err := s.documentConnector.ListAuthorshipTypes(c.UserContext())
 	if err != nil {
 		slog.Error("failed to list authorship types", "error", err)
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to retrieve authorship types",
+		status, errorCode, message := mapConnectorError(err, "Failed to retrieve authorship types")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -171,9 +157,10 @@ func (s *Server) listTags(c *fiber.Ctx) error {
 	response, err := s.documentConnector.ListTags(c.UserContext())
 	if err != nil {
 		slog.Error("failed to list tags", "error", err)
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to retrieve tags",
+		status, errorCode, message := mapConnectorError(err, "Failed to retrieve tags")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -210,18 +197,10 @@ func (s *Server) createTag(c *fiber.Ctx) error {
 	response, err := s.documentConnector.CreateTag(c.UserContext(), req, userRole)
 	if err != nil {
 		slog.Error("failed to create tag", "error", err)
-
-		// Check if it's an unauthorized error
-		if err.Error() == string(dto.ErrCodeUnauthorized) {
-			return c.Status(http.StatusForbidden).JSON(domain.ErrorResponse{
-				Error:   "forbidden",
-				Message: "Insufficient permissions to create tag",
-			})
-		}
-
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to create tag",
+		status, errorCode, message := mapConnectorError(err, "Failed to create tag")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 

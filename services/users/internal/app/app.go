@@ -41,6 +41,12 @@ type App struct {
 }
 
 func New() (*App, error) {
+	// Setup structured JSON logger
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+	slog.SetDefault(logger)
+
 	cfg, err := config.Load()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load configuration: %w", err)
@@ -52,14 +58,14 @@ func New() (*App, error) {
 
 	// Create tracer using unified telemetry package
 	tracer, err := telemetry.InitTracer(telemetry.TracerConfig{
-		ServiceName:    "users",
-		ServiceVersion: "1.0.0",
-		OTLPEndpoint:   "localhost:4318",
-		Enabled:        true,
-		ExportTimeout:  30 * time.Second,
-		BatchTimeout:   5 * time.Second,
-		MaxQueueSize:   2048,
-		MaxExportBatch: 512,
+		ServiceName:    cfg.Telemetry.ServiceName,
+		ServiceVersion: cfg.Telemetry.ServiceVersion,
+		OTLPEndpoint:   cfg.Telemetry.OTLPEndpoint,
+		Enabled:        cfg.Telemetry.Enabled,
+		ExportTimeout:  cfg.Telemetry.ExportTimeout,
+		BatchTimeout:   cfg.Telemetry.BatchTimeout,
+		MaxQueueSize:   cfg.Telemetry.MaxQueueSize,
+		MaxExportBatch: cfg.Telemetry.MaxExportBatch,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize tracer: %w", err)
@@ -91,7 +97,8 @@ func New() (*App, error) {
 		natsw.WithMiddleware(natsw.TraceHandlerMiddleware(natsTracer)),
 	)
 
-	svc := service.New(pg, pg, pg, metrics)
+	serviceTracer := tracer.Tracer("users-service")
+	svc := service.New(pg, pg, pg, metrics, serviceTracer)
 	h := handler.New(svc)
 
 	srv := server.New(client, h)

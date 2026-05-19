@@ -41,9 +41,10 @@ func (s *Server) login(c *fiber.Ctx) error {
 	authResp, err := s.authConnector.Login(c.UserContext(), req)
 	if err != nil {
 		slog.Error("failed to login", "error", err)
-		return c.Status(http.StatusUnauthorized).JSON(domain.ErrorResponse{
-			Error:   "unauthorized",
-			Message: "Invalid credentials",
+		status, errorCode, message := mapConnectorError(err, "Invalid credentials")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -81,7 +82,7 @@ func (s *Server) refreshToken(c *fiber.Ctx) error {
 	fingerprint := getSecureCookie(c, CookieFingerprint)
 
 	if refreshToken == "" || tokenID == "" || fingerprint == "" {
-		slog.Error("missing refresh token or metadata in cookies")
+		slog.Warn("missing refresh token or metadata in cookies")
 		return c.Status(http.StatusUnauthorized).JSON(domain.ErrorResponse{
 			Error:   "unauthorized",
 			Message: "Refresh token not found",
@@ -118,9 +119,10 @@ func (s *Server) refreshToken(c *fiber.Ctx) error {
 		clearSecureCookie(c, CookieRefreshToken)
 		clearSecureCookie(c, CookieTokenID)
 		clearSecureCookie(c, CookieFingerprint)
-		return c.Status(http.StatusUnauthorized).JSON(domain.ErrorResponse{
-			Error:   "unauthorized",
-			Message: "Invalid or expired refresh token",
+		status, errorCode, message := mapConnectorError(err, "Invalid or expired refresh token")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -205,7 +207,7 @@ func (s *Server) logout(c *fiber.Ctx) error {
 	// First validate the token to get user ID and JTI
 	validateResp, err := s.authConnector.ValidateToken(c.UserContext(), req.Token, fingerprint)
 	if err != nil || !validateResp.Valid {
-		slog.Error("invalid token for logout", "error", err)
+		slog.Warn("invalid token for logout", "error", err)
 		return c.Status(http.StatusUnauthorized).JSON(domain.ErrorResponse{
 			Error:   "unauthorized",
 			Message: "Invalid token",
@@ -215,9 +217,10 @@ func (s *Server) logout(c *fiber.Ctx) error {
 	// Call logout with all required parameters
 	if err := s.authConnector.Logout(c.UserContext(), tokenID, validateResp.JTI, validateResp.UserID, req.Token); err != nil {
 		slog.Error("failed to logout", "error", err)
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to logout",
+		status, errorCode, message := mapConnectorError(err, "Failed to logout")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -258,7 +261,7 @@ func (s *Server) logoutAll(c *fiber.Ctx) error {
 	// First validate the token to get user ID
 	validateResp, err := s.authConnector.ValidateToken(c.UserContext(), req.Token, fingerprint)
 	if err != nil || !validateResp.Valid {
-		slog.Error("invalid token for logout all", "error", err)
+		slog.Warn("invalid token for logout all", "error", err)
 		return c.Status(http.StatusUnauthorized).JSON(domain.ErrorResponse{
 			Error:   "unauthorized",
 			Message: "Invalid token",
@@ -267,9 +270,10 @@ func (s *Server) logoutAll(c *fiber.Ctx) error {
 
 	if err := s.authConnector.LogoutAll(c.UserContext(), validateResp.UserID, req.Token); err != nil {
 		slog.Error("failed to logout all", "error", err)
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Failed to logout from all devices",
+		status, errorCode, message := mapConnectorError(err, "Failed to logout from all devices")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
@@ -310,7 +314,7 @@ func (s *Server) changePassword(c *fiber.Ctx) error {
 	// First validate the token to get user ID
 	validateResp, err := s.authConnector.ValidateToken(c.UserContext(), req.Token, fingerprint)
 	if err != nil || !validateResp.Valid {
-		slog.Error("invalid token for change password", "error", err)
+		slog.Warn("invalid token for change password", "error", err)
 		return c.Status(http.StatusUnauthorized).JSON(domain.ErrorResponse{
 			Error:   "unauthorized",
 			Message: "Invalid token",
@@ -320,9 +324,10 @@ func (s *Server) changePassword(c *fiber.Ctx) error {
 	// Call ChangePassword - token already in req
 	if err := s.authConnector.ChangePassword(c.UserContext(), validateResp.UserID, req); err != nil {
 		slog.Error("failed to change password", "error", err)
-		return c.Status(http.StatusBadRequest).JSON(domain.ErrorResponse{
-			Error:   "bad_request",
-			Message: err.Error(),
+		status, errorCode, message := mapConnectorError(err, "Failed to change password")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
