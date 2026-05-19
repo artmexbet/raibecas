@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/google/uuid"
@@ -53,6 +54,7 @@ func (h *DocumentHandler) HandleCreateDocument(msg *natsw.Message) error {
 		Content:         req.Content,
 		TagIDs:          req.TagIDs,
 		CreatedBy:       req.CreatedBy,
+		IsPublic:        req.IsPublic,
 	}
 
 	doc, err := h.service.CreateDocument(msg.Ctx, domainReq)
@@ -88,6 +90,11 @@ func (h *DocumentHandler) HandleGetDocument(msg *natsw.Message) error {
 		}
 		h.logger.ErrorContext(msg.Ctx, "failed to get document", "error", err)
 		return h.respondError(msg, dto.ErrCodeInternal)
+	}
+
+	// Non-admin users cannot access non-public documents
+	if !h.isAdmin(msg) && !doc.IsPublic {
+		return h.respondError(msg, dto.ErrCodeNotFound)
 	}
 
 	// Convert domain document to dto
@@ -137,6 +144,13 @@ func (h *DocumentHandler) HandleListDocuments(msg *natsw.Message) error {
 		limit = 20
 	}
 
+	// For non-admin users, only show public documents
+	var isPublic *bool
+	if !h.isAdmin(msg) {
+		truthy := true
+		isPublic = &truthy
+	}
+
 	var categoryID *int32
 	if req.CategoryID != 0 {
 		cid := int32(req.CategoryID)
@@ -161,6 +175,7 @@ func (h *DocumentHandler) HandleListDocuments(msg *natsw.Message) error {
 		CategoryID:     categoryID,
 		DocumentTypeID: documentTypeID,
 		TagID:          intToInt32Ptr(req.TagID),
+		IsPublic:       isPublic,
 		Search:         req.Search,
 	})
 	if err != nil {
@@ -347,6 +362,7 @@ func (h *DocumentHandler) HandleUpdateDocument(msg *natsw.Message) error {
 		TagIDs:          req.TagIDs,
 		Changes:         req.Changes,
 		UpdatedBy:       req.UpdatedBy,
+		IsPublic:        req.IsPublic,
 	}
 
 	doc, err := h.service.UpdateDocument(msg.Ctx, req.ID, domainReq)
@@ -431,26 +447,47 @@ func (h *DocumentHandler) HandleListDocumentVersions(msg *natsw.Message) error {
 	return msg.RespondEasyJSON(&response)
 }
 
-// HandleDocumentIndexed handles document indexed events from index-python
+// HandleDocumentIndexed handles document indexed events from index-python via JetStream.
+// Returns an error to trigger NAK and redelivery on transient failures.
 func (h *DocumentHandler) HandleDocumentIndexed(msg *natsw.Message) error {
+	h.logger.InfoContext(msg.Ctx, "received document indexed event",
+		"subject", msg.Subject,
+		"data_len", len(msg.Data),
+	)
+
 	var event domain.DocumentIndexedEvent
 	if err := event.UnmarshalJSON(msg.Data); err != nil {
-		h.logger.ErrorContext(msg.Ctx, "invalid document indexed event", "error", err)
-		return nil // Don't fail on event processing
+		// Deserialization error is permanent — retrying won't help, so ACK (return nil).
+		h.logger.ErrorContext(msg.Ctx, "invalid document indexed event payload, skipping",
+			"error", err,
+			"raw_data", string(msg.Data),
+		)
+		return nil
 	}
+
+	h.logger.InfoContext(msg.Ctx, "parsed document indexed event",
+		"document_id", event.DocumentID,
+		"status", event.Status,
+		"chunks_count", event.ChunksCount,
+		"timestamp", event.Timestamp,
+	)
 
 	indexed := event.Status == "success"
 	if err := h.service.MarkDocumentIndexed(msg.Ctx, event.DocumentID, indexed); err != nil {
-		h.logger.ErrorContext(msg.Ctx, "failed to mark document as indexed",
+		// DB error is transient — return error to NAK and trigger redelivery.
+		h.logger.ErrorContext(msg.Ctx, "failed to mark document as indexed, will retry",
 			"document_id", event.DocumentID,
+			"status", event.Status,
 			"error", err,
 		)
-	} else {
-		h.logger.InfoContext(msg.Ctx, "marked document as indexed",
-			"document_id", event.DocumentID,
-			"chunks_count", event.ChunksCount,
-		)
+		return fmt.Errorf("mark document %s indexed: %w", event.DocumentID, err)
 	}
+
+	h.logger.InfoContext(msg.Ctx, "successfully marked document indexed status",
+		"document_id", event.DocumentID,
+		"indexed", indexed,
+		"chunks_count", event.ChunksCount,
+	)
 
 	return nil
 }
@@ -485,6 +522,32 @@ func (h *DocumentHandler) HandleUploadCover(msg *natsw.Message) error {
 	return msg.RespondEasyJSON(&response)
 }
 
+// HandleReindexDocument handles document reindex requests
+func (h *DocumentHandler) HandleReindexDocument(msg *natsw.Message) error {
+	var req documents.ReindexDocumentRequest
+	if err := msg.UnmarshalEasyJSON(&req); err != nil {
+		h.logger.ErrorContext(msg.Ctx, "invalid reindex document request", "error", err)
+		return h.respondError(msg, dto.ErrCodeInvalidRequest)
+	}
+
+	// Check authorization (admin only)
+	if !h.isAdmin(msg) {
+		h.logger.WarnContext(msg.Ctx, "unauthorized reindex document attempt")
+		return h.respondError(msg, dto.ErrCodeUnauthorized)
+	}
+
+	if err := h.service.ReindexDocument(msg.Ctx, req.ID); err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return h.respondError(msg, dto.ErrCodeNotFound)
+		}
+		h.logger.ErrorContext(msg.Ctx, "failed to reindex document", "error", err)
+		return h.respondError(msg, dto.ErrCodeInternal)
+	}
+
+	response := documents.ReindexDocumentResponse{Success: true}
+	return msg.RespondEasyJSON(&response)
+}
+
 // isAdmin checks if the user has admin role from message context
 func (h *DocumentHandler) isAdmin(msg *natsw.Message) bool {
 	// Extract role from message headers (set by gateway)
@@ -513,6 +576,7 @@ func convertDomainToDTO(doc domain.Document) documents.Document {
 		ContentPath:     doc.ContentPath,
 		CurrentVersion:  doc.CurrentVersion,
 		Indexed:         doc.Indexed,
+		IsPublic:        doc.IsPublic,
 		CreatedAt:       doc.CreatedAt,
 		UpdatedAt:       doc.UpdatedAt,
 		CoverURL:        doc.CoverURL,

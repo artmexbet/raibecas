@@ -34,12 +34,14 @@ func (r *DocumentRepository) Create(ctx context.Context, doc *domain.Document) e
 		ContentPath:     doc.ContentPath,
 		CurrentVersion:  int32(doc.CurrentVersion),
 		DocumentTypeID:  int32(doc.DocumentTypeID),
+		IsPublic:        doc.IsPublic,
 	})
 	if err != nil {
 		return fmt.Errorf("create document: %w", err)
 	}
 
 	doc.ID = created.ID
+	doc.IsPublic = created.IsPublic
 	doc.CreatedAt = created.CreatedAt
 	doc.UpdatedAt = created.UpdatedAt
 	return nil
@@ -72,6 +74,7 @@ func (r *DocumentRepository) List(ctx context.Context, params domain.ListDocumen
 		CategoryID:     params.CategoryID,
 		DocumentTypeID: params.DocumentTypeID,
 		TagID:          params.TagID,
+		IsPublic:       params.IsPublic,
 		Search:         convertStringToPtr(params.Search),
 	})
 	if err != nil {
@@ -97,6 +100,7 @@ func (r *DocumentRepository) Count(ctx context.Context, params domain.ListDocume
 		CategoryID:     params.CategoryID,
 		DocumentTypeID: params.DocumentTypeID,
 		TagID:          params.TagID,
+		IsPublic:       params.IsPublic,
 		Search:         convertStringToPtr(params.Search),
 	})
 	if err != nil {
@@ -157,6 +161,20 @@ func (r *DocumentRepository) UpdateIndexedStatus(ctx context.Context, id uuid.UU
 	return nil
 }
 
+// UpdatePublicStatus updates is_public status.
+func (r *DocumentRepository) UpdatePublicStatus(ctx context.Context, id uuid.UUID, isPublic bool) error {
+	if err := r.queries.UpdateDocumentPublic(ctx, queries.UpdateDocumentPublicParams{
+		ID:       id,
+		IsPublic: isPublic,
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrNotFound
+		}
+		return fmt.Errorf("update public status: %w", err)
+	}
+	return nil
+}
+
 // AddDocumentAuthor stores a document participant relation.
 func (r *DocumentRepository) AddDocumentAuthor(ctx context.Context, documentID, authorID uuid.UUID, typeID int) error {
 	if err := r.queries.AddDocumentAuthor(ctx, queries.AddDocumentAuthorParams{
@@ -187,6 +205,7 @@ func (r *DocumentRepository) toDomainDocumentFromRow(ctx context.Context, row qu
 		ContentPath:     row.ContentPath,
 		CurrentVersion:  row.CurrentVersion,
 		Indexed:         row.Indexed,
+		IsPublic:        row.IsPublic,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,
 		CoverPath:       row.CoverPath,
@@ -205,6 +224,7 @@ func (r *DocumentRepository) toDomainDocumentFromListRow(ctx context.Context, ro
 		ContentPath:     row.ContentPath,
 		CurrentVersion:  row.CurrentVersion,
 		Indexed:         row.Indexed,
+		IsPublic:        row.IsPublic,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,
 		CoverPath:       row.CoverPath,
@@ -231,6 +251,7 @@ func (r *DocumentRepository) toDomainDocument(
 		CoverPath:       row.CoverPath,
 		CurrentVersion:  int(row.CurrentVersion),
 		Indexed:         row.Indexed,
+		IsPublic:        row.IsPublic,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,
 	}

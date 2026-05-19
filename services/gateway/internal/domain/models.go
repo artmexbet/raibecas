@@ -86,6 +86,8 @@ type Document struct {
 	Tags            []Tag                 `json:"tags" validate:"dive"`
 	Content         *string               `json:"content,omitempty"`
 	CoverURL        *string               `json:"cover_url,omitempty"`
+	Indexed         bool                  `json:"indexed"`
+	IsPublic        bool                  `json:"is_public"`
 	Additional
 }
 

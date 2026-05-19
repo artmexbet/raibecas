@@ -3,7 +3,7 @@ module github.com/artmexbet/raibecas/libs/natsw
 go 1.25.1
 
 require (
-	github.com/mailru/easyjson v0.9.1
+	github.com/mailru/easyjson v0.9.2
 	github.com/nats-io/nats.go v1.48.0
 	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/trace v1.40.0

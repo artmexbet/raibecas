@@ -217,6 +217,20 @@ func easyjson18605acbDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 					*out.CoverPath = string(in.String())
 				}
 			}
+		case "is_public":
+			if in.IsNull() {
+				in.Skip()
+				out.IsPublic = nil
+			} else {
+				if out.IsPublic == nil {
+					out.IsPublic = new(bool)
+				}
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					*out.IsPublic = bool(in.Bool())
+				}
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -354,6 +368,16 @@ func easyjson18605acbEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 			out.RawString(prefix)
 		}
 		out.String(string(*in.CoverPath))
+	}
+	if in.IsPublic != nil {
+		const prefix string = ",\"is_public\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Bool(bool(*in.IsPublic))
 	}
 	out.RawByte('}')
 }
@@ -554,6 +578,20 @@ func easyjson18605acbDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 					*out.TagID = int32(in.Int32())
 				}
 			}
+		case "IsPublic":
+			if in.IsNull() {
+				in.Skip()
+				out.IsPublic = nil
+			} else {
+				if out.IsPublic == nil {
+					out.IsPublic = new(bool)
+				}
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					*out.IsPublic = bool(in.Bool())
+				}
+			}
 		case "Search":
 			if in.IsNull() {
 				in.Skip()
@@ -618,6 +656,15 @@ func easyjson18605acbEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 			out.RawString("null")
 		} else {
 			out.Int32(int32(*in.TagID))
+		}
+	}
+	{
+		const prefix string = ",\"IsPublic\":"
+		out.RawString(prefix)
+		if in.IsPublic == nil {
+			out.RawString("null")
+		} else {
+			out.Bool(bool(*in.IsPublic))
 		}
 	}
 	{
@@ -1151,6 +1198,12 @@ func easyjson18605acbDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 			} else {
 				out.Indexed = bool(in.Bool())
 			}
+		case "is_public":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.IsPublic = bool(in.Bool())
+			}
 		case "created_at":
 			if in.IsNull() {
 				in.Skip()
@@ -1340,6 +1393,11 @@ func easyjson18605acbEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 		const prefix string = ",\"indexed\":"
 		out.RawString(prefix)
 		out.Bool(bool(in.Indexed))
+	}
+	{
+		const prefix string = ",\"is_public\":"
+		out.RawString(prefix)
+		out.Bool(bool(in.IsPublic))
 	}
 	{
 		const prefix string = ",\"created_at\":"
@@ -1563,6 +1621,12 @@ func easyjson18605acbDecodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 					}
 				}
 			}
+		case "is_public":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.IsPublic = bool(in.Bool())
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -1639,6 +1703,11 @@ func easyjson18605acbEncodeGithubComArtmexbetRaibecasServicesDocumentsInternalDo
 		const prefix string = ",\"created_by\":"
 		out.RawString(prefix)
 		out.RawText((*in.CreatedBy).MarshalText())
+	}
+	{
+		const prefix string = ",\"is_public\":"
+		out.RawString(prefix)
+		out.Bool(bool(in.IsPublic))
 	}
 	out.RawByte('}')
 }

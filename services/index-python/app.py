@@ -69,13 +69,17 @@ class App:
 
     async def index_handler(self, msg: Msg) -> None:
         logger.debug("received message %s", msg.subject)
+        document_id = None
         try:
             payload = json.loads(msg.data.decode())
             request = DocumentIndexRequest.from_dict(payload)
+            document_id = request.document_id
             text = await self.document_loader.load(request)
-            await self._process_document(request, text)
+            chunks_count = await self._process_document(request, text)
+            await self._publish_indexed_event(document_id, chunks_count, "success")
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception("failed to process document: %s", exc)
+            await self._publish_indexed_event(document_id, 0, "failed")
 
     async def document_created_handler(self, msg: Msg) -> None:
         """Handles corpus.document.created events from the documents service."""
@@ -87,6 +91,7 @@ class App:
 
     async def _handle_document_event(self, msg: Msg, source: str) -> None:
         logger.info("received %s event", source)
+        document_id = None
         try:
             payload = json.loads(msg.data.decode())
 
@@ -97,6 +102,7 @@ class App:
 
             if not content_path:
                 logger.error("document event missing content_path: %s", payload)
+                await self._publish_indexed_event(document_id, 0, "failed")
                 return
 
             logger.info(
@@ -114,18 +120,20 @@ class App:
                 metadata=self._event_metadata(payload, version, source),
             )
 
-            await self._process_document(request, text)
-            logger.info("successfully indexed document: document_id=%s source=%s", document_id, source)
+            chunks_count = await self._process_document(request, text)
+            logger.info("successfully indexed document: document_id=%s source=%s chunks=%d", document_id, source, chunks_count)
+            await self._publish_indexed_event(document_id, chunks_count, "success")
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception("failed to handle %s event: %s", source, exc)
+            await self._publish_indexed_event(document_id, 0, "failed")
 
-    async def _process_document(self, request: DocumentIndexRequest, text: str) -> None:
+    async def _process_document(self, request: DocumentIndexRequest, text: str) -> int:
         document_id = request.document_id or str(uuid.uuid4())
         metadata = self._base_metadata(request, document_id)
         chunks = self.chunk_splitter.split(text, metadata)
         if not chunks:
             logger.warning("no chunks generated for %s", request.title)
-            return
+            return 0
 
         vectors = await self.embedding_service.embed([chunk.text for chunk in chunks])
 
@@ -134,12 +142,42 @@ class App:
             payload = {**chunk.metadata, "chunk_text": chunk.text}
             points.append(
                 qdrant_models.PointStruct(
-                    id=str(uuid.uuid4()),  # unique ID for the chunk
+                    id=str(uuid.uuid4()),
                     vector=vector,
                     payload=payload,
                 )
             )
         await self.qdrant_writer.write_points(points)
+        return len(chunks)
+
+    async def _publish_indexed_event(self, document_id: Any, chunks_count: int, status: str) -> None:
+        if not document_id:
+            logger.warning("skipping indexed event publish: document_id is empty")
+            return
+        try:
+            import datetime
+            event = {
+                "document_id": str(document_id),
+                "chunks_count": chunks_count,
+                "status": status,
+                "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+            }
+            payload = json.dumps(event)
+            logger.info(
+                "publishing indexed event via JetStream: subject=%s document_id=%s status=%s chunks=%d",
+                const.DOCUMENT_INDEXED_SUBJECT, document_id, status, chunks_count,
+            )
+            await self.nats_connector.js_publish(const.DOCUMENT_INDEXED_SUBJECT, payload)
+            logger.info(
+                "successfully published indexed event: document_id=%s status=%s",
+                document_id, status,
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception(
+                "CRITICAL: failed to publish indexed event via JetStream: "
+                "document_id=%s status=%s error=%s",
+                document_id, status, exc,
+            )
 
     @staticmethod
     def _base_metadata(request: DocumentIndexRequest, document_id: str) -> Dict[str, Any]:

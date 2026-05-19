@@ -77,6 +77,7 @@ func (s *DocumentService) CreateDocument(ctx context.Context, req domain.CreateD
 		ContentPath:     contentPath,
 		CurrentVersion:  1,
 		Indexed:         false,
+		IsPublic:        req.IsPublic,
 	}
 
 	if err := s.docRepo.Create(ctx, doc); err != nil {
@@ -209,6 +210,9 @@ func (s *DocumentService) UpdateDocument(ctx context.Context, id uuid.UUID, req 
 	if req.CoverPath != nil {
 		doc.CoverPath = req.CoverPath
 	}
+	if req.IsPublic != nil {
+		doc.IsPublic = *req.IsPublic
+	}
 
 	if len(req.Participants) > 0 {
 		participants, normErr := s.normalizeParticipants(req.Participants)
@@ -282,6 +286,23 @@ func (s *DocumentService) DeleteDocument(ctx context.Context, id uuid.UUID) erro
 // MarkDocumentIndexed marks document as indexed.
 func (s *DocumentService) MarkDocumentIndexed(ctx context.Context, id uuid.UUID, indexed bool) error {
 	return s.docRepo.UpdateIndexedStatus(ctx, id, indexed)
+}
+
+// ReindexDocument resets indexed=false and re-publishes corpus.document.updated to trigger the indexer.
+func (s *DocumentService) ReindexDocument(ctx context.Context, id uuid.UUID) error {
+	doc, err := s.docRepo.GetByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("get document: %w", err)
+	}
+
+	if err := s.docRepo.UpdateIndexedStatus(ctx, id, false); err != nil {
+		return fmt.Errorf("reset indexed status: %w", err)
+	}
+
+	go s.publishDocumentUpdatedEvent(*doc, doc.CurrentVersion, doc.CurrentVersion, nil)
+
+	s.logger.InfoContext(ctx, "triggered reindex", "document_id", id)
+	return nil
 }
 
 // ListDocumentVersions retrieves document versions.

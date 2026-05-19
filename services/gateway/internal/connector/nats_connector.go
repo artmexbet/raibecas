@@ -37,6 +37,7 @@ const (
 	SubjectDocumentsUpdate      = "documents.update"
 	SubjectDocumentsDelete      = "documents.delete"
 	SubjectDocumentsCoverUpload = "documents.cover.upload"
+	SubjectDocumentsReindex     = "documents.reindex"
 
 	// Metadata subjects
 	SubjectAuthorsList         = "documents.authors.list"
@@ -71,7 +72,7 @@ func NewNATSDocumentConnector(client *natsw.Client, timeout time.Duration) *NATS
 }
 
 // ListDocuments retrieves a list of documents based on query parameters
-func (c *NATSDocumentConnector) ListDocuments(ctx context.Context, query domain.ListDocumentsQuery) (*domain.ListDocumentsResponse, error) {
+func (c *NATSDocumentConnector) ListDocuments(ctx context.Context, query domain.ListDocumentsQuery, userRole string) (*domain.ListDocumentsResponse, error) {
 	// Convert to dto type
 	dtoQuery := documents.ListDocumentsQuery{
 		Page:           query.Page,
@@ -90,6 +91,9 @@ func (c *NATSDocumentConnector) ListDocuments(ctx context.Context, query domain.
 
 	msg := nats.NewMsg(SubjectDocumentsList)
 	msg.Data = reqData
+	if userRole != "" {
+		msg.Header.Set("X-User-Role", userRole)
+	}
 
 	// RequestMsg автоматически пропагирует trace context
 	respMsg, err := c.client.RequestMsg(ctx, msg)
@@ -236,7 +240,7 @@ func (c *NATSDocumentConnector) DeleteBookmark(ctx context.Context, userID, book
 }
 
 // GetDocument retrieves a single document by ID
-func (c *NATSDocumentConnector) GetDocument(ctx context.Context, id uuid.UUID) (*domain.GetDocumentResponse, error) {
+func (c *NATSDocumentConnector) GetDocument(ctx context.Context, id uuid.UUID, userRole string) (*domain.GetDocumentResponse, error) {
 	req := documents.GetDocumentRequest{ID: id}
 	reqData, err := req.MarshalJSON()
 	if err != nil {
@@ -245,10 +249,17 @@ func (c *NATSDocumentConnector) GetDocument(ctx context.Context, id uuid.UUID) (
 
 	msg := nats.NewMsg(SubjectDocumentsGet)
 	msg.Data = reqData
+	if userRole != "" {
+		msg.Header.Set("X-User-Role", userRole)
+	}
 
 	respMsg, err := c.client.RequestMsg(ctx, msg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send get request: %w", err)
+	}
+
+	if errResp := checkErrorResponse(respMsg.Data); errResp != nil {
+		return nil, errResp
 	}
 
 	var dtoResponse documents.GetDocumentResponse
@@ -299,7 +310,8 @@ func (c *NATSDocumentConnector) CreateDocument(ctx context.Context, req domain.C
 		Participants:    toDTOParticipantRefs(req.Participants),
 		PublicationDate: req.PublicationDate,
 		TagIDs:          req.TagIDs,
-		Content:         req.Content, // Передаем контент вместе с остальными данными
+		Content:         req.Content,
+		IsPublic:        req.IsPublic,
 	}
 
 	reqData, err := dtoReq.MarshalJSON()
@@ -345,6 +357,7 @@ func (c *NATSDocumentConnector) UpdateDocument(ctx context.Context, req domain.U
 		Participants:    toDTOParticipantRefs(req.Participants),
 		PublicationDate: req.PublicationDate,
 		TagIDs:          req.TagIDs,
+		IsPublic:        req.IsPublic,
 	}
 
 	reqData, err := dtoReq.MarshalJSON()
@@ -419,6 +432,8 @@ func convertDocument(dto documents.Document) domain.Document {
 		Participants:    nil,
 		PublicationDate: dto.PublicationDate,
 		CoverURL:        dto.CoverURL,
+		Indexed:         dto.Indexed,
+		IsPublic:        dto.IsPublic,
 		Additional: domain.Additional{
 			CreatedAt: dto.CreatedAt,
 			UpdatedAt: dto.UpdatedAt,
@@ -540,6 +555,32 @@ func (c *NATSDocumentConnector) UploadCover(ctx context.Context, id uuid.UUID, d
 	}
 
 	return dtoResponse.CoverURL, nil
+}
+
+// ReindexDocument triggers reindexing of a document
+func (c *NATSDocumentConnector) ReindexDocument(ctx context.Context, id uuid.UUID, userRole string) error {
+	req := documents.ReindexDocumentRequest{ID: id}
+	reqData, err := easyjson.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal reindex request: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectDocumentsReindex)
+	msg.Data = reqData
+	if userRole != "" {
+		msg.Header.Set("X-User-Role", userRole)
+	}
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return fmt.Errorf("failed to send reindex request: %w", err)
+	}
+
+	if errResp := checkErrorResponse(respMsg.Data); errResp != nil {
+		return errResp
+	}
+
+	return nil
 }
 
 // checkErrorResponse checks if NATS response contains an error and returns it

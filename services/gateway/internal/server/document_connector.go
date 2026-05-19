@@ -11,7 +11,7 @@ import (
 // DocumentServiceConnector defines the interface for communicating with the document service
 type DocumentServiceConnector interface {
 	// ListDocuments retrieves a list of documents with filtering and pagination
-	ListDocuments(ctx context.Context, query domain.ListDocumentsQuery) (*domain.ListDocumentsResponse, error)
+	ListDocuments(ctx context.Context, query domain.ListDocumentsQuery, userRole string) (*domain.ListDocumentsResponse, error)
 
 	// ListBookmarks retrieves a list of user bookmarks with filtering and pagination
 	ListBookmarks(ctx context.Context, query domain.ListBookmarksQuery) (*domain.ListBookmarksResponse, error)
@@ -26,7 +26,7 @@ type DocumentServiceConnector interface {
 	CreateDocument(ctx context.Context, req domain.CreateDocumentRequest, userRole string) (*domain.CreateDocumentResponse, error)
 
 	// GetDocument retrieves a single document by ID
-	GetDocument(ctx context.Context, id uuid.UUID) (*domain.GetDocumentResponse, error)
+	GetDocument(ctx context.Context, id uuid.UUID, userRole string) (*domain.GetDocumentResponse, error)
 
 	// UpdateDocument updates an existing document
 	UpdateDocument(ctx context.Context, req domain.UpdateDocumentRequest, userRole string) (*domain.UpdateDocumentResponse, error)
@@ -36,6 +36,9 @@ type DocumentServiceConnector interface {
 
 	// UploadCover uploads a cover image for a document
 	UploadCover(ctx context.Context, id uuid.UUID, data []byte, contentType string, userRole string) (string, error)
+
+	// ReindexDocument triggers reindexing of a document
+	ReindexDocument(ctx context.Context, id uuid.UUID, userRole string) error
 
 	// Metadata methods
 

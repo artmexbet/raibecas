@@ -86,6 +86,7 @@ type Document struct {
 	CoverPath       *string               `db:"cover_path" json:"cover_path,omitempty"`
 	CurrentVersion  int                   `db:"current_version" json:"current_version"`
 	Indexed         bool                  `db:"indexed" json:"indexed"`
+	IsPublic        bool                  `db:"is_public" json:"is_public"`
 	CreatedAt       time.Time             `db:"created_at" json:"created_at"`
 	UpdatedAt       time.Time             `db:"updated_at" json:"updated_at"`
 	Author          *Author               `json:"author,omitempty"`
@@ -122,6 +123,7 @@ type CreateDocumentRequest struct {
 	Content         string                   `json:"content"`
 	TagIDs          []int                    `json:"tag_ids,omitempty"`
 	CreatedBy       *uuid.UUID               `json:"created_by,omitempty"`
+	IsPublic        bool                     `json:"is_public"`
 }
 
 // UpdateDocumentRequest represents a request to update a document
@@ -139,6 +141,7 @@ type UpdateDocumentRequest struct {
 	Changes         *string                  `json:"changes,omitempty"`
 	UpdatedBy       *uuid.UUID               `json:"updated_by,omitempty"`
 	CoverPath       *string                  `json:"cover_path,omitempty"`
+	IsPublic        *bool                    `json:"is_public,omitempty"`
 }
 
 // ListDocumentsParams represents parameters for listing documents
@@ -149,5 +152,6 @@ type ListDocumentsParams struct {
 	CategoryID     *int32
 	DocumentTypeID *int32
 	TagID          *int32
+	IsPublic       *bool
 	Search         string
 }

@@ -40,6 +40,7 @@ type CreateDocumentRequest struct {
 	PublicationDate time.Time                `json:"publicationDate" validate:"required"`
 	TagIDs          []int                    `json:"tagIds" validate:"omitempty,dive,min=1"`
 	Content         string                   `json:"content" validate:"omitempty"`
+	IsPublic        bool                     `json:"isPublic"`
 }
 
 // CreateDocumentResponse represents a document creation response
@@ -62,6 +63,12 @@ type UpdateDocumentRequest struct {
 	Participants    []DocumentParticipantRef `json:"participants,omitempty" validate:"omitempty,min=1,dive"`
 	PublicationDate *time.Time               `json:"publicationDate" validate:"omitempty"`
 	TagIDs          []int                    `json:"tagIds" validate:"omitempty,dive,min=1"`
+	IsPublic        *bool                    `json:"isPublic,omitempty" validate:"omitempty"`
+}
+
+// ReindexDocumentResponse represents the response for a reindex operation
+type ReindexDocumentResponse struct {
+	Success bool `json:"success"`
 }
 
 // UpdateDocumentResponse represents a document update response

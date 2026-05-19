@@ -35,6 +35,7 @@ type DocumentRepository interface {
 	Update(ctx context.Context, doc *domain.Document) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	UpdateIndexedStatus(ctx context.Context, id uuid.UUID, indexed bool) error
+	UpdatePublicStatus(ctx context.Context, id uuid.UUID, isPublic bool) error
 	AddDocumentAuthor(ctx context.Context, documentID, authorID uuid.UUID, typeID int) error
 	ClearDocumentAuthors(ctx context.Context, documentID uuid.UUID) error
 }

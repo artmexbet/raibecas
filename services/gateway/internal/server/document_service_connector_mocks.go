@@ -419,9 +419,9 @@ func (_c *MockDocumentServiceConnector_DeleteDocument_Call) RunAndReturn(run fun
 	return _c
 }
 
-// GetDocument provides a mock function with given fields: ctx, id
-func (_m *MockDocumentServiceConnector) GetDocument(ctx context.Context, id uuid.UUID) (*domain.GetDocumentResponse, error) {
-	ret := _m.Called(ctx, id)
+// GetDocument provides a mock function with given fields: ctx, id, userRole
+func (_m *MockDocumentServiceConnector) GetDocument(ctx context.Context, id uuid.UUID, userRole string) (*domain.GetDocumentResponse, error) {
+	ret := _m.Called(ctx, id, userRole)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetDocument")
@@ -429,19 +429,19 @@ func (_m *MockDocumentServiceConnector) GetDocument(ctx context.Context, id uuid
 
 	var r0 *domain.GetDocumentResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) (*domain.GetDocumentResponse, error)); ok {
-		return rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID, string) (*domain.GetDocumentResponse, error)); ok {
+		return rf(ctx, id, userRole)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) *domain.GetDocumentResponse); ok {
-		r0 = rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID, string) *domain.GetDocumentResponse); ok {
+		r0 = rf(ctx, id, userRole)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*domain.GetDocumentResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
-		r1 = rf(ctx, id)
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID, string) error); ok {
+		r1 = rf(ctx, id, userRole)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -457,13 +457,14 @@ type MockDocumentServiceConnector_GetDocument_Call struct {
 // GetDocument is a helper method to define mock.On call
 //   - ctx context.Context
 //   - id uuid.UUID
-func (_e *MockDocumentServiceConnector_Expecter) GetDocument(ctx interface{}, id interface{}) *MockDocumentServiceConnector_GetDocument_Call {
-	return &MockDocumentServiceConnector_GetDocument_Call{Call: _e.mock.On("GetDocument", ctx, id)}
+//   - userRole string
+func (_e *MockDocumentServiceConnector_Expecter) GetDocument(ctx interface{}, id interface{}, userRole interface{}) *MockDocumentServiceConnector_GetDocument_Call {
+	return &MockDocumentServiceConnector_GetDocument_Call{Call: _e.mock.On("GetDocument", ctx, id, userRole)}
 }
 
-func (_c *MockDocumentServiceConnector_GetDocument_Call) Run(run func(ctx context.Context, id uuid.UUID)) *MockDocumentServiceConnector_GetDocument_Call {
+func (_c *MockDocumentServiceConnector_GetDocument_Call) Run(run func(ctx context.Context, id uuid.UUID, userRole string)) *MockDocumentServiceConnector_GetDocument_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(uuid.UUID))
+		run(args[0].(context.Context), args[1].(uuid.UUID), args[2].(string))
 	})
 	return _c
 }
@@ -473,7 +474,7 @@ func (_c *MockDocumentServiceConnector_GetDocument_Call) Return(_a0 *domain.GetD
 	return _c
 }
 
-func (_c *MockDocumentServiceConnector_GetDocument_Call) RunAndReturn(run func(context.Context, uuid.UUID) (*domain.GetDocumentResponse, error)) *MockDocumentServiceConnector_GetDocument_Call {
+func (_c *MockDocumentServiceConnector_GetDocument_Call) RunAndReturn(run func(context.Context, uuid.UUID, string) (*domain.GetDocumentResponse, error)) *MockDocumentServiceConnector_GetDocument_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -653,9 +654,9 @@ func (_c *MockDocumentServiceConnector_ListCategories_Call) RunAndReturn(run fun
 	return _c
 }
 
-// ListDocuments provides a mock function with given fields: ctx, query
-func (_m *MockDocumentServiceConnector) ListDocuments(ctx context.Context, query domain.ListDocumentsQuery) (*domain.ListDocumentsResponse, error) {
-	ret := _m.Called(ctx, query)
+// ListDocuments provides a mock function with given fields: ctx, query, userRole
+func (_m *MockDocumentServiceConnector) ListDocuments(ctx context.Context, query domain.ListDocumentsQuery, userRole string) (*domain.ListDocumentsResponse, error) {
+	ret := _m.Called(ctx, query, userRole)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListDocuments")
@@ -663,19 +664,19 @@ func (_m *MockDocumentServiceConnector) ListDocuments(ctx context.Context, query
 
 	var r0 *domain.ListDocumentsResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, domain.ListDocumentsQuery) (*domain.ListDocumentsResponse, error)); ok {
-		return rf(ctx, query)
+	if rf, ok := ret.Get(0).(func(context.Context, domain.ListDocumentsQuery, string) (*domain.ListDocumentsResponse, error)); ok {
+		return rf(ctx, query, userRole)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, domain.ListDocumentsQuery) *domain.ListDocumentsResponse); ok {
-		r0 = rf(ctx, query)
+	if rf, ok := ret.Get(0).(func(context.Context, domain.ListDocumentsQuery, string) *domain.ListDocumentsResponse); ok {
+		r0 = rf(ctx, query, userRole)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*domain.ListDocumentsResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, domain.ListDocumentsQuery) error); ok {
-		r1 = rf(ctx, query)
+	if rf, ok := ret.Get(1).(func(context.Context, domain.ListDocumentsQuery, string) error); ok {
+		r1 = rf(ctx, query, userRole)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -691,13 +692,14 @@ type MockDocumentServiceConnector_ListDocuments_Call struct {
 // ListDocuments is a helper method to define mock.On call
 //   - ctx context.Context
 //   - query domain.ListDocumentsQuery
-func (_e *MockDocumentServiceConnector_Expecter) ListDocuments(ctx interface{}, query interface{}) *MockDocumentServiceConnector_ListDocuments_Call {
-	return &MockDocumentServiceConnector_ListDocuments_Call{Call: _e.mock.On("ListDocuments", ctx, query)}
+//   - userRole string
+func (_e *MockDocumentServiceConnector_Expecter) ListDocuments(ctx interface{}, query interface{}, userRole interface{}) *MockDocumentServiceConnector_ListDocuments_Call {
+	return &MockDocumentServiceConnector_ListDocuments_Call{Call: _e.mock.On("ListDocuments", ctx, query, userRole)}
 }
 
-func (_c *MockDocumentServiceConnector_ListDocuments_Call) Run(run func(ctx context.Context, query domain.ListDocumentsQuery)) *MockDocumentServiceConnector_ListDocuments_Call {
+func (_c *MockDocumentServiceConnector_ListDocuments_Call) Run(run func(ctx context.Context, query domain.ListDocumentsQuery, userRole string)) *MockDocumentServiceConnector_ListDocuments_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(domain.ListDocumentsQuery))
+		run(args[0].(context.Context), args[1].(domain.ListDocumentsQuery), args[2].(string))
 	})
 	return _c
 }
@@ -707,7 +709,55 @@ func (_c *MockDocumentServiceConnector_ListDocuments_Call) Return(_a0 *domain.Li
 	return _c
 }
 
-func (_c *MockDocumentServiceConnector_ListDocuments_Call) RunAndReturn(run func(context.Context, domain.ListDocumentsQuery) (*domain.ListDocumentsResponse, error)) *MockDocumentServiceConnector_ListDocuments_Call {
+func (_c *MockDocumentServiceConnector_ListDocuments_Call) RunAndReturn(run func(context.Context, domain.ListDocumentsQuery, string) (*domain.ListDocumentsResponse, error)) *MockDocumentServiceConnector_ListDocuments_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReindexDocument provides a mock function with given fields: ctx, id, userRole
+func (_m *MockDocumentServiceConnector) ReindexDocument(ctx context.Context, id uuid.UUID, userRole string) error {
+	ret := _m.Called(ctx, id, userRole)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReindexDocument")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID, string) error); ok {
+		r0 = rf(ctx, id, userRole)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockDocumentServiceConnector_ReindexDocument_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReindexDocument'
+type MockDocumentServiceConnector_ReindexDocument_Call struct {
+	*mock.Call
+}
+
+// ReindexDocument is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id uuid.UUID
+//   - userRole string
+func (_e *MockDocumentServiceConnector_Expecter) ReindexDocument(ctx interface{}, id interface{}, userRole interface{}) *MockDocumentServiceConnector_ReindexDocument_Call {
+	return &MockDocumentServiceConnector_ReindexDocument_Call{Call: _e.mock.On("ReindexDocument", ctx, id, userRole)}
+}
+
+func (_c *MockDocumentServiceConnector_ReindexDocument_Call) Run(run func(ctx context.Context, id uuid.UUID, userRole string)) *MockDocumentServiceConnector_ReindexDocument_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockDocumentServiceConnector_ReindexDocument_Call) Return(_a0 error) *MockDocumentServiceConnector_ReindexDocument_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDocumentServiceConnector_ReindexDocument_Call) RunAndReturn(run func(context.Context, uuid.UUID, string) error) *MockDocumentServiceConnector_ReindexDocument_Call {
 	_c.Call.Return(run)
 	return _c
 }
