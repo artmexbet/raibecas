@@ -7,14 +7,18 @@ import (
 	"log/slog"
 	"strings"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/artmexbet/raibecas/services/chat/internal/domain"
 )
 
-type iVectorStore interface {
+type vectorStore interface {
 	RetrieveVectors(ctx context.Context, vector []float64) ([]domain.Document, error)
 }
 
-type iNeuroConnector interface {
+type neuroConnector interface {
 	GenerateEmbeddings(ctx context.Context, input string) ([]float64, error)
 	Chat(
 		ctx context.Context,
@@ -24,7 +28,7 @@ type iNeuroConnector interface {
 	) error
 }
 
-type iChatHistoryStore interface {
+type chatHistoryStore interface {
 	RetrieveChatHistory(ctx context.Context, userID, sessionID string) ([]domain.Message, error)
 	SaveMessage(ctx context.Context, userID, sessionID string, message domain.Message) error
 	ClearChatHistory(ctx context.Context, userID string) error
@@ -34,18 +38,20 @@ type iChatHistoryStore interface {
 }
 
 type Chat struct {
-	vectorStore  iVectorStore
-	neuro        iNeuroConnector
-	historyStore iChatHistoryStore
+	vectorStore  vectorStore
+	neuro        neuroConnector
+	historyStore chatHistoryStore
+	tracer       trace.Tracer
 }
 
 // New creates a new Chat service with the provided vector store and embedder.
 // vectorStore is used to retrieve vectors, and embedder is used to generate embeddings.
-func New(vectorStore iVectorStore, neuro iNeuroConnector, historyStore iChatHistoryStore) *Chat {
+func New(vectorStore vectorStore, neuro neuroConnector, historyStore chatHistoryStore, tracer trace.Tracer) *Chat {
 	return &Chat{
 		vectorStore:  vectorStore,
 		neuro:        neuro,
 		historyStore: historyStore,
+		tracer:       tracer,
 	}
 }
 
@@ -58,15 +64,28 @@ func New(vectorStore iVectorStore, neuro iNeuroConnector, historyStore iChatHist
 // Returns:
 //   - error: non-nil if embedding generation or vector retrieval fails.
 func (c *Chat) ProcessInput(ctx context.Context, input, userID, sessionID string, fn func(response domain.ChatResponse) error) error {
+	ctx, span := c.tracer.Start(ctx, "chat.service.process_input",
+		trace.WithAttributes(
+			attribute.String("chat.user_id", userID),
+			attribute.String("chat.session_id", sessionID),
+		),
+	)
+	defer span.End()
+
 	embedding, err := c.neuro.GenerateEmbeddings(ctx, input)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "embedding generation failed")
 		return fmt.Errorf("could not generate embeddings: %w", err)
 	}
 
 	docs, err := c.vectorStore.RetrieveVectors(ctx, embedding)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "vector retrieval failed")
 		return fmt.Errorf("could not retrieve vectors: %w", err)
 	}
+	span.SetAttributes(attribute.Int("chat.docs_count", len(docs)))
 	slog.DebugContext(ctx, "retrieved documents", "count", len(docs), "docs", docs)
 
 	// Retrieve chat history from Redis
@@ -131,15 +150,30 @@ func (c *Chat) ProcessInput(ctx context.Context, input, userID, sessionID string
 
 // ClearUserChat clears all chat history for a user
 func (c *Chat) ClearUserChat(ctx context.Context, userID string) error {
+	ctx, span := c.tracer.Start(ctx, "chat.service.clear_history",
+		trace.WithAttributes(attribute.String("chat.user_id", userID)),
+	)
+	defer span.End()
+
 	return c.historyStore.ClearChatHistory(ctx, userID)
 }
 
 // GetUserSessions returns all chat sessions with messages for a user
 func (c *Chat) GetUserSessions(ctx context.Context, userID string) ([]domain.ChatSession, error) {
+	ctx, span := c.tracer.Start(ctx, "chat.service.get_sessions",
+		trace.WithAttributes(attribute.String("chat.user_id", userID)),
+	)
+	defer span.End()
+
 	return c.historyStore.GetUserSessions(ctx, userID)
 }
 
 // CreateSession creates a new chat session for a user
 func (c *Chat) CreateSession(ctx context.Context, userID, title string) (string, error) {
+	ctx, span := c.tracer.Start(ctx, "chat.service.create_session",
+		trace.WithAttributes(attribute.String("chat.user_id", userID)),
+	)
+	defer span.End()
+
 	return c.historyStore.CreateSession(ctx, userID, title)
 }

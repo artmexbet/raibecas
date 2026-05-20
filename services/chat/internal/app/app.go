@@ -12,6 +12,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/qdrant/go-client/qdrant"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/artmexbet/raibecas/libs/natsw"
@@ -158,7 +159,8 @@ func New() (*App, error) {
 	slog.Info("connected to postgres (chat history)")
 
 	// Create service
-	svc := service.New(qdrantWrap, ollama, pgStore)
+	serviceTracer := otel.GetTracerProvider().Tracer("chat-service")
+	svc := service.New(qdrantWrap, ollama, pgStore, serviceTracer)
 
 	// Create NATS handler
 	natsHandler := natshandler.NewHandler(natsClient, svc)
