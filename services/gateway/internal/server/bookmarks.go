@@ -1,14 +1,12 @@
 package server
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
-	"github.com/artmexbet/raibecas/services/gateway/internal/connector"
 	"github.com/artmexbet/raibecas/services/gateway/internal/domain"
 )
 
@@ -53,7 +51,7 @@ func (s *Server) listBookmarks(c *fiber.Ctx) error {
 	response, err := s.documentConnector.ListBookmarks(c.UserContext(), query)
 	if err != nil {
 		slog.Error("failed to list bookmarks", "error", err)
-		status, errorCode, message := mapBookmarkConnectorError(err, "Failed to retrieve bookmarks")
+		status, errorCode, message := mapConnectorError(err, "Failed to retrieve bookmarks")
 		return c.Status(status).JSON(domain.ErrorResponse{
 			Error:   errorCode,
 			Message: message,
@@ -97,7 +95,7 @@ func (s *Server) createBookmark(c *fiber.Ctx) error {
 	response, err := s.documentConnector.CreateBookmark(c.UserContext(), req)
 	if err != nil {
 		slog.Error("failed to create bookmark", "error", err)
-		status, errorCode, message := mapBookmarkConnectorError(err, "Failed to save bookmark")
+		status, errorCode, message := mapConnectorError(err, "Failed to save bookmark")
 		return c.Status(status).JSON(domain.ErrorResponse{
 			Error:   errorCode,
 			Message: message,
@@ -128,7 +126,7 @@ func (s *Server) deleteBookmark(c *fiber.Ctx) error {
 
 	if err := s.documentConnector.DeleteBookmark(c.UserContext(), authUser.ID, bookmarkID); err != nil {
 		slog.Error("failed to delete bookmark", "bookmark_id", bookmarkID, "user_id", authUser.ID, "error", err)
-		status, errorCode, message := mapBookmarkConnectorError(err, "Failed to delete bookmark")
+		status, errorCode, message := mapConnectorError(err, "Failed to delete bookmark")
 		return c.Status(status).JSON(domain.ErrorResponse{
 			Error:   errorCode,
 			Message: message,
@@ -136,23 +134,4 @@ func (s *Server) deleteBookmark(c *fiber.Ctx) error {
 	}
 
 	return c.SendStatus(http.StatusNoContent)
-}
-
-func mapBookmarkConnectorError(err error, fallbackMessage string) (status int, errorCode string, message string) {
-	if err == nil {
-		return http.StatusOK, "", ""
-	}
-
-	switch {
-	case errors.Is(err, connector.ErrInvalidRequest):
-		return http.StatusBadRequest, "invalid_request", fallbackMessage
-	case errors.Is(err, connector.ErrNotFound):
-		return http.StatusNotFound, "not_found", fallbackMessage
-	case errors.Is(err, connector.ErrUnauthorized):
-		return http.StatusUnauthorized, "unauthorized", fallbackMessage
-	case errors.Is(err, connector.ErrForbidden):
-		return http.StatusForbidden, "forbidden", fallbackMessage
-	default:
-		return http.StatusInternalServerError, "internal_error", fallbackMessage
-	}
 }

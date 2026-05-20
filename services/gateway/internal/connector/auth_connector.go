@@ -42,6 +42,24 @@ type authResponse struct {
 	Error   string          `json:"error,omitempty"`
 }
 
+// mapAuthError maps auth service error strings to connector sentinel errors.
+func mapAuthError(errStr string) error {
+	switch errStr {
+	case "invalid_request":
+		return ErrInvalidRequest
+	case "not_found":
+		return ErrNotFound
+	case "unauthorized":
+		return ErrUnauthorized
+	case "forbidden":
+		return ErrForbidden
+	case "internal_error":
+		return ErrInternal
+	default:
+		return fmt.Errorf("auth service error: %s", errStr)
+	}
+}
+
 // Login authenticates a user and returns tokens
 func (c *NATSAuthConnector) Login(ctx context.Context, req domain.LoginRequest) (*domain.AuthServiceLoginResponse, error) {
 	reqData, err := req.MarshalJSON()
@@ -63,7 +81,7 @@ func (c *NATSAuthConnector) Login(ctx context.Context, req domain.LoginRequest) 
 	}
 
 	if !response.Success {
-		return nil, fmt.Errorf("login failed: %s", response.Error)
+		return nil, mapAuthError(response.Error)
 	}
 
 	var loginResp domain.AuthServiceLoginResponse
@@ -95,7 +113,7 @@ func (c *NATSAuthConnector) RefreshToken(ctx context.Context, req domain.AuthSer
 	}
 
 	if !response.Success {
-		return nil, fmt.Errorf("refresh failed: %s", response.Error)
+		return nil, mapAuthError(response.Error)
 	}
 
 	var refreshResp domain.AuthServiceLoginResponse
@@ -185,7 +203,7 @@ func (c *NATSAuthConnector) Logout(ctx context.Context, tokenID, accessTokenJTI 
 	}
 
 	if !response.Success {
-		return fmt.Errorf("logout failed: %s", response.Error)
+		return mapAuthError(response.Error)
 	}
 
 	return nil
@@ -217,7 +235,7 @@ func (c *NATSAuthConnector) LogoutAll(ctx context.Context, userID uuid.UUID, tok
 	}
 
 	if !response.Success {
-		return fmt.Errorf("logout all failed: %s", response.Error)
+		return mapAuthError(response.Error)
 	}
 
 	return nil
@@ -251,7 +269,7 @@ func (c *NATSAuthConnector) ChangePassword(ctx context.Context, userID uuid.UUID
 	}
 
 	if !response.Success {
-		return fmt.Errorf("change password failed: %s", response.Error)
+		return mapAuthError(response.Error)
 	}
 
 	return nil

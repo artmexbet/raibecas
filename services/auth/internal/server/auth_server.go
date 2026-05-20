@@ -117,9 +117,12 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	natsTracer := tracerProvider.Tracer("nats-client")
+	serviceTracer := tracerProvider.Tracer("auth-service")
+	logger := slog.Default()
+
 	// Create nats wrapper client with middleware
 	natsClient := natsw.NewClient(natsConn,
-		natsw.WithLogger(slog.Default()),
+		natsw.WithLogger(logger),
 		natsw.WithRecover(),
 		natsw.WithTracer(natsTracer),
 		natsw.WithMiddleware(natsw.TraceHandlerMiddleware(natsTracer)),
@@ -141,19 +144,19 @@ func New(cfg *config.Config) (*App, error) {
 	)
 
 	// Initialize services
-	authService := service.NewAuthService(pgs, jwtManager)
-	regService := service.NewRegistrationService(pgs, pgs)
+	authService := service.NewAuthService(pgs, jwtManager, serviceTracer, logger)
+	regService := service.NewRegistrationService(pgs, pgs, logger)
 
 	// Initialize nats publisher and subscriber
 	publisher := natspkg.NewPublisher(natsConn)
 	subscriber := natspkg.NewSubscriber(natsConn, regService, publisher)
 
 	// Initialize user consumer for outbox events
-	userConsumer := consumer.NewUserConsumer(pgs, slog.Default())
+	userConsumer := consumer.NewUserConsumer(pgs, logger)
 
 	// Initialize App handlers
-	authHandler := handler.NewAuthHandler(authService, publisher)
-	regHandler := handler.NewRegistrationHandler(regService, publisher)
+	authHandler := handler.NewAuthHandler(authService, publisher, serviceTracer)
+	regHandler := handler.NewRegistrationHandler(regService, publisher, serviceTracer)
 
 	// Setup App subscriptions
 	server := &App{

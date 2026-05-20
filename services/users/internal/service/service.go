@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/artmexbet/raibecas/services/users/internal/domain"
@@ -18,6 +20,7 @@ type Service struct {
 	regRepo    RegistrationRepository
 	outboxRepo OutboxRepository
 	metrics    Metrics
+	tracer     trace.Tracer
 }
 
 func New(
@@ -25,18 +28,23 @@ func New(
 	regRepo RegistrationRepository,
 	outboxRepo OutboxRepository,
 	metrics Metrics,
+	tracer trace.Tracer,
 ) *Service {
 	return &Service{
 		userRepo:   userRepo,
 		regRepo:    regRepo,
 		outboxRepo: outboxRepo,
 		metrics:    metrics,
+		tracer:     tracer,
 	}
 }
 
 // User methods
 
 func (s *Service) ListUsers(ctx context.Context, params postgres.ListUsersParams) ([]domain.User, int, error) {
+	ctx, span := s.tracer.Start(ctx, "users.service.list")
+	defer span.End()
+
 	// Validate and normalize parameters
 	if params.Limit > 100 {
 		params.Limit = 100
@@ -57,6 +65,11 @@ func (s *Service) ListUsers(ctx context.Context, params postgres.ListUsersParams
 }
 
 func (s *Service) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
+	ctx, span := s.tracer.Start(ctx, "users.service.get",
+		trace.WithAttributes(attribute.String("user.id", id.String())),
+	)
+	defer span.End()
+
 	if id == uuid.Nil {
 		return nil, ErrInvalidUserID
 	}
@@ -72,6 +85,11 @@ func (s *Service) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, 
 }
 
 func (s *Service) UpdateUser(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
+	ctx, span := s.tracer.Start(ctx, "users.service.update",
+		trace.WithAttributes(attribute.String("user.id", params.ID.String())),
+	)
+	defer span.End()
+
 	if params.ID == uuid.Nil {
 		return nil, ErrInvalidUserID
 	}
@@ -94,6 +112,11 @@ func (s *Service) UpdateUser(ctx context.Context, params domain.UpdateUserParams
 }
 
 func (s *Service) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	ctx, span := s.tracer.Start(ctx, "users.service.delete",
+		trace.WithAttributes(attribute.String("user.id", id.String())),
+	)
+	defer span.End()
+
 	if id == uuid.Nil {
 		return ErrInvalidUserID
 	}
@@ -107,6 +130,9 @@ func (s *Service) DeleteUser(ctx context.Context, id uuid.UUID) error {
 // Registration Request methods
 
 func (s *Service) CreateRegistrationRequest(ctx context.Context, req *domain.RegistrationRequest) (*domain.RegistrationRequest, error) {
+	ctx, span := s.tracer.Start(ctx, "users.service.create_registration")
+	defer span.End()
+
 	if req == nil {
 		return nil, ErrRegistrationRequestNil
 	}
@@ -129,6 +155,9 @@ func (s *Service) CreateRegistrationRequest(ctx context.Context, req *domain.Reg
 }
 
 func (s *Service) ListRegistrationRequests(ctx context.Context, status domain.RegistrationStatus, limit, offset int) ([]domain.RegistrationRequest, int, error) {
+	ctx, span := s.tracer.Start(ctx, "users.service.list_registrations")
+	defer span.End()
+
 	// Validate and normalize parameters
 	if limit > 100 {
 		limit = 100
@@ -149,6 +178,11 @@ func (s *Service) ListRegistrationRequests(ctx context.Context, status domain.Re
 }
 
 func (s *Service) ApproveRegistrationRequest(ctx context.Context, requestID uuid.UUID, approverID uuid.UUID, role string) (*domain.User, error) {
+	ctx, span := s.tracer.Start(ctx, "users.service.approve_registration",
+		trace.WithAttributes(attribute.String("registration.id", requestID.String())),
+	)
+	defer span.End()
+
 	if requestID == uuid.Nil || approverID == uuid.Nil {
 		return nil, ErrInvalidRequestOrApproverID
 	}
@@ -166,6 +200,11 @@ func (s *Service) ApproveRegistrationRequest(ctx context.Context, requestID uuid
 }
 
 func (s *Service) RejectRegistrationRequest(ctx context.Context, requestID uuid.UUID, approverID uuid.UUID, reason string) error {
+	ctx, span := s.tracer.Start(ctx, "users.service.reject_registration",
+		trace.WithAttributes(attribute.String("registration.id", requestID.String())),
+	)
+	defer span.End()
+
 	if requestID == uuid.Nil || approverID == uuid.Nil {
 		return ErrInvalidRequestOrApproverID
 	}

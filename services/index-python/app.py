@@ -5,6 +5,8 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from nats.aio.client import Msg
+from opentelemetry import trace
+from opentelemetry.trace import StatusCode
 from qdrant_client.http import models as qdrant_models
 
 from broker import const, nats_connector
@@ -15,14 +17,24 @@ from pipeline.loader import DocumentLoader
 from pipeline.minio_loader import MinIOConfig, MinIODocumentLoader
 from pipeline.types import DocumentIndexRequest
 from pipeline.writer import QdrantWriter
+from telemetry import TelemetryConfig, get_tracer, init_tracer, shutdown as shutdown_tracer
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 
 class App:
-    def __init__(self, config: Optional[AppConfig] = None, nats_cfg: None | nats_connector.NATSConfig = None, minio_cfg: None | MinIOConfig = None):
+    def __init__(
+        self,
+        config: Optional[AppConfig] = None,
+        nats_cfg: None | nats_connector.NATSConfig = None,
+        minio_cfg: None | MinIOConfig = None,
+        telemetry_cfg: None | TelemetryConfig = None,
+    ):
         self.config = config or AppConfig()
         self.nats_connector = nats_connector.NATSConnector(nats_cfg or nats_connector.NATSConfig())
         self.document_loader = DocumentLoader()
@@ -30,6 +42,8 @@ class App:
         self.chunk_splitter = ChunkSplitter(self.config.chunk)
         self.embedding_service = EmbeddingService(self.config.ollama)
         self.qdrant_writer = QdrantWriter(self.config.qdrant)
+        self._tracer_provider = init_tracer(telemetry_cfg or TelemetryConfig())
+        self._tracer = get_tracer("index-python")
 
     async def __run(self) -> None:
         logger.info("starting index-python service")
@@ -66,20 +80,29 @@ class App:
         logger.info("shutting down services")
         self.qdrant_writer.close()
         await self.nats_connector.close()
+        shutdown_tracer(self._tracer_provider)
 
     async def index_handler(self, msg: Msg) -> None:
-        logger.debug("received message %s", msg.subject)
-        document_id = None
-        try:
-            payload = json.loads(msg.data.decode())
-            request = DocumentIndexRequest.from_dict(payload)
-            document_id = request.document_id
-            text = await self.document_loader.load(request)
-            chunks_count = await self._process_document(request, text)
-            await self._publish_indexed_event(document_id, chunks_count, "success")
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.exception("failed to process document: %s", exc)
-            await self._publish_indexed_event(document_id, 0, "failed")
+        with self._tracer.start_as_current_span("index.handler.index") as span:
+            document_id = None
+            try:
+                payload = json.loads(msg.data.decode())
+                request = DocumentIndexRequest.from_dict(payload)
+                document_id = request.document_id
+                span.set_attribute("document.id", str(document_id) if document_id else "")
+                logger.info("indexing document: document_id=%s", document_id)
+
+                text = await self.document_loader.load(request)
+                chunks_count = await self._process_document(request, text)
+
+                span.set_attribute("document.chunks_count", chunks_count)
+                await self._publish_indexed_event(document_id, chunks_count, "success")
+                logger.info("successfully indexed document: document_id=%s chunks=%d", document_id, chunks_count)
+            except Exception as exc:
+                span.set_status(StatusCode.ERROR, str(exc))
+                span.record_exception(exc)
+                logger.exception("failed to process document: %s", exc)
+                await self._publish_indexed_event(document_id, 0, "failed")
 
     async def document_created_handler(self, msg: Msg) -> None:
         """Handles corpus.document.created events from the documents service."""
@@ -90,65 +113,84 @@ class App:
         await self._handle_document_event(msg, source=const.DOCUMENT_UPDATED_SUBJECT)
 
     async def _handle_document_event(self, msg: Msg, source: str) -> None:
-        logger.info("received %s event", source)
-        document_id = None
-        try:
-            payload = json.loads(msg.data.decode())
+        with self._tracer.start_as_current_span(
+            "index.handler.document_event",
+            attributes={"event.source": source},
+        ) as span:
+            document_id = None
+            try:
+                payload = json.loads(msg.data.decode())
 
-            document_id = payload.get("document_id")
-            title = payload.get("title", "")
-            content_path = payload.get("content_path")
-            version = payload.get("version") or payload.get("new_version") or 1
+                document_id = payload.get("document_id")
+                title = payload.get("title", "")
+                content_path = payload.get("content_path")
+                version = payload.get("version") or payload.get("new_version") or 1
 
-            if not content_path:
-                logger.error("document event missing content_path: %s", payload)
+                span.set_attribute("document.id", str(document_id) if document_id else "")
+                span.set_attribute("document.title", title)
+
+                if not content_path:
+                    logger.error("document event missing content_path: %s", payload)
+                    span.set_status(StatusCode.ERROR, "missing content_path")
+                    await self._publish_indexed_event(document_id, 0, "failed")
+                    return
+
+                logger.info(
+                    "indexing document from MinIO: document_id=%s title=%s path=%s source=%s",
+                    document_id, title, content_path, source,
+                )
+
+                text = await self.minio_loader.load(content_path)
+
+                request = DocumentIndexRequest(
+                    title=title,
+                    path=content_path,
+                    content=text,
+                    document_id=str(document_id) if document_id else None,
+                    metadata=self._event_metadata(payload, version, source),
+                )
+
+                chunks_count = await self._process_document(request, text)
+                span.set_attribute("document.chunks_count", chunks_count)
+                logger.info("successfully indexed document: document_id=%s source=%s chunks=%d", document_id, source, chunks_count)
+                await self._publish_indexed_event(document_id, chunks_count, "success")
+            except Exception as exc:
+                span.set_status(StatusCode.ERROR, str(exc))
+                span.record_exception(exc)
+                logger.exception("failed to handle %s event: %s", source, exc)
                 await self._publish_indexed_event(document_id, 0, "failed")
-                return
-
-            logger.info(
-                "indexing document from MinIO: document_id=%s title=%s path=%s source=%s",
-                document_id, title, content_path, source,
-            )
-
-            text = await self.minio_loader.load(content_path)
-
-            request = DocumentIndexRequest(
-                title=title,
-                path=content_path,
-                content=text,
-                document_id=str(document_id) if document_id else None,
-                metadata=self._event_metadata(payload, version, source),
-            )
-
-            chunks_count = await self._process_document(request, text)
-            logger.info("successfully indexed document: document_id=%s source=%s chunks=%d", document_id, source, chunks_count)
-            await self._publish_indexed_event(document_id, chunks_count, "success")
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.exception("failed to handle %s event: %s", source, exc)
-            await self._publish_indexed_event(document_id, 0, "failed")
 
     async def _process_document(self, request: DocumentIndexRequest, text: str) -> int:
-        document_id = request.document_id or str(uuid.uuid4())
-        metadata = self._base_metadata(request, document_id)
-        chunks = self.chunk_splitter.split(text, metadata)
-        if not chunks:
-            logger.warning("no chunks generated for %s", request.title)
-            return 0
+        with self._tracer.start_as_current_span("index.pipeline.process") as span:
+            document_id = request.document_id or str(uuid.uuid4())
+            span.set_attribute("document.id", document_id)
 
-        vectors = await self.embedding_service.embed([chunk.text for chunk in chunks])
+            metadata = self._base_metadata(request, document_id)
+            chunks = self.chunk_splitter.split(text, metadata)
+            if not chunks:
+                logger.warning("no chunks generated for %s", request.title)
+                return 0
 
-        points: List[qdrant_models.PointStruct] = []
-        for chunk, vector in zip(chunks, vectors):
-            payload = {**chunk.metadata, "chunk_text": chunk.text}
-            points.append(
-                qdrant_models.PointStruct(
-                    id=str(uuid.uuid4()),
-                    vector=vector,
-                    payload=payload,
+            span.set_attribute("document.chunks_count", len(chunks))
+
+            with self._tracer.start_as_current_span("index.pipeline.embed"):
+                vectors = await self.embedding_service.embed([chunk.text for chunk in chunks])
+
+            points: List[qdrant_models.PointStruct] = []
+            for chunk, vector in zip(chunks, vectors):
+                payload = {**chunk.metadata, "chunk_text": chunk.text}
+                points.append(
+                    qdrant_models.PointStruct(
+                        id=str(uuid.uuid4()),
+                        vector=vector,
+                        payload=payload,
+                    )
                 )
-            )
-        await self.qdrant_writer.write_points(points)
-        return len(chunks)
+
+            with self._tracer.start_as_current_span("index.pipeline.write_qdrant"):
+                await self.qdrant_writer.write_points(points)
+
+            return len(chunks)
 
     async def _publish_indexed_event(self, document_id: Any, chunks_count: int, status: str) -> None:
         if not document_id:
@@ -172,7 +214,7 @@ class App:
                 "successfully published indexed event: document_id=%s status=%s",
                 document_id, status,
             )
-        except Exception as exc:  # pylint: disable=broad-except
+        except Exception as exc:
             logger.exception(
                 "CRITICAL: failed to publish indexed event via JetStream: "
                 "document_id=%s status=%s error=%s",

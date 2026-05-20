@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"go.opentelemetry.io/otel"
 
 	"github.com/artmexbet/raibecas/libs/natsw"
 	"github.com/artmexbet/raibecas/libs/telemetry"
@@ -70,6 +71,10 @@ func New(ctx context.Context) (*App, error) {
 			ServiceVersion: cfg.Telemetry.ServiceVersion,
 			OTLPEndpoint:   cfg.Telemetry.OTLPEndpoint,
 			Enabled:        cfg.Telemetry.Enabled,
+			ExportTimeout:  cfg.Telemetry.ExportTimeout,
+			BatchTimeout:   cfg.Telemetry.BatchTimeout,
+			MaxQueueSize:   cfg.Telemetry.MaxQueueSize,
+			MaxExportBatch: cfg.Telemetry.MaxExportBatch,
 		})
 		if err != nil {
 			logger.Warn("failed to initialize telemetry", "error", err)
@@ -125,10 +130,13 @@ func New(ctx context.Context) (*App, error) {
 	app.natsConn = natsConn
 	logger.Info("connected to nats", "url", cfg.NATS.URL)
 
-	// Create NATS client with middleware
+	// Create NATS client with middleware and tracing
+	natsTracer := otel.GetTracerProvider().Tracer("nats-client")
 	natsClient := natsw.NewClient(natsConn,
 		natsw.WithLogger(logger),
 		natsw.WithRecover(),
+		natsw.WithTracer(natsTracer),
+		natsw.WithMiddleware(natsw.TraceHandlerMiddleware(natsTracer)),
 	)
 	app.natsClient = natsClient
 
@@ -160,6 +168,9 @@ func New(ctx context.Context) (*App, error) {
 	tagRepo := postgres.NewTagRepository(q)
 	metadataRepo := postgres.NewMetadataRepository(q)
 
+	// Create service tracer
+	serviceTracer := otel.GetTracerProvider().Tracer("documents-service")
+
 	// Initialize service with repositories
 	docService := service.NewDocumentService(
 		docRepo,
@@ -170,6 +181,7 @@ func New(ctx context.Context) (*App, error) {
 		minioStorage,
 		publisher,
 		logger,
+		serviceTracer,
 	)
 
 	// Initialize handlers

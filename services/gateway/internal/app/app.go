@@ -28,6 +28,12 @@ type App struct {
 
 // New creates a new App instance with all dependencies initialized
 func New() (*App, error) {
+	// Setup structured JSON logger
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+	slog.SetDefault(logger)
+
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {

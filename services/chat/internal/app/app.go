@@ -12,6 +12,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/qdrant/go-client/qdrant"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/artmexbet/raibecas/libs/natsw"
@@ -43,10 +44,9 @@ type App struct {
 
 // New creates and returns a new App instance with all dependencies initialized.
 func New() (*App, error) {
-	// Initialize logger
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		AddSource: true,
-		Level:     slog.LevelDebug,
+	// Initialize structured JSON logger
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
 	}))
 	slog.SetDefault(logger)
 
@@ -63,14 +63,14 @@ func New() (*App, error) {
 
 	// Initialize tracer
 	tp, err := telemetry.InitTracer(telemetry.TracerConfig{
-		ServiceName:    "chat",
-		ServiceVersion: "1.0.0",
-		OTLPEndpoint:   "localhost:4317",
-		Enabled:        true,
-		ExportTimeout:  30 * time.Second,
-		BatchTimeout:   5 * time.Second,
-		MaxQueueSize:   2048,
-		MaxExportBatch: 512,
+		ServiceName:    cfg.Telemetry.ServiceName,
+		ServiceVersion: cfg.Telemetry.ServiceVersion,
+		OTLPEndpoint:   cfg.Telemetry.OTLPEndpoint,
+		Enabled:        cfg.Telemetry.Enabled,
+		ExportTimeout:  cfg.Telemetry.ExportTimeout,
+		BatchTimeout:   cfg.Telemetry.BatchTimeout,
+		MaxQueueSize:   cfg.Telemetry.MaxQueueSize,
+		MaxExportBatch: cfg.Telemetry.MaxExportBatch,
 	})
 	if err != nil {
 		slog.Warn("failed to initialize tracer, continuing without tracing", "error", err)
@@ -88,12 +88,20 @@ func New() (*App, error) {
 	}
 	slog.Info("connected to NATS", "url", cfg.NATS.URL)
 
-	// Create NATS wrapper client
-	natsClient := natsw.NewClient(
-		natsConn,
+	// Create NATS wrapper client with tracing
+	var natsClientOpts []natsw.ClientOption
+	natsClientOpts = append(natsClientOpts,
 		natsw.WithRecover(),
 		natsw.WithLogger(slog.Default()),
 	)
+	if tp != nil {
+		natsTracer := tp.Tracer("nats-client")
+		natsClientOpts = append(natsClientOpts,
+			natsw.WithTracer(natsTracer),
+			natsw.WithMiddleware(natsw.TraceHandlerMiddleware(natsTracer)),
+		)
+	}
+	natsClient := natsw.NewClient(natsConn, natsClientOpts...)
 
 	// Initialize Qdrant client
 	qdrantClient, err := qdrant.NewClient(&qdrant.Config{
@@ -151,7 +159,8 @@ func New() (*App, error) {
 	slog.Info("connected to postgres (chat history)")
 
 	// Create service
-	svc := service.New(qdrantWrap, ollama, pgStore)
+	serviceTracer := otel.GetTracerProvider().Tracer("chat-service")
+	svc := service.New(qdrantWrap, ollama, pgStore, serviceTracer)
 
 	// Create NATS handler
 	natsHandler := natshandler.NewHandler(natsClient, svc)

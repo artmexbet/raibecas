@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
 )
@@ -38,10 +39,23 @@ func (d DatabaseConfig) DSN() string {
 	)
 }
 
+// TelemetryConfig holds telemetry configuration
+type TelemetryConfig struct {
+	Enabled        bool          `env:"ENABLED" env-default:"true"`
+	ServiceName    string        `env:"SERVICE_NAME" env-default:"users"`
+	ServiceVersion string        `env:"SERVICE_VERSION" env-default:"1.0.0"`
+	OTLPEndpoint   string        `env:"OTLP_ENDPOINT" env-default:"localhost:4318"`
+	ExportTimeout  time.Duration `env:"EXPORT_TIMEOUT" env-default:"30s"`
+	BatchTimeout   time.Duration `env:"BATCH_TIMEOUT" env-default:"5s"`
+	MaxQueueSize   int           `env:"MAX_QUEUE_SIZE" env-default:"2048"`
+	MaxExportBatch int           `env:"MAX_EXPORT_BATCH" env-default:"512"`
+}
+
 type Config struct {
-	NATS     NATS           `yaml:"nats" env-prefix:"NATS_"`
-	Database DatabaseConfig `yaml:"database" env-prefix:"DB_"`
-	Metrics  Metrics        `yaml:"metrics" env-prefix:"METRICS_"`
+	NATS      NATS            `yaml:"nats" env-prefix:"NATS_"`
+	Database  DatabaseConfig  `yaml:"database" env-prefix:"DB_"`
+	Metrics   Metrics         `yaml:"metrics" env-prefix:"METRICS_"`
+	Telemetry TelemetryConfig `yaml:"telemetry" env-prefix:"TELEMETRY_"`
 }
 
 func Load() (Config, error) {
