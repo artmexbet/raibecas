@@ -161,7 +161,69 @@ type CountDocumentsParams struct {
 
 // CountDocuments
 //
-//	SELECT COUNT(*) FROM documents ...
+//	SELECT COUNT(*) FROM documents
+//	WHERE (
+//	    CASE
+//	        WHEN $1::uuid IS NOT NULL THEN EXISTS (
+//	            SELECT 1
+//	            FROM document_authors da
+//	            WHERE da.document_id = documents.id
+//	              AND da.author_id = $1::uuid
+//	        )
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $2::int IS NOT NULL THEN category_id = $2::int
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $3::int IS NOT NULL THEN document_type_id = $3::int
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $4::int IS NOT NULL THEN EXISTS (
+//	            SELECT 1
+//	            FROM document_tags dt
+//	            WHERE dt.document_id = documents.id
+//	              AND dt.tag_id = $4::int
+//	        )
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $5::boolean IS NOT NULL THEN is_public = $5::boolean
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $6::text IS NOT NULL AND $6::text != ''
+//	        THEN (
+//	            to_tsvector('russian', title || ' ' || COALESCE(description, '') || ' ' || COALESCE((SELECT name FROM document_types WHERE id = documents.document_type_id), '')) @@ plainto_tsquery('russian', $6::text)
+//	            OR EXISTS (
+//	                SELECT 1
+//	                FROM document_authors da
+//	                JOIN authors a ON a.id = da.author_id
+//	                JOIN authorship_types at ON at.id = da.type_id
+//	                WHERE da.document_id = documents.id
+//	                  AND (
+//	                      a.name ILIKE '%' || $6::text || '%'
+//	                      OR at.title ILIKE '%' || $6::text || '%'
+//	                  )
+//	            )
+//	            OR EXISTS (
+//	                SELECT 1
+//	                FROM document_tags dt
+//	                JOIN tags t ON t.id = dt.tag_id
+//	                WHERE dt.document_id = documents.id
+//	                  AND t.title ILIKE '%' || $6::text || '%'
+//	            )
+//	        )
+//	        ELSE TRUE
+//	    END
+//	)
 func (q *Queries) CountDocuments(ctx context.Context, arg CountDocumentsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countDocuments,
 		arg.AuthorID,
@@ -251,7 +313,7 @@ INSERT INTO documents (
     document_type_id,
     is_public
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, title, description, category_id, publication_date, content_path, current_version, indexed, is_public, created_at, updated_at, cover_path, document_type_id
+RETURNING id, title, description, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path, document_type_id, is_public
 `
 
 type CreateDocumentParams struct {
@@ -277,7 +339,7 @@ type CreateDocumentParams struct {
 //	    document_type_id,
 //	    is_public
 //	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-//	RETURNING id, title, description, category_id, publication_date, content_path, current_version, indexed, is_public, created_at, updated_at, cover_path, document_type_id
+//	RETURNING id, title, description, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path, document_type_id, is_public
 func (q *Queries) CreateDocument(ctx context.Context, arg CreateDocumentParams) (Document, error) {
 	row := q.db.QueryRow(ctx, createDocument,
 		arg.Title,
@@ -299,11 +361,11 @@ func (q *Queries) CreateDocument(ctx context.Context, arg CreateDocumentParams) 
 		&i.ContentPath,
 		&i.CurrentVersion,
 		&i.Indexed,
-		&i.IsPublic,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CoverPath,
 		&i.DocumentTypeID,
+		&i.IsPublic,
 	)
 	return i, err
 }
@@ -549,7 +611,7 @@ func (q *Queries) GetDocumentAuthors(ctx context.Context, documentID uuid.UUID) 
 
 const getDocumentByID = `-- name: GetDocumentByID :one
 SELECT
-    documents.id, documents.title, documents.description, documents.category_id, documents.publication_date, documents.content_path, documents.current_version, documents.indexed, documents.is_public, documents.created_at, documents.updated_at, documents.cover_path, documents.document_type_id,
+    documents.id, documents.title, documents.description, documents.category_id, documents.publication_date, documents.content_path, documents.current_version, documents.indexed, documents.created_at, documents.updated_at, documents.cover_path, documents.document_type_id, documents.is_public,
     categories.id, categories.title, categories.description, categories.created_at,
     document_types.id, document_types.name, document_types.created_at
 FROM documents
@@ -567,19 +629,24 @@ type GetDocumentByIDRow struct {
 	ContentPath     string
 	CurrentVersion  int32
 	Indexed         bool
-	IsPublic        bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	CoverPath       *string
 	DocumentTypeID  int32
+	IsPublic        bool
 	Category        Category
 	DocumentType    DocumentType
 }
 
 // GetDocumentByID
 //
-//	SELECT documents.*, categories.*, document_types.*
-//	FROM documents LEFT JOIN categories ... LEFT JOIN document_types ...
+//	SELECT
+//	    documents.id, documents.title, documents.description, documents.category_id, documents.publication_date, documents.content_path, documents.current_version, documents.indexed, documents.created_at, documents.updated_at, documents.cover_path, documents.document_type_id, documents.is_public,
+//	    categories.id, categories.title, categories.description, categories.created_at,
+//	    document_types.id, document_types.name, document_types.created_at
+//	FROM documents
+//	LEFT JOIN categories ON documents.category_id = categories.id
+//	LEFT JOIN document_types ON documents.document_type_id = document_types.id
 //	WHERE documents.id = $1
 func (q *Queries) GetDocumentByID(ctx context.Context, id uuid.UUID) (GetDocumentByIDRow, error) {
 	row := q.db.QueryRow(ctx, getDocumentByID, id)
@@ -593,11 +660,11 @@ func (q *Queries) GetDocumentByID(ctx context.Context, id uuid.UUID) (GetDocumen
 		&i.ContentPath,
 		&i.CurrentVersion,
 		&i.Indexed,
-		&i.IsPublic,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CoverPath,
 		&i.DocumentTypeID,
+		&i.IsPublic,
 		&i.Category.ID,
 		&i.Category.Title,
 		&i.Category.Description,
@@ -871,7 +938,7 @@ func (q *Queries) ListDocumentVersions(ctx context.Context, documentID uuid.UUID
 
 const listDocuments = `-- name: ListDocuments :many
 SELECT
-    d.id, d.title, d.description, d.category_id, d.publication_date, d.content_path, d.current_version, d.indexed, d.is_public, d.created_at, d.updated_at, d.cover_path, d.document_type_id,
+    d.id, d.title, d.description, d.category_id, d.publication_date, d.content_path, d.current_version, d.indexed, d.created_at, d.updated_at, d.cover_path, d.document_type_id, d.is_public,
     c.id, c.title, c.description, c.created_at,
     dt.id, dt.name, dt.created_at
 FROM documents d
@@ -963,20 +1030,88 @@ type ListDocumentsRow struct {
 	ContentPath     string
 	CurrentVersion  int32
 	Indexed         bool
-	IsPublic        bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	CoverPath       *string
 	DocumentTypeID  int32
+	IsPublic        bool
 	Category        Category
 	DocumentType    DocumentType
 }
 
 // ListDocuments
 //
-//	SELECT d.*, c.*, dt.* FROM documents d
-//	LEFT JOIN categories c ... LEFT JOIN document_types dt ...
-//	WHERE ... ORDER BY d.created_at DESC LIMIT $1 OFFSET $2
+//	SELECT
+//	    d.id, d.title, d.description, d.category_id, d.publication_date, d.content_path, d.current_version, d.indexed, d.created_at, d.updated_at, d.cover_path, d.document_type_id, d.is_public,
+//	    c.id, c.title, c.description, c.created_at,
+//	    dt.id, dt.name, dt.created_at
+//	FROM documents d
+//	LEFT JOIN categories c ON d.category_id = c.id
+//	LEFT JOIN document_types dt ON d.document_type_id = dt.id
+//	WHERE (
+//	    CASE
+//	        WHEN $3::uuid IS NOT NULL THEN EXISTS (
+//	            SELECT 1
+//	            FROM document_authors da
+//	            WHERE da.document_id = d.id
+//	              AND da.author_id = $3::uuid
+//	        )
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $4::int IS NOT NULL THEN d.category_id = $4::int
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $5::int IS NOT NULL THEN d.document_type_id = $5::int
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $6::int IS NOT NULL THEN EXISTS (
+//	            SELECT 1
+//	            FROM document_tags dtt
+//	            WHERE dtt.document_id = d.id
+//	              AND dtt.tag_id = $6::int
+//	        )
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $7::boolean IS NOT NULL THEN d.is_public = $7::boolean
+//	        ELSE TRUE
+//	    END
+//	) AND (
+//	    CASE
+//	        WHEN $8::text IS NOT NULL AND $8::text != ''
+//	        THEN (
+//	            to_tsvector('russian', d.title || ' ' || COALESCE(d.description, '') || ' ' || COALESCE(dt.name, '')) @@ plainto_tsquery('russian', $8::text)
+//	            OR EXISTS (
+//	                SELECT 1
+//	                FROM document_authors da
+//	                JOIN authors sa ON sa.id = da.author_id
+//	                JOIN authorship_types sat ON sat.id = da.type_id
+//	                WHERE da.document_id = d.id
+//	                  AND (
+//	                      sa.name ILIKE '%' || $8::text || '%'
+//	                      OR sat.title ILIKE '%' || $8::text || '%'
+//	                  )
+//	            )
+//	            OR EXISTS (
+//	                SELECT 1
+//	                FROM document_tags dtt
+//	                JOIN tags tt ON tt.id = dtt.tag_id
+//	                WHERE dtt.document_id = d.id
+//	                  AND tt.title ILIKE '%' || $8::text || '%'
+//	            )
+//	        )
+//	        ELSE TRUE
+//	    END
+//	)
+//	ORDER BY d.created_at DESC
+//	LIMIT $1 OFFSET $2
 func (q *Queries) ListDocuments(ctx context.Context, arg ListDocumentsParams) ([]ListDocumentsRow, error) {
 	rows, err := q.db.Query(ctx, listDocuments,
 		arg.Limit,
@@ -1004,11 +1139,11 @@ func (q *Queries) ListDocuments(ctx context.Context, arg ListDocumentsParams) ([
 			&i.ContentPath,
 			&i.CurrentVersion,
 			&i.Indexed,
-			&i.IsPublic,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.CoverPath,
 			&i.DocumentTypeID,
+			&i.IsPublic,
 			&i.Category.ID,
 			&i.Category.Title,
 			&i.Category.Description,
@@ -1088,7 +1223,7 @@ SET
     document_type_id = COALESCE($9, document_type_id),
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, title, description, category_id, publication_date, content_path, current_version, indexed, is_public, created_at, updated_at, cover_path, document_type_id
+RETURNING id, title, description, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path, document_type_id, is_public
 `
 
 type UpdateDocumentParams struct {
@@ -1105,8 +1240,19 @@ type UpdateDocumentParams struct {
 
 // UpdateDocument
 //
-//	UPDATE documents SET ... WHERE id = $1
-//	RETURNING id, title, description, ..., is_public, ...
+//	UPDATE documents
+//	SET
+//	    title = COALESCE($2, title),
+//	    description = COALESCE($3, description),
+//	    category_id = COALESCE($4, category_id),
+//	    publication_date = COALESCE($5, publication_date),
+//	    content_path = COALESCE($6, content_path),
+//	    current_version = COALESCE($7, current_version),
+//	    cover_path = COALESCE($8, cover_path),
+//	    document_type_id = COALESCE($9, document_type_id),
+//	    updated_at = NOW()
+//	WHERE id = $1
+//	RETURNING id, title, description, category_id, publication_date, content_path, current_version, indexed, created_at, updated_at, cover_path, document_type_id, is_public
 func (q *Queries) UpdateDocument(ctx context.Context, arg UpdateDocumentParams) (Document, error) {
 	row := q.db.QueryRow(ctx, updateDocument,
 		arg.ID,
@@ -1129,11 +1275,11 @@ func (q *Queries) UpdateDocument(ctx context.Context, arg UpdateDocumentParams) 
 		&i.ContentPath,
 		&i.CurrentVersion,
 		&i.Indexed,
-		&i.IsPublic,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CoverPath,
 		&i.DocumentTypeID,
+		&i.IsPublic,
 	)
 	return i, err
 }

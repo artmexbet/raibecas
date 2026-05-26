@@ -154,6 +154,14 @@ func (s *Server) setupProtectedRoutes() {
 	bookmarks.Post("/", s.createBookmark)
 	bookmarks.Delete("/:id", s.deleteBookmark)
 
+	// Notes routes
+	notes := protected.Group("/api/v1/notes")
+	notes.Get("/", s.listNotes)
+	notes.Get("/:id", s.getNote)
+	notes.Post("/", s.createNote)
+	notes.Put("/:id", s.updateNote)
+	notes.Delete("/:id", s.deleteNote)
+
 	// Authors routes
 	authors := protected.Group("/api/v1/authors")
 	authors.Get("/", s.listAuthors)

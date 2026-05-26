@@ -691,3 +691,202 @@ func intPtrValue(value *int) int {
 	}
 	return *value
 }
+
+// --- Notes handlers ---
+
+// HandleListNotes handles note listing requests.
+func (h *DocumentHandler) HandleListNotes(msg *natsw.Message) error {
+	var req documents.ListNotesQuery
+	if err := msg.UnmarshalEasyJSON(&req); err != nil {
+		h.logger.ErrorContext(msg.Ctx, "invalid list notes request", "error", err)
+		return h.respondError(msg, dto.ErrCodeInvalidRequest)
+	}
+
+	page := max(req.Page, 1)
+	limit := req.Limit
+	if limit <= 0 || limit > 100 {
+		limit = 16
+	}
+
+	if req.UserID == uuid.Nil {
+		if userIDValue := msg.Header.Get("X-User-ID"); userIDValue != "" {
+			userID, err := uuid.Parse(userIDValue)
+			if err != nil {
+				h.logger.ErrorContext(msg.Ctx, "invalid X-User-ID header", "error", err)
+				return h.respondError(msg, dto.ErrCodeInvalidRequest)
+			}
+			req.UserID = userID
+		}
+	}
+
+	notes, total, err := h.service.ListNotes(msg.Ctx, domain.ListNotesParams{
+		Page:       page,
+		Limit:      limit,
+		Search:     req.Search,
+		DocumentID: req.DocumentID,
+		BookmarkID: req.BookmarkID,
+		UserID:     req.UserID,
+	})
+	if err != nil {
+		h.logger.ErrorContext(msg.Ctx, "failed to list notes", "error", err)
+		if errors.Is(err, service.ErrInvalidInput) {
+			return h.respondError(msg, dto.ErrCodeInvalidRequest)
+		}
+		return h.respondError(msg, dto.ErrCodeInternal)
+	}
+
+	totalPages := 0
+	if total > 0 {
+		totalPages = (total + limit - 1) / limit
+	}
+
+	dtoItems := make([]documents.NoteItem, len(notes))
+	for i, note := range notes {
+		dtoItems[i] = convertNoteDomainToDTO(note)
+	}
+
+	response := documents.ListNotesResponse{
+		Items:      dtoItems,
+		Total:      total,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+	}
+
+	return msg.RespondEasyJSON(response)
+}
+
+// HandleGetNote handles note retrieval requests.
+func (h *DocumentHandler) HandleGetNote(msg *natsw.Message) error {
+	var req documents.GetNoteRequest
+	if err := msg.UnmarshalEasyJSON(&req); err != nil {
+		h.logger.ErrorContext(msg.Ctx, "invalid get note request", "error", err)
+		return h.respondError(msg, dto.ErrCodeInvalidRequest)
+	}
+
+	note, err := h.service.GetNote(msg.Ctx, req.UserID, req.ID)
+	if err != nil {
+		h.logger.ErrorContext(msg.Ctx, "failed to get note", "error", err)
+		if errors.Is(err, service.ErrNotFound) {
+			return h.respondError(msg, dto.ErrCodeNotFound)
+		}
+		if errors.Is(err, service.ErrInvalidInput) {
+			return h.respondError(msg, dto.ErrCodeInvalidRequest)
+		}
+		return h.respondError(msg, dto.ErrCodeInternal)
+	}
+
+	response := documents.GetNoteResponse{
+		Item: convertNoteDomainToDTO(*note),
+	}
+
+	return msg.RespondEasyJSON(&response)
+}
+
+// HandleCreateNote handles note creation requests.
+func (h *DocumentHandler) HandleCreateNote(msg *natsw.Message) error {
+	var req documents.CreateNoteRequest
+	if err := msg.UnmarshalEasyJSON(&req); err != nil {
+		h.logger.ErrorContext(msg.Ctx, "invalid create note request", "error", err)
+		return h.respondError(msg, dto.ErrCodeInvalidRequest)
+	}
+
+	note, err := h.service.CreateNote(msg.Ctx, domain.CreateNoteRequest{
+		UserID:             req.UserID,
+		Title:              req.Title,
+		Content:            req.Content,
+		DocumentID:         req.DocumentID,
+		BookmarkID:         req.BookmarkID,
+		PositionInDocument: req.PositionInDocument,
+	})
+	if err != nil {
+		h.logger.ErrorContext(msg.Ctx, "failed to create note", "error", err)
+		if errors.Is(err, service.ErrInvalidInput) {
+			return h.respondError(msg, dto.ErrCodeInvalidRequest)
+		}
+		if errors.Is(err, service.ErrNotFound) {
+			return h.respondError(msg, dto.ErrCodeNotFound)
+		}
+		return h.respondError(msg, dto.ErrCodeInternal)
+	}
+
+	response := documents.CreateNoteResponse{
+		Item: convertNoteDomainToDTO(*note),
+	}
+
+	return msg.RespondEasyJSON(&response)
+}
+
+// HandleUpdateNote handles note update requests.
+func (h *DocumentHandler) HandleUpdateNote(msg *natsw.Message) error {
+	var req documents.UpdateNoteRequest
+	if err := msg.UnmarshalEasyJSON(&req); err != nil {
+		h.logger.ErrorContext(msg.Ctx, "invalid update note request", "error", err)
+		return h.respondError(msg, dto.ErrCodeInvalidRequest)
+	}
+
+	note, err := h.service.UpdateNote(msg.Ctx, domain.UpdateNoteRequest{
+		ID:                 req.ID,
+		UserID:             req.UserID,
+		Title:              req.Title,
+		Content:            req.Content,
+		DocumentID:         req.DocumentID,
+		BookmarkID:         req.BookmarkID,
+		PositionInDocument: req.PositionInDocument,
+		ClearDocumentID:    req.ClearDocumentID,
+		ClearBookmarkID:    req.ClearBookmarkID,
+		ClearPosition:      req.ClearPosition,
+	})
+	if err != nil {
+		h.logger.ErrorContext(msg.Ctx, "failed to update note", "error", err)
+		if errors.Is(err, service.ErrNotFound) {
+			return h.respondError(msg, dto.ErrCodeNotFound)
+		}
+		if errors.Is(err, service.ErrInvalidInput) {
+			return h.respondError(msg, dto.ErrCodeInvalidRequest)
+		}
+		return h.respondError(msg, dto.ErrCodeInternal)
+	}
+
+	response := documents.UpdateNoteResponse{
+		Item: convertNoteDomainToDTO(*note),
+	}
+
+	return msg.RespondEasyJSON(&response)
+}
+
+// HandleDeleteNote handles note deletion requests.
+func (h *DocumentHandler) HandleDeleteNote(msg *natsw.Message) error {
+	var req documents.DeleteNoteRequest
+	if err := msg.UnmarshalEasyJSON(&req); err != nil {
+		h.logger.ErrorContext(msg.Ctx, "invalid delete note request", "error", err)
+		return h.respondError(msg, dto.ErrCodeInvalidRequest)
+	}
+
+	if err := h.service.DeleteNote(msg.Ctx, req.UserID, req.ID); err != nil {
+		h.logger.ErrorContext(msg.Ctx, "failed to delete note", "error", err)
+		if errors.Is(err, service.ErrNotFound) {
+			return h.respondError(msg, dto.ErrCodeNotFound)
+		}
+		if errors.Is(err, service.ErrInvalidInput) {
+			return h.respondError(msg, dto.ErrCodeInvalidRequest)
+		}
+		return h.respondError(msg, dto.ErrCodeInternal)
+	}
+
+	response := documents.DeleteNoteResponse{Success: true}
+	return msg.RespondEasyJSON(&response)
+}
+
+func convertNoteDomainToDTO(note domain.Note) documents.NoteItem {
+	return documents.NoteItem{
+		ID:                 note.ID.String(),
+		Title:              note.Title,
+		Content:            note.Content,
+		DocumentID:         note.DocumentID,
+		BookmarkID:         note.BookmarkID,
+		PositionInDocument: note.PositionInDocument,
+		CreatedAt:          note.CreatedAt,
+		UpdatedAt:          note.UpdatedAt,
+	}
+}

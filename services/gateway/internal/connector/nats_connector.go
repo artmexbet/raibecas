@@ -31,6 +31,11 @@ const (
 	SubjectBookmarksList        = "documents.bookmarks.list"
 	SubjectBookmarksCreate      = "documents.bookmarks.create"
 	SubjectBookmarksDelete      = "documents.bookmarks.delete"
+	SubjectNotesList            = "documents.notes.list"
+	SubjectNotesGet             = "documents.notes.get"
+	SubjectNotesCreate          = "documents.notes.create"
+	SubjectNotesUpdate          = "documents.notes.update"
+	SubjectNotesDelete          = "documents.notes.delete"
 	SubjectDocumentsGet         = "documents.get"
 	SubjectDocumentsGetContent  = "documents.get.content"
 	SubjectDocumentsCreate      = "documents.create"
@@ -893,4 +898,212 @@ func (c *NATSDocumentConnector) CreateTag(ctx context.Context, req domain.Create
 			Title: dtoResponse.Tag.Title,
 		},
 	}, nil
+}
+
+// --- Notes ---
+
+// ListNotes retrieves a list of notes based on query parameters.
+func (c *NATSDocumentConnector) ListNotes(ctx context.Context, query domain.ListNotesQuery) (*domain.ListNotesResponse, error) {
+	dtoQuery := documents.ListNotesQuery{
+		Page:       query.Page,
+		Limit:      query.Limit,
+		Search:     query.Search,
+		DocumentID: query.DocumentID,
+		BookmarkID: query.BookmarkID,
+		UserID:     query.UserID,
+	}
+
+	reqData, err := dtoQuery.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal notes list request: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectNotesList)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send notes list request: %w", err)
+	}
+
+	if errResp := checkErrorResponse(respMsg.Data); errResp != nil {
+		return nil, errResp
+	}
+
+	var dtoResponse documents.ListNotesResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &dtoResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal notes list response: %w", err)
+	}
+
+	return &domain.ListNotesResponse{
+		Items:      convertNotes(dtoResponse.Items),
+		Total:      dtoResponse.Total,
+		Page:       dtoResponse.Page,
+		Limit:      dtoResponse.Limit,
+		TotalPages: dtoResponse.TotalPages,
+	}, nil
+}
+
+// GetNote retrieves a single note by ID.
+func (c *NATSDocumentConnector) GetNote(ctx context.Context, userID, noteID uuid.UUID) (*domain.GetNoteResponse, error) {
+	dtoReq := documents.GetNoteRequest{
+		ID:     noteID,
+		UserID: userID,
+	}
+
+	reqData, err := dtoReq.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal get note request: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectNotesGet)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send get note request: %w", err)
+	}
+
+	if errResp := checkErrorResponse(respMsg.Data); errResp != nil {
+		return nil, errResp
+	}
+
+	var dtoResponse documents.GetNoteResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &dtoResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal get note response: %w", err)
+	}
+
+	return &domain.GetNoteResponse{Item: convertNote(dtoResponse.Item)}, nil
+}
+
+// CreateNote creates a new note for the authenticated user.
+func (c *NATSDocumentConnector) CreateNote(ctx context.Context, req domain.CreateNoteRequest) (*domain.CreateNoteResponse, error) {
+	dtoReq := documents.CreateNoteRequest{
+		UserID:             req.UserID,
+		Title:              req.Title,
+		Content:            req.Content,
+		DocumentID:         req.DocumentID,
+		BookmarkID:         req.BookmarkID,
+		PositionInDocument: req.PositionInDocument,
+	}
+
+	reqData, err := dtoReq.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal create note request: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectNotesCreate)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send create note request: %w", err)
+	}
+
+	if errResp := checkErrorResponse(respMsg.Data); errResp != nil {
+		return nil, errResp
+	}
+
+	var dtoResponse documents.CreateNoteResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &dtoResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal create note response: %w", err)
+	}
+
+	return &domain.CreateNoteResponse{Item: convertNote(dtoResponse.Item)}, nil
+}
+
+// UpdateNote updates an existing note for the authenticated user.
+func (c *NATSDocumentConnector) UpdateNote(ctx context.Context, req domain.UpdateNoteRequest) (*domain.UpdateNoteResponse, error) {
+	dtoReq := documents.UpdateNoteRequest{
+		ID:                 req.ID,
+		UserID:             req.UserID,
+		Title:              req.Title,
+		Content:            req.Content,
+		DocumentID:         req.DocumentID,
+		BookmarkID:         req.BookmarkID,
+		PositionInDocument: req.PositionInDocument,
+		ClearDocumentID:    req.ClearDocumentID,
+		ClearBookmarkID:    req.ClearBookmarkID,
+		ClearPosition:      req.ClearPosition,
+	}
+
+	reqData, err := dtoReq.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update note request: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectNotesUpdate)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send update note request: %w", err)
+	}
+
+	if errResp := checkErrorResponse(respMsg.Data); errResp != nil {
+		return nil, errResp
+	}
+
+	var dtoResponse documents.UpdateNoteResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &dtoResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal update note response: %w", err)
+	}
+
+	return &domain.UpdateNoteResponse{Item: convertNote(dtoResponse.Item)}, nil
+}
+
+// DeleteNote removes a note for the authenticated user.
+func (c *NATSDocumentConnector) DeleteNote(ctx context.Context, userID, noteID uuid.UUID) error {
+	dtoReq := documents.DeleteNoteRequest{
+		ID:     noteID,
+		UserID: userID,
+	}
+
+	reqData, err := dtoReq.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("failed to marshal delete note request: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectNotesDelete)
+	msg.Data = reqData
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return fmt.Errorf("failed to send delete note request: %w", err)
+	}
+
+	if errResp := checkErrorResponse(respMsg.Data); errResp != nil {
+		return errResp
+	}
+
+	var dtoResponse documents.DeleteNoteResponse
+	if err := easyjson.Unmarshal(respMsg.Data, &dtoResponse); err != nil {
+		return fmt.Errorf("failed to unmarshal delete note response: %w", err)
+	}
+	if !dtoResponse.Success {
+		return fmt.Errorf("delete note failed")
+	}
+
+	return nil
+}
+
+func convertNote(dtoNote documents.NoteItem) domain.NoteItem {
+	return domain.NoteItem{
+		ID:                 dtoNote.ID,
+		Title:              dtoNote.Title,
+		Content:            dtoNote.Content,
+		DocumentID:         dtoNote.DocumentID,
+		BookmarkID:         dtoNote.BookmarkID,
+		PositionInDocument: dtoNote.PositionInDocument,
+		CreatedAt:          dtoNote.CreatedAt,
+		UpdatedAt:          dtoNote.UpdatedAt,
+	}
+}
+
+func convertNotes(dtoNotes []documents.NoteItem) []domain.NoteItem {
+	result := make([]domain.NoteItem, len(dtoNotes))
+	for i, dtoNote := range dtoNotes {
+		result[i] = convertNote(dtoNote)
+	}
+	return result
 }

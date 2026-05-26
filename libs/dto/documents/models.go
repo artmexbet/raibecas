@@ -419,3 +419,114 @@ type UploadCoverRequest struct {
 type UploadCoverResponse struct {
 	CoverURL string `json:"cover_url"`
 }
+
+// --- Notes DTOs ---
+
+// NoteItem represents a single note in list/detail responses.
+//
+//easyjson:json
+type NoteItem struct {
+	ID                 string     `json:"id"`
+	Title              string     `json:"title"`
+	Content            string     `json:"content"`
+	DocumentID         *uuid.UUID `json:"document_id,omitempty"`
+	BookmarkID         *uuid.UUID `json:"bookmark_id,omitempty"`
+	PositionInDocument *string    `json:"position_in_document,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+}
+
+// ListNotesQuery represents query parameters for listing notes.
+//
+//easyjson:json
+type ListNotesQuery struct {
+	Page       int        `json:"page,omitempty"`
+	Limit      int        `json:"limit,omitempty"`
+	Search     string     `json:"search,omitempty"`
+	DocumentID *uuid.UUID `json:"document_id,omitempty"`
+	BookmarkID *uuid.UUID `json:"bookmark_id,omitempty"`
+	UserID     uuid.UUID  `json:"user_id,omitempty"`
+}
+
+// ListNotesResponse represents the response for listing notes.
+//
+//easyjson:json
+type ListNotesResponse struct {
+	Items      []NoteItem `json:"items"`
+	Total      int        `json:"total"`
+	Page       int        `json:"page,omitempty"`
+	Limit      int        `json:"limit,omitempty"`
+	TotalPages int        `json:"totalPages,omitempty"`
+}
+
+// GetNoteRequest represents a request to get a single note.
+//
+//easyjson:json
+type GetNoteRequest struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+// GetNoteResponse represents a single note response.
+//
+//easyjson:json
+type GetNoteResponse struct {
+	Item NoteItem `json:"item"`
+}
+
+// CreateNoteRequest represents a request to create a note.
+//
+//easyjson:json
+type CreateNoteRequest struct {
+	UserID             uuid.UUID  `json:"user_id"`
+	Title              string     `json:"title"`
+	Content            string     `json:"content"`
+	DocumentID         *uuid.UUID `json:"document_id,omitempty"`
+	BookmarkID         *uuid.UUID `json:"bookmark_id,omitempty"`
+	PositionInDocument *string    `json:"position_in_document,omitempty"`
+}
+
+// CreateNoteResponse represents a note creation response.
+//
+//easyjson:json
+type CreateNoteResponse struct {
+	Item NoteItem `json:"item"`
+}
+
+// UpdateNoteRequest represents a request to update a note.
+//
+//easyjson:json
+type UpdateNoteRequest struct {
+	ID                 uuid.UUID  `json:"id"`
+	UserID             uuid.UUID  `json:"user_id"`
+	Title              *string    `json:"title,omitempty"`
+	Content            *string    `json:"content,omitempty"`
+	DocumentID         *uuid.UUID `json:"document_id,omitempty"`
+	BookmarkID         *uuid.UUID `json:"bookmark_id,omitempty"`
+	PositionInDocument *string    `json:"position_in_document,omitempty"`
+	ClearDocumentID    bool       `json:"clear_document_id,omitempty"`
+	ClearBookmarkID    bool       `json:"clear_bookmark_id,omitempty"`
+	ClearPosition      bool       `json:"clear_position,omitempty"`
+}
+
+// UpdateNoteResponse represents a note update response.
+//
+//easyjson:json
+type UpdateNoteResponse struct {
+	Item NoteItem `json:"item"`
+}
+
+// DeleteNoteRequest represents a request to delete a note.
+//
+//easyjson:json
+type DeleteNoteRequest struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+// DeleteNoteResponse represents a note deletion response.
+//
+//easyjson:json
+type DeleteNoteResponse struct {
+	Success bool `json:"success"`
+}
