@@ -50,6 +50,16 @@ type BookmarkRepository interface {
 	Delete(ctx context.Context, userID, bookmarkID uuid.UUID) error
 }
 
+// NoteRepository defines the interface for note persistence.
+type NoteRepository interface {
+	Create(ctx context.Context, note *domain.Note) error
+	GetByIDForUser(ctx context.Context, userID, noteID uuid.UUID) (*domain.Note, error)
+	ListByUser(ctx context.Context, params domain.ListNotesParams) ([]domain.Note, error)
+	CountByUser(ctx context.Context, params domain.ListNotesParams) (int, error)
+	Update(ctx context.Context, req domain.UpdateNoteRequest) (*domain.Note, error)
+	Delete(ctx context.Context, userID, noteID uuid.UUID) error
+}
+
 // VersionRepository defines the interface for version data access
 type VersionRepository interface {
 	Create(ctx context.Context, version *domain.DocumentVersion) error

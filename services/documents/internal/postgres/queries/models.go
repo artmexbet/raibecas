@@ -41,11 +41,11 @@ type Document struct {
 	ContentPath     string
 	CurrentVersion  int32
 	Indexed         bool
-	IsPublic        bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	CoverPath       *string
 	DocumentTypeID  int32
+	IsPublic        bool
 }
 
 type DocumentAuthor struct {
@@ -85,6 +85,18 @@ type DocumentVersion struct {
 	Changes     *string
 	CreatedBy   *uuid.UUID
 	CreatedAt   time.Time
+}
+
+type Note struct {
+	ID                 uuid.UUID
+	UserID             uuid.UUID
+	Title              string
+	Content            string
+	DocumentID         *uuid.UUID
+	BookmarkID         *uuid.UUID
+	PositionInDocument *string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type Tag struct {

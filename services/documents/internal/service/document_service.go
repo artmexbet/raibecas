@@ -17,6 +17,7 @@ import (
 type DocumentService struct {
 	docRepo      DocumentRepository
 	bookmarkRepo BookmarkRepository
+	noteRepo     NoteRepository
 	versionRepo  VersionRepository
 	tagRepo      TagRepository
 	metadataRepo MetadataRepository
@@ -30,6 +31,7 @@ type DocumentService struct {
 func NewDocumentService(
 	docRepo DocumentRepository,
 	bookmarkRepo BookmarkRepository,
+	noteRepo NoteRepository,
 	versionRepo VersionRepository,
 	tagRepo TagRepository,
 	metadataRepo MetadataRepository,
@@ -41,6 +43,7 @@ func NewDocumentService(
 	return &DocumentService{
 		docRepo:      docRepo,
 		bookmarkRepo: bookmarkRepo,
+		noteRepo:     noteRepo,
 		versionRepo:  versionRepo,
 		tagRepo:      tagRepo,
 		metadataRepo: metadataRepo,

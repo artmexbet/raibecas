@@ -48,14 +48,6 @@ CREATE TABLE IF NOT EXISTS document_authors (
     PRIMARY KEY (document_id, author_id, type_id)
 );
 
-INSERT INTO document_authors (document_id, author_id, type_id)
-SELECT d.id, d.author_id, at.id
-FROM documents d
-CROSS JOIN authorship_types at
-WHERE d.author_id IS NOT NULL
-  AND at.title = 'автор'
-ON CONFLICT DO NOTHING;
-
 ALTER TABLE documents
     DROP COLUMN IF EXISTS author_id;
 

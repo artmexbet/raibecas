@@ -15,6 +15,11 @@ const (
 	subjectBookmarksList        = "documents.bookmarks.list"
 	subjectBookmarksCreate      = "documents.bookmarks.create"
 	subjectBookmarksDelete      = "documents.bookmarks.delete"
+	subjectNotesList            = "documents.notes.list"
+	subjectNotesGet             = "documents.notes.get"
+	subjectNotesCreate          = "documents.notes.create"
+	subjectNotesUpdate          = "documents.notes.update"
+	subjectNotesDelete          = "documents.notes.delete"
 	subjectDocumentsGet         = "documents.get"
 	subjectDocumentsGetContent  = "documents.get.content"
 	subjectDocumentsList        = "documents.list"
@@ -68,6 +73,11 @@ func (s *Server) Start() error {
 	s.client.Subscribe(subjectBookmarksList, s.handler.HandleListBookmarks)
 	s.client.Subscribe(subjectBookmarksCreate, s.handler.HandleCreateBookmark)
 	s.client.Subscribe(subjectBookmarksDelete, s.handler.HandleDeleteBookmark)
+	s.client.Subscribe(subjectNotesList, s.handler.HandleListNotes)
+	s.client.Subscribe(subjectNotesGet, s.handler.HandleGetNote)
+	s.client.Subscribe(subjectNotesCreate, s.handler.HandleCreateNote)
+	s.client.Subscribe(subjectNotesUpdate, s.handler.HandleUpdateNote)
+	s.client.Subscribe(subjectNotesDelete, s.handler.HandleDeleteNote)
 	s.client.Subscribe(subjectDocumentsGet, s.handler.HandleGetDocument)
 	s.client.Subscribe(subjectDocumentsGetContent, s.handler.HandleGetDocumentContent)
 	s.client.Subscribe(subjectDocumentsList, s.handler.HandleListDocuments)

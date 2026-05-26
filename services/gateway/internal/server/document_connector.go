@@ -22,6 +22,21 @@ type DocumentServiceConnector interface {
 	// DeleteBookmark removes a bookmark for the authenticated user
 	DeleteBookmark(ctx context.Context, userID, bookmarkID uuid.UUID) error
 
+	// ListNotes retrieves a list of user notes with filtering and pagination
+	ListNotes(ctx context.Context, query domain.ListNotesQuery) (*domain.ListNotesResponse, error)
+
+	// GetNote retrieves a single note by ID
+	GetNote(ctx context.Context, userID, noteID uuid.UUID) (*domain.GetNoteResponse, error)
+
+	// CreateNote creates a new note for the authenticated user
+	CreateNote(ctx context.Context, req domain.CreateNoteRequest) (*domain.CreateNoteResponse, error)
+
+	// UpdateNote updates an existing note for the authenticated user
+	UpdateNote(ctx context.Context, req domain.UpdateNoteRequest) (*domain.UpdateNoteResponse, error)
+
+	// DeleteNote removes a note for the authenticated user
+	DeleteNote(ctx context.Context, userID, noteID uuid.UUID) error
+
 	// CreateDocument creates a new document
 	CreateDocument(ctx context.Context, req domain.CreateDocumentRequest, userRole string) (*domain.CreateDocumentResponse, error)
 
