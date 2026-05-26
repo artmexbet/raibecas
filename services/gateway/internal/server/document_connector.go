@@ -80,4 +80,7 @@ type DocumentServiceConnector interface {
 
 	// CreateTag creates a new tag
 	CreateTag(ctx context.Context, req domain.CreateTagRequest, userRole string) (*domain.CreateTagResponse, error)
+
+	// SemanticSearch performs semantic search via corpus.search NATS subject (index-python)
+	SemanticSearch(ctx context.Context, query domain.SearchQuery) (*domain.SearchResponse, error)
 }

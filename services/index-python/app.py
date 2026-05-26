@@ -15,6 +15,7 @@ from pipeline.config import AppConfig
 from pipeline.embeddings import EmbeddingService
 from pipeline.loader import DocumentLoader
 from pipeline.minio_loader import MinIOConfig, MinIODocumentLoader
+from pipeline.searcher import Searcher
 from pipeline.types import DocumentIndexRequest
 from pipeline.writer import QdrantWriter
 from telemetry import TelemetryConfig, get_tracer, init_tracer, shutdown as shutdown_tracer
@@ -42,6 +43,7 @@ class App:
         self.chunk_splitter = ChunkSplitter(self.config.chunk)
         self.embedding_service = EmbeddingService(self.config.ollama)
         self.qdrant_writer = QdrantWriter(self.config.qdrant)
+        self.searcher = Searcher(self.embedding_service, self.config.qdrant)
         self._tracer_provider = init_tracer(telemetry_cfg or TelemetryConfig())
         self._tracer = get_tracer("index-python")
 
@@ -69,6 +71,9 @@ class App:
         await self.nats_connector.subscribe(const.DOCUMENT_UPDATED_SUBJECT, self.document_updated_handler)
         logger.info("subscribed to %s", const.DOCUMENT_UPDATED_SUBJECT)
 
+        await self.nats_connector.subscribe(const.CORPUS_SEARCH_SUBJECT, self.search_handler)
+        logger.info("subscribed to %s", const.CORPUS_SEARCH_SUBJECT)
+
     async def _keep_alive(self) -> None:
         try:
             while True:
@@ -79,6 +84,7 @@ class App:
     async def _shutdown(self) -> None:
         logger.info("shutting down services")
         self.qdrant_writer.close()
+        self.searcher.close()
         await self.nats_connector.close()
         shutdown_tracer(self._tracer_provider)
 
@@ -103,6 +109,44 @@ class App:
                 span.record_exception(exc)
                 logger.exception("failed to process document: %s", exc)
                 await self._publish_indexed_event(document_id, 0, "failed")
+
+    async def search_handler(self, msg: Msg) -> None:
+        """Handles corpus.search NATS request-reply for semantic search."""
+        with self._tracer.start_as_current_span("index.handler.search") as span:
+            try:
+                payload = json.loads(msg.data.decode())
+                query = payload.get("query", "")
+                limit = payload.get("limit", 10)
+
+                span.set_attribute("search.query", query)
+                span.set_attribute("search.limit", limit)
+
+                if not query.strip():
+                    response = {"success": True, "data": {"query": query, "results": [], "total": 0}}
+                    await msg.respond(json.dumps(response).encode())
+                    return
+
+                results = await self.searcher.search(query, limit)
+
+                response = {
+                    "success": True,
+                    "data": {
+                        "query": query,
+                        "results": [r.to_dict() for r in results],
+                        "total": len(results),
+                    },
+                }
+
+                span.set_attribute("search.results_count", len(results))
+                logger.info("search completed: query=%r results=%d", query, len(results))
+                await msg.respond(json.dumps(response).encode())
+
+            except Exception as exc:
+                span.set_status(StatusCode.ERROR, str(exc))
+                span.record_exception(exc)
+                logger.exception("search failed: %s", exc)
+                error_response = {"success": False, "error": str(exc)}
+                await msg.respond(json.dumps(error_response).encode())
 
     async def document_created_handler(self, msg: Msg) -> None:
         """Handles corpus.document.created events from the documents service."""

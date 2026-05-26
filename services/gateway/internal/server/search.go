@@ -10,6 +10,7 @@ import (
 )
 
 // semanticSearch handles GET /api/v1/search?q=<query>&limit=<N>
+// It sends a NATS request to corpus.search (index-python) and returns the results.
 func (s *Server) semanticSearch(c *fiber.Ctx) error {
 	var query domain.SearchQuery
 	if err := c.QueryParser(&query); err != nil {
@@ -38,12 +39,13 @@ func (s *Server) semanticSearch(c *fiber.Ctx) error {
 		})
 	}
 
-	result, err := s.chatHTTPConnector.Search(c.UserContext(), query.Q, query.Limit)
+	result, err := s.documentConnector.SemanticSearch(c.UserContext(), query)
 	if err != nil {
 		slog.Error("semantic search failed", "query", query.Q, "error", err)
-		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Search failed",
+		status, errorCode, message := mapConnectorError(err, "Search failed")
+		return c.Status(status).JSON(domain.ErrorResponse{
+			Error:   errorCode,
+			Message: message,
 		})
 	}
 
