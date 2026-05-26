@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -43,6 +44,7 @@ const (
 	SubjectDocumentsDelete      = "documents.delete"
 	SubjectDocumentsCoverUpload = "documents.cover.upload"
 	SubjectDocumentsReindex     = "documents.reindex"
+	SubjectCorpusSearch         = "corpus.search"
 
 	// Metadata subjects
 	SubjectAuthorsList         = "documents.authors.list"
@@ -1106,4 +1108,46 @@ func convertNotes(dtoNotes []documents.NoteItem) []domain.NoteItem {
 		result[i] = convertNote(dtoNote)
 	}
 	return result
+}
+
+// SemanticSearch sends a NATS request to corpus.search (index-python) and returns search results.
+func (c *NATSDocumentConnector) SemanticSearch(ctx context.Context, query domain.SearchQuery) (*domain.SearchResponse, error) {
+	reqPayload := map[string]any{
+		"query": query.Q,
+		"limit": query.Limit,
+	}
+
+	reqData, err := json.Marshal(reqPayload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal search request: %w", err)
+	}
+
+	msg := nats.NewMsg(SubjectCorpusSearch)
+	msg.Data = reqData
+
+	// Use a longer timeout for search (embedding generation + vector search)
+	searchTimeout := c.timeout * 3 //nolint:mnd // search needs more time than typical NATS requests
+	ctx, cancel := context.WithTimeout(ctx, searchTimeout)
+	defer cancel()
+
+	respMsg, err := c.client.RequestMsg(ctx, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send search request: %w", err)
+	}
+
+	// Parse the response — index-python returns {"success": bool, "data": {...}, "error": "..."}
+	var rawResp struct {
+		Success bool                  `json:"success"`
+		Data    domain.SearchResponse `json:"data"`
+		Error   string                `json:"error"`
+	}
+	if err := json.Unmarshal(respMsg.Data, &rawResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal search response: %w", err)
+	}
+
+	if !rawResp.Success {
+		return nil, fmt.Errorf("search failed: %s", rawResp.Error)
+	}
+
+	return &rawResp.Data, nil
 }
