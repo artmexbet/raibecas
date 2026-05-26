@@ -197,6 +197,9 @@ func (s *Server) setupProtectedRoutes() {
 	chatSessions.Get("/:userID/sessions", s.getChatSessions)
 	chatSessions.Post("/:userID/sessions", s.createChatSession)
 
+	// Semantic search route — any authenticated user
+	protected.Get("/api/v1/search", s.semanticSearch)
+
 	// Registration requests - only Admin/SuperAdmin can list and act on them
 	registrationRequests := protected.Group("/api/v1/registration-requests")
 	registrationRequests.Get("/", adminOnly, s.listRegistrationRequests)

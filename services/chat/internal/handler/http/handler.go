@@ -20,6 +20,7 @@ type service interface {
 	ClearUserChat(ctx context.Context, userID string) error
 	GetUserSessions(ctx context.Context, userID string) ([]domain.ChatSession, error)
 	CreateSession(ctx context.Context, userID, title string) (string, error)
+	Search(ctx context.Context, query string, limit int) (*domain.SearchResponse, error)
 }
 
 // Handler represents the HTTP handler.
@@ -59,6 +60,9 @@ func (h *Handler) RegisterRoutes() {
 	// Sessions (admin) endpoints
 	h.router.Get("/api/v1/chat/:userID/sessions", h.getUserSessionsHandler)
 	h.router.Post("/api/v1/chat/:userID/sessions", h.createSessionHandler)
+
+	// Semantic search endpoint
+	h.router.Get("/api/v1/search", h.searchHandler)
 
 	// WebSocket chat endpoint for Gateway connection
 	h.router.Use("/ws/chat", h.WSUpgradeHandler)

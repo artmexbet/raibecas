@@ -84,3 +84,52 @@ func (q *QdrantWrapper) RetrieveVectors(ctx context.Context, vector []float64) (
 
 	return response, nil
 }
+
+// ScoredDocument extends Document with a similarity score from Qdrant.
+type ScoredDocument struct {
+	domain.Document
+	Score float32
+}
+
+// SearchWithScores queries Qdrant for similar vectors and returns results with scores.
+// Unlike RetrieveVectors, it supports a custom limit and preserves the similarity score.
+func (q *QdrantWrapper) SearchWithScores(ctx context.Context, vector []float64, limit uint64) ([]ScoredDocument, error) {
+	convertedVector := make([]float32, len(vector))
+	for i, v := range vector {
+		convertedVector[i] = float32(v)
+	}
+
+	if limit == 0 {
+		limit = q.cfg.CountOfResults
+	}
+
+	result, err := q.client.Query(
+		ctx,
+		&qdrant.QueryPoints{
+			CollectionName: q.cfg.CollectionName,
+			Query:          qdrant.NewQuery(convertedVector...),
+			WithPayload:    qdrant.NewWithPayload(true),
+			Limit:          pointer.To(limit),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("cannot search vectors: %w", err)
+	}
+
+	docs := make([]ScoredDocument, len(result))
+	for i, v := range result {
+		doc := ScoredDocument{
+			Document: domain.Document{
+				ID:       v.Id.String(),
+				Metadata: make(map[string]any),
+			},
+			Score: v.Score,
+		}
+		for key, value := range v.Payload {
+			doc.Metadata[key] = value.GetStringValue()
+		}
+		docs[i] = doc
+	}
+
+	return docs, nil
+}
