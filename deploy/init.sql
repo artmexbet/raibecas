@@ -111,3 +111,4 @@ ALTER DEFAULT PRIVILEGES FOR ROLE documents_user IN SCHEMA public
 SELECT 'Databases created: auth_db, users_db, documents_db' AS status;
 SELECT 'Users created: auth_user, users_user, documents_user' AS status;
 SELECT 'All privileges granted successfully' AS status;
+

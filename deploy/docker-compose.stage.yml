@@ -1,0 +1,425 @@
+name: "raibecas-stage"
+
+services:
+  # ─── Infrastructure ───────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: raibecas
+      POSTGRES_USER: raibecas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-raibecas_stage}
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U raibecas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  nats:
+    image: nats:latest
+    command:
+      - "-js"
+      - "-sd=/data"
+    ports:
+      - "14222:4222"
+      - "18222:8222"
+    volumes:
+      - nats_data:/data
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-raibecas}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-raibecas_minio_stage}
+    ports:
+      - "19000:9000"
+      - "19001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant
+    ports:
+      - "16333:6333"
+      - "16334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
+  # ─── Observability ────────────────────────────────────────────────────────────
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+      - "14317:4317"
+      - "14318:4318"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --timeout=5 http://localhost:16686 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "19090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --timeout=5 http://localhost:9090/-/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.5.0
+    ports:
+      - "13100:3100"
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --timeout=5 http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:3.5.0
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "13001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    restart: unless-stopped
+
+  # ─── Go Services ──────────────────────────────────────────────────────────────
+
+  auth-service:
+    build:
+      context: ../
+      dockerfile: services/auth/Dockerfile
+    labels:
+      logging: "promtail"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: raibecas
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-raibecas_stage}
+      DB_NAME: auth_db
+      DB_SSL_MODE: disable
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NATS_URL: nats://nats:4222
+      NATS_CONNECTION_NAME: auth-service
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-168h}
+      TELEMETRY_ENABLED: "true"
+      TELEMETRY_SERVICE_NAME: auth-service
+      TELEMETRY_SERVICE_VERSION: "1.0.0"
+      TELEMETRY_OTLP_ENDPOINT: jaeger:4318
+      TELEMETRY_EXPORT_TIMEOUT: 30s
+      TELEMETRY_BATCH_TIMEOUT: 5s
+      TELEMETRY_MAX_QUEUE_SIZE: 2048
+      TELEMETRY_MAX_EXPORT_BATCH: 512
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      jaeger:
+        condition: service_healthy
+    restart: unless-stopped
+
+  users-service:
+    build:
+      context: ../
+      dockerfile: services/users/Dockerfile
+    labels:
+      logging: "promtail"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: raibecas
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-raibecas_stage}
+      DB_NAME: users_db
+      DB_SSL_MODE: disable
+      # users-service читает NATS как NATS_HOST + NATS_PORT (prefix NATS_)
+      NATS_HOST: nats
+      NATS_PORT: 4222
+      TELEMETRY_ENABLED: "true"
+      TELEMETRY_SERVICE_NAME: users-service
+      TELEMETRY_SERVICE_VERSION: "1.0.0"
+      TELEMETRY_OTLP_ENDPOINT: jaeger:4318
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      jaeger:
+        condition: service_healthy
+    restart: unless-stopped
+
+  documents-service:
+    build:
+      context: ../
+      dockerfile: services/documents/Dockerfile
+    labels:
+      logging: "promtail"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: raibecas
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-raibecas_stage}
+      DB_NAME: documents_db
+      DB_SSL_MODE: disable
+      NATS_URL: nats://nats:4222
+      NATS_CONNECTION_NAME: documents-service
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-raibecas}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-raibecas_minio_stage}
+      MINIO_BUCKET: raibecas-documents
+      MINIO_USE_SSL: "false"
+      TELEMETRY_ENABLED: "true"
+      TELEMETRY_SERVICE_NAME: documents-service
+      TELEMETRY_SERVICE_VERSION: "1.0.0"
+      TELEMETRY_OTLP_ENDPOINT: jaeger:4318
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      minio:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    restart: unless-stopped
+
+  chat-service:
+    build:
+      context: ../
+      dockerfile: services/chat/Dockerfile
+    labels:
+      logging: "promtail"
+    environment:
+      # NATS: prefix NATS_ + field URL → NATS_URL
+      NATS_URL: nats://nats:4222
+      # Database: prefix CHAT_DB_ → CHAT_DB_HOST, CHAT_DB_USER, etc.
+      CHAT_DB_HOST: postgres
+      CHAT_DB_PORT: 5432
+      CHAT_DB_USER: raibecas
+      CHAT_DB_PASSWORD: ${POSTGRES_PASSWORD:-raibecas_stage}
+      CHAT_DB_NAME: chat_db
+      CHAT_DB_SSL_MODE: disable
+      # Redis: prefix REDIS_
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Qdrant: prefix QDRANT_
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6334
+      QDRANT_COLLECTION_NAME: documents
+      # Ollama: prefix OLLAMA_ → host.docker.internal для доступа к Ollama вне Docker
+      OLLAMA_HOST: host.docker.internal
+      OLLAMA_PORT: "11434"
+      OLLAMA_PROTOCOL: http
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-embeddinggemma}
+      OLLAMA_GENERATION_MODEL: ${OLLAMA_GENERATION_MODEL:-gemma3:4b}
+      TELEMETRY_ENABLED: "true"
+      TELEMETRY_SERVICE_NAME: chat-service
+      TELEMETRY_SERVICE_VERSION: "1.0.0"
+      TELEMETRY_OTLP_ENDPOINT: jaeger:4318
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      jaeger:
+        condition: service_healthy
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ../
+      dockerfile: services/gateway/Dockerfile
+    labels:
+      logging: "promtail"
+    ports:
+      - "8080:8080"
+    environment:
+      ENVIRONMENT: production
+      # HTTPConfig: prefix GATEWAY_ + env HTTP_HOST/HTTP_PORT
+      GATEWAY_HTTP_HOST: 0.0.0.0
+      GATEWAY_HTTP_PORT: 8080
+      GATEWAY_HTTP_RPS: ${GATEWAY_RPS:-200}
+      CORS_ALLOW_ORIGINS: ${ALLOWED_ORIGINS:?ALLOWED_ORIGINS is required}
+      NATS_URL: nats://nats:4222
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TELEMETRY_ENABLED: "true"
+      TELEMETRY_SERVICE_NAME: gateway
+      TELEMETRY_SERVICE_VERSION: "1.0.0"
+      TELEMETRY_OTLP_ENDPOINT: jaeger:4318
+    depends_on:
+      nats:
+        condition: service_started
+      jaeger:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      users-service:
+        condition: service_started
+      documents-service:
+        condition: service_started
+      chat-service:
+        condition: service_started
+    restart: unless-stopped
+
+  # ─── ML / Python Service ──────────────────────────────────────────────────────
+
+  index-python:
+    build:
+      context: ../
+      dockerfile: services/index-python/Dockerfile
+    labels:
+      logging: "promtail"
+    environment:
+      OLLAMA__URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA__EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-embeddinggemma}
+      OLLAMA__TIMEOUT_SECONDS: "30.0"
+      QDRANT__HOST: qdrant
+      QDRANT__PORT: 6333
+      QDRANT__COLLECTION_NAME: documents
+      QDRANT__DISTANCE: Cosine
+      QDRANT__VECTOR_SIZE: 768
+      CHUNK__CHUNK_SIZE: ${CHUNK_SIZE:-700}
+      CHUNK__CHUNK_OVERLAP: ${CHUNK_OVERLAP:-80}
+      CHUNK__MAX_CHUNKS: "0"
+      NATS__SERVERS: '["nats://nats:4222"]'
+      NATS__NAME: index-python-service
+      NATS__ALLOW_RECONNECT: "true"
+      NATS__RECONNECT_TIME_WAIT: "2.0"
+      NATS__MAX_RECONNECT_ATTEMPTS: "-1"
+      NATS__CONNECT_TIMEOUT: "5.0"
+      NATS__REQUEST_TIMEOUT: "5.0"
+      MINIO__ENDPOINT: minio:9000
+      MINIO__ACCESS_KEY: ${MINIO_ACCESS_KEY:-raibecas}
+      MINIO__SECRET_KEY: ${MINIO_SECRET_KEY:-raibecas_minio_stage}
+      MINIO__BUCKET: raibecas-documents
+      MINIO__USE_SSL: "false"
+      TELEMETRY_ENABLED: "true"
+      TELEMETRY_SERVICE_NAME: index-python
+      TELEMETRY_SERVICE_VERSION: "1.0.0"
+      TELEMETRY_OTLP_ENDPOINT: http://jaeger:4318
+      TELEMETRY_EXPORT_TIMEOUT_MS: "30000"
+      TELEMETRY_BATCH_TIMEOUT_MS: "5000"
+      TELEMETRY_MAX_QUEUE_SIZE: "2048"
+      TELEMETRY_MAX_EXPORT_BATCH_SIZE: "512"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      nats:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      minio:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Frontend ─────────────────────────────────────────────────────────────────
+
+  admin-panel:
+    build:
+      context: ../
+      dockerfile: frontend/apps/admin-panel/Dockerfile
+      args:
+        BUN_PUBLIC_API_URL: ${API_URL:-http://localhost:8080}
+    ports:
+      - "8081:80"
+    restart: unless-stopped
+
+  user-app:
+    build:
+      context: ../
+      dockerfile: frontend/apps/user-app/Dockerfile
+      args:
+        BUN_PUBLIC_API_URL: ${API_URL:-http://localhost:8080}
+    ports:
+      - "8082:80"
+    restart: unless-stopped
+
+# ─── Volumes ────────────────────────────────────────────────────────────────────
+
+volumes:
+  postgres_data:
+  redis_data:
+  nats_data:
+  qdrant_data:
+  minio_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+

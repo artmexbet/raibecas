@@ -16,10 +16,10 @@ type HTTPConfig struct {
 }
 
 type NATSConfig struct {
-	URL            string        `env:"NATS_URL" env-default:"nats://localhost:4222"`
-	RequestTimeout time.Duration `env:"NATS_REQUEST_TIMEOUT" env-default:"5s"`
-	MaxReconnects  int           `env:"NATS_MAX_RECONNECTS" env-default:"10"`
-	ReconnectWait  time.Duration `env:"NATS_RECONNECT_WAIT" env-default:"2s"`
+	URL            string        `env:"URL" env-default:"nats://localhost:4222"`
+	RequestTimeout time.Duration `env:"REQUEST_TIMEOUT" env-default:"5s"`
+	MaxReconnects  int           `env:"MAX_RECONNECTS" env-default:"10"`
+	ReconnectWait  time.Duration `env:"RECONNECT_WAIT" env-default:"2s"`
 }
 
 type TelemetryConfig struct {

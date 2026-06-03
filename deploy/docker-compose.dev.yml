@@ -183,7 +183,7 @@ services:
       DB_PORT: 5432
       DB_USER: raibecas
       DB_PASSWORD: raibecas_dev
-      DB_NAME: raibecas
+      DB_NAME: documents_db
       DB_SSL_MODE: disable
       NATS_URL: nats://nats:4222
       NATS_CONNECTION_NAME: documents-service
