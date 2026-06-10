@@ -11,14 +11,14 @@ from qdrant_client.http import models as qdrant_models
 
 from broker import const, nats_connector
 from pipeline.chunker import ChunkSplitter
-from pipeline.config import AppConfig
+from pipeline.config import AppConfig, MinIOConfig, TelemetryConfig
 from pipeline.embeddings import EmbeddingService
 from pipeline.loader import DocumentLoader
-from pipeline.minio_loader import MinIOConfig, MinIODocumentLoader
+from pipeline.minio_loader import MinIODocumentLoader
 from pipeline.searcher import Searcher
 from pipeline.types import DocumentIndexRequest
 from pipeline.writer import QdrantWriter
-from telemetry import TelemetryConfig, get_tracer, init_tracer, shutdown as shutdown_tracer
+from telemetry import get_tracer, init_tracer, shutdown as shutdown_tracer
 
 
 logging.basicConfig(
@@ -37,14 +37,14 @@ class App:
         telemetry_cfg: None | TelemetryConfig = None,
     ):
         self.config = config or AppConfig()
-        self.nats_connector = nats_connector.NATSConnector(nats_cfg or nats_connector.NATSConfig())
+        self.nats_connector = nats_connector.NATSConnector(nats_cfg or self.config.nats)
         self.document_loader = DocumentLoader()
-        self.minio_loader = MinIODocumentLoader(minio_cfg or MinIOConfig())
+        self.minio_loader = MinIODocumentLoader(minio_cfg or self.config.minio)
         self.chunk_splitter = ChunkSplitter(self.config.chunk)
         self.embedding_service = EmbeddingService(self.config.ollama)
         self.qdrant_writer = QdrantWriter(self.config.qdrant)
         self.searcher = Searcher(self.embedding_service, self.config.qdrant)
-        self._tracer_provider = init_tracer(telemetry_cfg or TelemetryConfig())
+        self._tracer_provider = init_tracer(telemetry_cfg or self.config.telemetry)
         self._tracer = get_tracer("index-python")
 
     async def __run(self) -> None:

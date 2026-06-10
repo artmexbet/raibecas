@@ -106,7 +106,8 @@ func New(ctx context.Context) (*App, error) {
 	)
 
 	// Initialize MinIO storage
-	minioStorage, err := storage.NewMinIOStorage(cfg.MinIO, logger)
+	storageTracer := otel.GetTracerProvider().Tracer("minio-storage")
+	minioStorage, err := storage.NewMinIOStorage(cfg.MinIO, logger, storageTracer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize minio storage: %w", err)
 	}

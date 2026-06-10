@@ -50,7 +50,7 @@ func New(
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     corsCfg.AllowOrigins,
 		AllowCredentials: true, // Required for cookies
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Device-ID",
+		AllowHeaders:     "Access-Control-Request-Headers, Access-Control-Request-Method, Origin, Content-Type, Accept, Authorization, X-Device-ID",
 		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS, PATCH",
 	}))
 

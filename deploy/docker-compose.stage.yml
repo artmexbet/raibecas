@@ -233,6 +233,7 @@ services:
       NATS_URL: nats://nats:4222
       NATS_CONNECTION_NAME: documents-service
       MINIO_ENDPOINT: minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-82.146.19.6:19000}
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-raibecas}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-raibecas_minio_stage}
       MINIO_BUCKET: raibecas-documents
@@ -285,6 +286,8 @@ services:
       TELEMETRY_SERVICE_NAME: chat-service
       TELEMETRY_SERVICE_VERSION: "1.0.0"
       TELEMETRY_OTLP_ENDPOINT: jaeger:4318
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: 8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -309,7 +312,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      ENVIRONMENT: production
+      ENVIRONMENT: stage
       # HTTPConfig: prefix GATEWAY_ + env HTTP_HOST/HTTP_PORT
       GATEWAY_HTTP_HOST: 0.0.0.0
       GATEWAY_HTTP_PORT: 8080
@@ -321,6 +324,8 @@ services:
       TELEMETRY_SERVICE_NAME: gateway
       TELEMETRY_SERVICE_VERSION: "1.0.0"
       TELEMETRY_OTLP_ENDPOINT: jaeger:4318
+      CHAT_HTTP_URL: http://chat-service:8080
+      CHAT_WS_URL: ws://chat-service:8080/ws/chat
     depends_on:
       nats:
         condition: service_started
@@ -368,14 +373,14 @@ services:
       MINIO__SECRET_KEY: ${MINIO_SECRET_KEY:-raibecas_minio_stage}
       MINIO__BUCKET: raibecas-documents
       MINIO__USE_SSL: "false"
-      TELEMETRY_ENABLED: "true"
-      TELEMETRY_SERVICE_NAME: index-python
-      TELEMETRY_SERVICE_VERSION: "1.0.0"
-      TELEMETRY_OTLP_ENDPOINT: http://jaeger:4318
-      TELEMETRY_EXPORT_TIMEOUT_MS: "30000"
-      TELEMETRY_BATCH_TIMEOUT_MS: "5000"
-      TELEMETRY_MAX_QUEUE_SIZE: "2048"
-      TELEMETRY_MAX_EXPORT_BATCH_SIZE: "512"
+      TELEMETRY__ENABLED: "true"
+      TELEMETRY__SERVICE_NAME: index-python
+      TELEMETRY__SERVICE_VERSION: "1.0.0"
+      TELEMETRY__OTLP_ENDPOINT: http://jaeger:4318
+      TELEMETRY__EXPORT_TIMEOUT_MS: "30000"
+      TELEMETRY__BATCH_TIMEOUT_MS: "5000"
+      TELEMETRY__MAX_QUEUE_SIZE: "2048"
+      TELEMETRY__MAX_EXPORT_BATCH_SIZE: "512"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -395,20 +400,28 @@ services:
     build:
       context: ../
       dockerfile: frontend/apps/admin-panel/Dockerfile
-      args:
-        BUN_PUBLIC_API_URL: ${API_URL:-http://localhost:8080}
+    environment:
+      API_URL: http://gateway:8080
+      NODE_ENV: production
     ports:
-      - "8081:80"
+      - "8081:3000"
+    depends_on:
+      gateway:
+        condition: service_started
     restart: unless-stopped
 
   user-app:
     build:
       context: ../
       dockerfile: frontend/apps/user-app/Dockerfile
-      args:
-        BUN_PUBLIC_API_URL: ${API_URL:-http://localhost:8080}
+    environment:
+      API_URL: http://gateway:8080
+      NODE_ENV: production
     ports:
-      - "8082:80"
+      - "8082:3002"
+    depends_on:
+      gateway:
+        condition: service_started
     restart: unless-stopped
 
 # ─── Volumes ────────────────────────────────────────────────────────────────────

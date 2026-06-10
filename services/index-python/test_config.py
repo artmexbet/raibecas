@@ -2,8 +2,7 @@
 Тест для проверки загрузки конфигурации из переменных окружения
 """
 import os
-from pipeline.config import AppConfig, OllamaConfig, QdrantConfig, ChunkConfig
-from broker.nats_connector import NATSConfig
+from pipeline.config import AppConfig, NATSConfig, OllamaConfig, QdrantConfig, ChunkConfig, MinIOConfig, TelemetryConfig
 
 
 def test_default_config():
@@ -23,6 +22,18 @@ def test_default_config():
     assert config.chunk.chunk_size == 700
     assert config.chunk.chunk_overlap == 80
     assert config.chunk.max_chunks == 0
+
+    assert list(config.nats.servers) == ["nats://127.0.0.1:4222"]
+    assert config.nats.allow_reconnect is True
+    assert config.nats.max_reconnect_attempts == -1
+
+    assert config.minio.endpoint == "localhost:9000"
+    assert config.minio.bucket == "raibecas-documents"
+    assert config.minio.use_ssl is False
+
+    assert config.telemetry.enabled is True
+    assert config.telemetry.service_name == "index-python"
+    assert config.telemetry.otlp_endpoint == "http://localhost:4318"
 
     print("✓ Default config test passed")
 
@@ -54,15 +65,61 @@ def test_env_config():
 
 
 def test_nats_config():
-    """Тест загрузки конфигурации NATS"""
-    config = NATSConfig()
+    """Тест загрузки конфигурации NATS через AppConfig (NATS__ prefix)"""
+    os.environ["NATS__SERVERS"] = '["nats://nats:4222"]'
+    os.environ["NATS__NAME"] = "test-service"
 
-    assert config.servers == ("nats://127.0.0.1:4222",)
-    assert config.allow_reconnect is True
-    assert config.reconnect_time_wait == 2.0
-    assert config.max_reconnect_attempts == -1
+    config = AppConfig()
+
+    assert list(config.nats.servers) == ["nats://nats:4222"]
+    assert config.nats.name == "test-service"
+    assert config.nats.allow_reconnect is True
+    assert config.nats.reconnect_time_wait == 2.0
+    assert config.nats.max_reconnect_attempts == -1
+
+    for key in ["NATS__SERVERS", "NATS__NAME"]:
+        if key in os.environ:
+            del os.environ[key]
 
     print("✓ NATS config test passed")
+
+
+def test_minio_config():
+    """Тест загрузки конфигурации MinIO через AppConfig (MINIO__ prefix)"""
+    os.environ["MINIO__ENDPOINT"] = "minio:9000"
+    os.environ["MINIO__ACCESS_KEY"] = "test-key"
+    os.environ["MINIO__BUCKET"] = "test-bucket"
+
+    config = AppConfig()
+
+    assert config.minio.endpoint == "minio:9000"
+    assert config.minio.access_key == "test-key"
+    assert config.minio.bucket == "test-bucket"
+
+    for key in ["MINIO__ENDPOINT", "MINIO__ACCESS_KEY", "MINIO__BUCKET"]:
+        if key in os.environ:
+            del os.environ[key]
+
+    print("✓ MinIO config test passed")
+
+
+def test_telemetry_config():
+    """Тест загрузки конфигурации Telemetry через AppConfig (TELEMETRY__ prefix)"""
+    os.environ["TELEMETRY__ENABLED"] = "false"
+    os.environ["TELEMETRY__SERVICE_NAME"] = "test-service"
+    os.environ["TELEMETRY__OTLP_ENDPOINT"] = "http://jaeger:4318"
+
+    config = AppConfig()
+
+    assert config.telemetry.enabled is False
+    assert config.telemetry.service_name == "test-service"
+    assert config.telemetry.otlp_endpoint == "http://jaeger:4318"
+
+    for key in ["TELEMETRY__ENABLED", "TELEMETRY__SERVICE_NAME", "TELEMETRY__OTLP_ENDPOINT"]:
+        if key in os.environ:
+            del os.environ[key]
+
+    print("✓ Telemetry config test passed")
 
 
 def test_qdrant_url_property():
@@ -77,6 +134,8 @@ if __name__ == "__main__":
     test_default_config()
     test_env_config()
     test_nats_config()
+    test_minio_config()
+    test_telemetry_config()
     test_qdrant_url_property()
 
     print("\n✅ All tests passed!")

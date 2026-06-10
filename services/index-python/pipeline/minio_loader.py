@@ -4,21 +4,10 @@ from typing import Optional
 
 from minio import Minio
 from minio.error import S3Error
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from .config import MinIOConfig
 
 logger = logging.getLogger(__name__)
-
-
-class MinIOConfig(BaseSettings):
-    """Configuration for MinIO connection"""
-    model_config = SettingsConfigDict(env_prefix='MINIO_')
-
-    endpoint: str = Field(default="localhost:9000", description="MinIO endpoint")
-    access_key: str = Field(default="raibecas", description="MinIO access key")
-    secret_key: str = Field(default="raibecas_minio_dev", description="MinIO secret key")
-    bucket: str = Field(default="raibecas-documents", description="MinIO bucket name")
-    use_ssl: bool = Field(default=False, description="Use SSL for MinIO connection")
 
 
 class MinIODocumentLoader:

@@ -42,11 +42,12 @@ type NATSConfig struct {
 
 // MinIOConfig holds MinIO configuration
 type MinIOConfig struct {
-	Endpoint  string `env:"ENDPOINT" env-default:"localhost:9000"`
-	AccessKey string `env:"ACCESS_KEY" env-default:"raibecas"`
-	SecretKey string `env:"SECRET_KEY" env-required:"true"`
-	Bucket    string `env:"BUCKET" env-default:"raibecas-documents"`
-	UseSSL    bool   `env:"USE_SSL" env-default:"false"`
+	Endpoint       string `env:"ENDPOINT" env-default:"localhost:9000"`
+	PublicEndpoint string `env:"PUBLIC_ENDPOINT" env-default:""`
+	AccessKey      string `env:"ACCESS_KEY" env-default:"raibecas"`
+	SecretKey      string `env:"SECRET_KEY" env-required:"true"`
+	Bucket         string `env:"BUCKET" env-default:"raibecas-documents"`
+	UseSSL         bool   `env:"USE_SSL" env-default:"false"`
 }
 
 // TelemetryConfig holds telemetry configuration
