@@ -1,17 +1,19 @@
 import asyncio
 import json
 import logging
+import time
 import uuid
 from typing import Any, Dict, List, Optional
 
 from nats.aio.client import Msg
 from opentelemetry import trace
 from opentelemetry.trace import StatusCode
+from prometheus_client import Counter, Histogram, start_http_server
 from qdrant_client.http import models as qdrant_models
 
 from broker import const, nats_connector
 from pipeline.chunker import ChunkSplitter
-from pipeline.config import AppConfig, MinIOConfig, TelemetryConfig
+from pipeline.config import AppConfig, MetricsConfig, MinIOConfig, TelemetryConfig
 from pipeline.embeddings import EmbeddingService
 from pipeline.loader import DocumentLoader
 from pipeline.minio_loader import MinIODocumentLoader
@@ -27,6 +29,30 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+INDEX_REQUESTS_TOTAL = Counter(
+    "index_requests_total",
+    "Total number of document index requests processed",
+    ["status"],
+)
+INDEX_DURATION_SECONDS = Histogram(
+    "index_request_duration_seconds",
+    "Duration of document indexing pipeline runs in seconds",
+)
+SEARCH_REQUESTS_TOTAL = Counter(
+    "search_requests_total",
+    "Total number of corpus search requests processed",
+    ["status"],
+)
+SEARCH_DURATION_SECONDS = Histogram(
+    "search_request_duration_seconds",
+    "Duration of corpus search requests in seconds",
+)
+DOCUMENT_EVENTS_TOTAL = Counter(
+    "document_events_total",
+    "Total number of document created/updated events processed",
+    ["source", "status"],
+)
+
 
 class App:
     def __init__(
@@ -35,6 +61,7 @@ class App:
         nats_cfg: None | nats_connector.NATSConfig = None,
         minio_cfg: None | MinIOConfig = None,
         telemetry_cfg: None | TelemetryConfig = None,
+        metrics_cfg: None | MetricsConfig = None,
     ):
         self.config = config or AppConfig()
         self.nats_connector = nats_connector.NATSConnector(nats_cfg or self.config.nats)
@@ -46,6 +73,10 @@ class App:
         self.searcher = Searcher(self.embedding_service, self.config.qdrant)
         self._tracer_provider = init_tracer(telemetry_cfg or self.config.telemetry)
         self._tracer = get_tracer("index-python")
+
+        metrics_cfg = metrics_cfg or self.config.metrics
+        start_http_server(metrics_cfg.port)
+        logger.info("metrics server started on port %d", metrics_cfg.port)
 
     async def __run(self) -> None:
         logger.info("starting index-python service")
@@ -90,6 +121,7 @@ class App:
 
     async def index_handler(self, msg: Msg) -> None:
         with self._tracer.start_as_current_span("index.handler.index") as span:
+            start_time = time.monotonic()
             document_id = None
             try:
                 payload = json.loads(msg.data.decode())
@@ -104,15 +136,20 @@ class App:
                 span.set_attribute("document.chunks_count", chunks_count)
                 await self._publish_indexed_event(document_id, chunks_count, "success")
                 logger.info("successfully indexed document: document_id=%s chunks=%d", document_id, chunks_count)
+                INDEX_REQUESTS_TOTAL.labels(status="success").inc()
             except Exception as exc:
                 span.set_status(StatusCode.ERROR, str(exc))
                 span.record_exception(exc)
                 logger.exception("failed to process document: %s", exc)
                 await self._publish_indexed_event(document_id, 0, "failed")
+                INDEX_REQUESTS_TOTAL.labels(status="failed").inc()
+            finally:
+                INDEX_DURATION_SECONDS.observe(time.monotonic() - start_time)
 
     async def search_handler(self, msg: Msg) -> None:
         """Handles corpus.search NATS request-reply for semantic search."""
         with self._tracer.start_as_current_span("index.handler.search") as span:
+            start_time = time.monotonic()
             try:
                 payload = json.loads(msg.data.decode())
                 query = payload.get("query", "")
@@ -124,6 +161,7 @@ class App:
                 if not query.strip():
                     response = {"success": True, "data": {"query": query, "results": [], "total": 0}}
                     await msg.respond(json.dumps(response).encode())
+                    SEARCH_REQUESTS_TOTAL.labels(status="success").inc()
                     return
 
                 results = await self.searcher.search(query, limit)
@@ -140,6 +178,7 @@ class App:
                 span.set_attribute("search.results_count", len(results))
                 logger.info("search completed: query=%r results=%d", query, len(results))
                 await msg.respond(json.dumps(response).encode())
+                SEARCH_REQUESTS_TOTAL.labels(status="success").inc()
 
             except Exception as exc:
                 span.set_status(StatusCode.ERROR, str(exc))
@@ -147,6 +186,9 @@ class App:
                 logger.exception("search failed: %s", exc)
                 error_response = {"success": False, "error": str(exc)}
                 await msg.respond(json.dumps(error_response).encode())
+                SEARCH_REQUESTS_TOTAL.labels(status="error").inc()
+            finally:
+                SEARCH_DURATION_SECONDS.observe(time.monotonic() - start_time)
 
     async def document_created_handler(self, msg: Msg) -> None:
         """Handles corpus.document.created events from the documents service."""
@@ -177,6 +219,7 @@ class App:
                     logger.error("document event missing content_path: %s", payload)
                     span.set_status(StatusCode.ERROR, "missing content_path")
                     await self._publish_indexed_event(document_id, 0, "failed")
+                    DOCUMENT_EVENTS_TOTAL.labels(source=source, status="failed").inc()
                     return
 
                 logger.info(
@@ -198,11 +241,13 @@ class App:
                 span.set_attribute("document.chunks_count", chunks_count)
                 logger.info("successfully indexed document: document_id=%s source=%s chunks=%d", document_id, source, chunks_count)
                 await self._publish_indexed_event(document_id, chunks_count, "success")
+                DOCUMENT_EVENTS_TOTAL.labels(source=source, status="success").inc()
             except Exception as exc:
                 span.set_status(StatusCode.ERROR, str(exc))
                 span.record_exception(exc)
                 logger.exception("failed to handle %s event: %s", source, exc)
                 await self._publish_indexed_event(document_id, 0, "failed")
+                DOCUMENT_EVENTS_TOTAL.labels(source=source, status="failed").inc()
 
     async def _process_document(self, request: DocumentIndexRequest, text: str) -> int:
         with self._tracer.start_as_current_span("index.pipeline.process") as span:

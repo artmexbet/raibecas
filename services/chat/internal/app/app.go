@@ -2,14 +2,18 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qdrant/go-client/qdrant"
 	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/otel"
@@ -21,6 +25,7 @@ import (
 	"github.com/artmexbet/raibecas/services/chat/internal/config"
 	httphandler "github.com/artmexbet/raibecas/services/chat/internal/handler/http"
 	natshandler "github.com/artmexbet/raibecas/services/chat/internal/handler/nats"
+	"github.com/artmexbet/raibecas/services/chat/internal/metrics"
 	"github.com/artmexbet/raibecas/services/chat/internal/neuro"
 	"github.com/artmexbet/raibecas/services/chat/internal/postgres"
 	qdrantWrapper "github.com/artmexbet/raibecas/services/chat/internal/qdrant-wrapper"
@@ -40,6 +45,7 @@ type App struct {
 	svc            *service.Chat
 	natsHandler    *natshandler.Handler
 	httpHandler    *httphandler.Handler
+	metricsServer  *http.Server
 }
 
 // New creates and returns a new App instance with all dependencies initialized.
@@ -88,11 +94,16 @@ func New() (*App, error) {
 	}
 	slog.Info("connected to NATS", "url", cfg.NATS.URL)
 
+	// Initialize Prometheus metrics
+	natsMetrics := natsw.NewMetrics(prometheus.DefaultRegisterer)
+	businessMetrics := metrics.New(prometheus.DefaultRegisterer)
+
 	// Create NATS wrapper client with tracing
 	var natsClientOpts []natsw.ClientOption
 	natsClientOpts = append(natsClientOpts,
 		natsw.WithRecover(),
 		natsw.WithLogger(slog.Default()),
+		natsw.WithMiddleware(natsMetrics.Middleware),
 	)
 	if tp != nil {
 		natsTracer := tp.Tracer("nats-client")
@@ -160,7 +171,7 @@ func New() (*App, error) {
 
 	// Create service
 	serviceTracer := otel.GetTracerProvider().Tracer("chat-service")
-	svc := service.New(qdrantWrap, ollama, pgStore, serviceTracer)
+	svc := service.New(qdrantWrap, ollama, pgStore, serviceTracer, businessMetrics)
 
 	// Create NATS handler
 	natsHandler := natshandler.NewHandler(natsClient, svc)
@@ -176,6 +187,9 @@ func New() (*App, error) {
 	httpHandler := httphandler.New(&cfg.HTTP, svc)
 	httpHandler.RegisterRoutes()
 
+	// Start metrics server
+	metricsServer := startMetricsServer(cfg.Metrics.Port)
+
 	return &App{
 		cfg:            cfg,
 		natsConn:       natsConn,
@@ -187,7 +201,28 @@ func New() (*App, error) {
 		svc:            svc,
 		natsHandler:    natsHandler,
 		httpHandler:    httpHandler,
+		metricsServer:  metricsServer,
 	}, nil
+}
+
+// startMetricsServer starts an HTTP server exposing Prometheus metrics on /metrics
+func startMetricsServer(port int) *http.Server {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: mux,
+	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("metrics server error", "error", err)
+		}
+	}()
+
+	slog.Info("metrics server started", "port", port)
+	return srv
 }
 
 // Run starts the application and blocks until shutdown signal is received.
@@ -212,6 +247,11 @@ func (a *App) Run() error {
 	defer cancel()
 
 	slog.InfoContext(shutdownCtx, "shutting down the service...")
+
+	// Shutdown metrics server gracefully
+	if err := a.metricsServer.Shutdown(shutdownCtx); err != nil {
+		slog.ErrorContext(shutdownCtx, "metrics server shutdown error", "error", err)
+	}
 
 	// Shutdown HTTP server gracefully
 	if err := a.httpHandler.Shutdown(shutdownCtx); err != nil {

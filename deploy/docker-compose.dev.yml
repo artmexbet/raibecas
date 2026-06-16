@@ -141,6 +141,8 @@ services:
       dockerfile: services/auth/Dockerfile
     labels:
       logging: "promtail"
+    ports:
+      - "9092:9092"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -155,6 +157,7 @@ services:
       JWT_SECRET: dev_secret_change_in_production
       JWT_ACCESS_TTL: 15m
       JWT_REFRESH_TTL: 168h
+      METRICS_PORT: 9092
       TELEMETRY_ENABLED: "true"
       TELEMETRY_SERVICE_NAME: auth-service
       TELEMETRY_SERVICE_VERSION: "1.0.0"
@@ -178,6 +181,8 @@ services:
       dockerfile: services/documents/Dockerfile
     labels:
       logging: "promtail"
+    ports:
+      - "9093:9093"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -193,6 +198,7 @@ services:
       MINIO_SECRET_KEY: raibecas_minio_dev
       MINIO_BUCKET: raibecas-documents
       MINIO_USE_SSL: "false"
+      METRICS_PORT: 9093
       TELEMETRY_ENABLED: "true"
       TELEMETRY_SERVICE_NAME: documents-service
       TELEMETRY_SERVICE_VERSION: "1.0.0"

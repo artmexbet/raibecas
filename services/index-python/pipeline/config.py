@@ -80,6 +80,13 @@ class NATSConfig(BaseSettings):
     drain_timeout: float = Field(default=5.0, description="Drain timeout in seconds")
 
 
+class MetricsConfig(BaseSettings):
+    """Configuration for the Prometheus metrics server"""
+    model_config = SettingsConfigDict(env_prefix='METRICS_')
+
+    port: int = Field(default=9095, description="Prometheus metrics server port")
+
+
 class AppConfig(BaseSettings):
     """Main application configuration"""
     model_config = SettingsConfigDict(env_nested_delimiter='__')
@@ -90,3 +97,4 @@ class AppConfig(BaseSettings):
     nats: NATSConfig = Field(default_factory=NATSConfig)
     minio: MinIOConfig = Field(default_factory=MinIOConfig)
     telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
+    metrics: MetricsConfig = Field(default_factory=MetricsConfig)

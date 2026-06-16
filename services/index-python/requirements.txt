@@ -23,6 +23,7 @@ orjson==3.11.5
 ormsgpack==1.12.1
 packaging==25.0
 portalocker==3.2.0
+prometheus_client==0.25.0
 protobuf==6.33.2
 pycparser==3.0
 pycryptodome==3.23.0

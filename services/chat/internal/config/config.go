@@ -101,6 +101,11 @@ type TelemetryConfig struct {
 	MaxExportBatch int           `env:"MAX_EXPORT_BATCH" env-default:"512"`
 }
 
+// MetricsConfig holds Prometheus metrics server configuration
+type MetricsConfig struct {
+	Port int `yaml:"port" env:"PORT" env-default:"9094"`
+}
+
 type Config struct {
 	Qdrant    Qdrant          `yaml:"qdrant" env-prefix:"QDRANT_"`
 	Ollama    Ollama          `yaml:"ollama" env-prefix:"OLLAMA_"`
@@ -108,6 +113,7 @@ type Config struct {
 	NATS      NATS            `yaml:"nats" env-prefix:"NATS_"`
 	Database  Database        `yaml:"database" env-prefix:"CHAT_DB_"`
 	Telemetry TelemetryConfig `yaml:"telemetry" env-prefix:"TELEMETRY_"`
+	Metrics   MetricsConfig   `yaml:"metrics" env-prefix:"METRICS_"`
 
 	HTTP    HTTP `yaml:"http" env-prefix:"HTTP_"`
 	UseHTTP bool `yaml:"use_http" env:"USE_HTTP" env-default:"false"`
