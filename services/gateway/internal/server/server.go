@@ -42,7 +42,11 @@ func New(
 	chatConnector *connector.ChatWSConnector,
 	chatHTTPConnector *connector.ChatHTTPConnector,
 ) *Server {
-	router := fiber.New()
+	router := fiber.New(fiber.Config{
+		// Default BodyLimit is 4MB, which rejects cover uploads near the 5MB
+		// cap (plus multipart overhead). Raise it to fit the largest cover.
+		BodyLimit: 8 * 1024 * 1024,
+	})
 	logger := slog.Default()
 	router.Use(slogfiber.New(logger))
 

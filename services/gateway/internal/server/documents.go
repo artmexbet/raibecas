@@ -1,6 +1,7 @@
 package server
 
 import (
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -280,8 +281,8 @@ func (s *Server) uploadCover(c *fiber.Ctx) error {
 	}
 	defer f.Close() //nolint:errcheck
 
-	data := make([]byte, file.Size)
-	if _, err := f.Read(data); err != nil {
+	data, err := io.ReadAll(f)
+	if err != nil {
 		slog.Error("failed to read cover file", "error", err)
 		return c.Status(http.StatusInternalServerError).JSON(domain.ErrorResponse{
 			Error:   "internal_error",

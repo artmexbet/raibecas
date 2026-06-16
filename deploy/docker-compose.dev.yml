@@ -34,6 +34,9 @@ services:
     command:
       - "-js"
       - "-sd=/data"
+      # Default max_payload is 1MB; cover images (up to 5MB) are base64-encoded
+      # into the NATS request, so raise the limit to comfortably fit them.
+      - "--max_payload=8388608"
     ports:
       - "4222:4222"
       - "8222:8222"
