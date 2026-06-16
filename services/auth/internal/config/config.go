@@ -14,6 +14,7 @@ type Config struct {
 	Redis     RedisConfig     `yaml:"redis" env-prefix:"REDIS_"`
 	NATS      NATSConfig      `yaml:"nats" env-prefix:"NATS_"`
 	JWT       JWTConfig       `yaml:"jwt" env-prefix:"JWT_"`
+	Metrics   MetricsConfig   `yaml:"metrics" env-prefix:"METRICS_"`
 	Telemetry TelemetryConfig `yaml:"telemetry" env-prefix:"TELEMETRY_"`
 }
 
@@ -51,6 +52,11 @@ type NATSConfig struct {
 	MaxReconnects  int           `env:"MAX_RECONNECTS" env-default:"10"`
 	ReconnectWait  time.Duration `env:"RECONNECT_WAIT" env-default:"2s"`
 	ConnectionName string        `env:"CONNECTION_NAME" env-default:"auth-service"`
+}
+
+// MetricsConfig holds Prometheus metrics server configuration
+type MetricsConfig struct {
+	Port int `env:"PORT" env-default:"9092"`
 }
 
 // JWTConfig holds JWT configuration

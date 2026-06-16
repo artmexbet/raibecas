@@ -14,6 +14,7 @@ import (
 	"github.com/artmexbet/raibecas/libs/natsw"
 
 	"github.com/artmexbet/raibecas/services/auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/internal/metrics"
 )
 
 type RegistrationService interface {
@@ -25,14 +26,16 @@ type RegistrationHandler struct {
 	regService RegistrationService
 	publisher  EventPublisher
 	tracer     trace.Tracer
+	metrics    *metrics.Metrics
 }
 
 // NewRegistrationHandler creates a new NATS registration handler
-func NewRegistrationHandler(regService RegistrationService, publisher EventPublisher, tracer trace.Tracer) *RegistrationHandler {
+func NewRegistrationHandler(regService RegistrationService, publisher EventPublisher, tracer trace.Tracer, m *metrics.Metrics) *RegistrationHandler {
 	return &RegistrationHandler{
 		regService: regService,
 		publisher:  publisher,
 		tracer:     tracer,
+		metrics:    m,
 	}
 }
 
@@ -63,6 +66,7 @@ func (h *RegistrationHandler) HandleRegister(msg *natsw.Message) error {
 	}
 
 	span.SetAttributes(attribute.String("auth.request_id", requestID.String()))
+	h.metrics.RegistrationRequests.Inc()
 
 	// Publish registration requested event
 	_ = h.publisher.PublishRegistrationRequested(ctx, domain.RegistrationRequestedEvent{

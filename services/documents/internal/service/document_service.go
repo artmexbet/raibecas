@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/artmexbet/raibecas/services/documents/internal/domain"
+	"github.com/artmexbet/raibecas/services/documents/internal/metrics"
 )
 
 // DocumentService handles business logic for documents.
@@ -25,6 +26,7 @@ type DocumentService struct {
 	publisher    EventPublisher
 	logger       *slog.Logger
 	tracer       trace.Tracer
+	metrics      *metrics.Metrics
 }
 
 // NewDocumentService creates a new document service.
@@ -39,6 +41,7 @@ func NewDocumentService(
 	publisher EventPublisher,
 	logger *slog.Logger,
 	tracer trace.Tracer,
+	m *metrics.Metrics,
 ) *DocumentService {
 	return &DocumentService{
 		docRepo:      docRepo,
@@ -51,15 +54,24 @@ func NewDocumentService(
 		publisher:    publisher,
 		logger:       logger,
 		tracer:       tracer,
+		metrics:      m,
 	}
 }
 
 // CreateDocument creates a new document.
-func (s *DocumentService) CreateDocument(ctx context.Context, req domain.CreateDocumentRequest) (*domain.Document, error) {
+func (s *DocumentService) CreateDocument(ctx context.Context, req domain.CreateDocumentRequest) (doc *domain.Document, err error) {
 	ctx, span := s.tracer.Start(ctx, "documents.service.create",
 		trace.WithAttributes(attribute.String("document.title", req.Title)),
 	)
 	defer span.End()
+
+	defer func() {
+		status := "success"
+		if err != nil {
+			status = "failure"
+		}
+		s.metrics.DocumentOperations.WithLabelValues("create", status).Inc()
+	}()
 
 	if req.Title == "" || req.Content == "" {
 		return nil, fmt.Errorf("%w: title and content are required", ErrInvalidInput)
@@ -79,8 +91,9 @@ func (s *DocumentService) CreateDocument(ctx context.Context, req domain.CreateD
 		s.logger.ErrorContext(ctx, "failed to save document to storage", "error", err)
 		return nil, fmt.Errorf("%w: %v", ErrStorageFailure, err)
 	}
+	s.metrics.DocumentContentBytes.Observe(float64(len(req.Content)))
 
-	doc := &domain.Document{
+	doc = &domain.Document{
 		ID:              documentID,
 		Title:           req.Title,
 		Description:     req.Description,
@@ -185,13 +198,21 @@ func (s *DocumentService) ListDocuments(ctx context.Context, params domain.ListD
 }
 
 // UpdateDocument updates a document.
-func (s *DocumentService) UpdateDocument(ctx context.Context, id uuid.UUID, req domain.UpdateDocumentRequest) (*domain.Document, error) {
+func (s *DocumentService) UpdateDocument(ctx context.Context, id uuid.UUID, req domain.UpdateDocumentRequest) (doc *domain.Document, err error) {
 	ctx, span := s.tracer.Start(ctx, "documents.service.update",
 		trace.WithAttributes(attribute.String("document.id", id.String())),
 	)
 	defer span.End()
 
-	doc, err := s.docRepo.GetByID(ctx, id)
+	defer func() {
+		status := "success"
+		if err != nil {
+			status = "failure"
+		}
+		s.metrics.DocumentOperations.WithLabelValues("update", status).Inc()
+	}()
+
+	doc, err = s.docRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get document: %w", err)
 	}
@@ -205,6 +226,7 @@ func (s *DocumentService) UpdateDocument(ctx context.Context, id uuid.UUID, req 
 		if saveErr != nil {
 			return nil, fmt.Errorf("%w: %v", ErrStorageFailure, saveErr)
 		}
+		s.metrics.DocumentContentBytes.Observe(float64(len(*req.Content)))
 		doc.ContentPath = contentPath
 		doc.CurrentVersion = newVersion
 
@@ -275,11 +297,19 @@ func (s *DocumentService) UpdateDocument(ctx context.Context, id uuid.UUID, req 
 }
 
 // DeleteDocument deletes a document.
-func (s *DocumentService) DeleteDocument(ctx context.Context, id uuid.UUID) error {
+func (s *DocumentService) DeleteDocument(ctx context.Context, id uuid.UUID) (err error) {
 	ctx, span := s.tracer.Start(ctx, "documents.service.delete",
 		trace.WithAttributes(attribute.String("document.id", id.String())),
 	)
 	defer span.End()
+
+	defer func() {
+		status := "success"
+		if err != nil {
+			status = "failure"
+		}
+		s.metrics.DocumentOperations.WithLabelValues("delete", status).Inc()
+	}()
 
 	doc, err := s.docRepo.GetByID(ctx, id)
 	if err != nil {
@@ -325,11 +355,19 @@ func (s *DocumentService) MarkDocumentIndexed(ctx context.Context, id uuid.UUID,
 }
 
 // ReindexDocument resets indexed=false and re-publishes corpus.document.updated to trigger the indexer.
-func (s *DocumentService) ReindexDocument(ctx context.Context, id uuid.UUID) error {
+func (s *DocumentService) ReindexDocument(ctx context.Context, id uuid.UUID) (err error) {
 	ctx, span := s.tracer.Start(ctx, "documents.service.reindex",
 		trace.WithAttributes(attribute.String("document.id", id.String())),
 	)
 	defer span.End()
+
+	defer func() {
+		status := "success"
+		if err != nil {
+			status = "failure"
+		}
+		s.metrics.DocumentOperations.WithLabelValues("reindex", status).Inc()
+	}()
 
 	doc, err := s.docRepo.GetByID(ctx, id)
 	if err != nil {
@@ -401,7 +439,7 @@ func (s *DocumentService) CreateTag(ctx context.Context, title string) (*domain.
 }
 
 // UploadCover saves a cover image for a document and returns the presigned URL.
-func (s *DocumentService) UploadCover(ctx context.Context, id uuid.UUID, data []byte, contentType string) (string, error) {
+func (s *DocumentService) UploadCover(ctx context.Context, id uuid.UUID, data []byte, contentType string) (presignedURL string, err error) {
 	ctx, span := s.tracer.Start(ctx, "documents.service.upload_cover",
 		trace.WithAttributes(
 			attribute.String("document.id", id.String()),
@@ -409,6 +447,14 @@ func (s *DocumentService) UploadCover(ctx context.Context, id uuid.UUID, data []
 		),
 	)
 	defer span.End()
+
+	defer func() {
+		status := "success"
+		if err != nil {
+			status = "failure"
+		}
+		s.metrics.CoverUploads.WithLabelValues(status).Inc()
+	}()
 
 	doc, err := s.docRepo.GetByID(ctx, id)
 	if err != nil {
@@ -431,7 +477,7 @@ func (s *DocumentService) UploadCover(ctx context.Context, id uuid.UUID, data []
 		return "", fmt.Errorf("update document cover path: %w", err)
 	}
 
-	presignedURL, err := s.storage.GetCoverPresignedURL(ctx, coverPath)
+	presignedURL, err = s.storage.GetCoverPresignedURL(ctx, coverPath)
 	if err != nil {
 		return "", fmt.Errorf("get cover presigned url: %w", err)
 	}

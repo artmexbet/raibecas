@@ -8,33 +8,10 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from pipeline.config import TelemetryConfig
 
 logger = logging.getLogger(__name__)
-
-
-class TelemetryConfig(BaseSettings):
-    """Configuration for OpenTelemetry tracing."""
-
-    model_config = SettingsConfigDict(env_prefix="TELEMETRY_")
-
-    enabled: bool = Field(default=True, description="Enable tracing")
-    service_name: str = Field(default="index-python", description="Service name")
-    service_version: str = Field(default="1.0.0", description="Service version")
-    otlp_endpoint: str = Field(
-        default="http://localhost:4318", description="OTLP HTTP endpoint"
-    )
-    export_timeout_ms: int = Field(
-        default=30000, description="Export timeout in milliseconds"
-    )
-    batch_timeout_ms: int = Field(
-        default=5000, description="Batch timeout in milliseconds"
-    )
-    max_queue_size: int = Field(default=2048, description="Max queue size")
-    max_export_batch_size: int = Field(
-        default=512, description="Max export batch size"
-    )
 
 
 def init_tracer(cfg: Optional[TelemetryConfig] = None) -> Optional[TracerProvider]:

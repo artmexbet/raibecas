@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/artmexbet/raibecas/services/chat/internal/domain"
+	"github.com/artmexbet/raibecas/services/chat/internal/metrics"
 )
 
 type vectorStore interface {
@@ -42,16 +44,18 @@ type Chat struct {
 	neuro        neuroConnector
 	historyStore chatHistoryStore
 	tracer       trace.Tracer
+	metrics      *metrics.Metrics
 }
 
 // New creates a new Chat service with the provided vector store and embedder.
 // vectorStore is used to retrieve vectors, and embedder is used to generate embeddings.
-func New(vectorStore vectorStore, neuro neuroConnector, historyStore chatHistoryStore, tracer trace.Tracer) *Chat {
+func New(vectorStore vectorStore, neuro neuroConnector, historyStore chatHistoryStore, tracer trace.Tracer, m *metrics.Metrics) *Chat {
 	return &Chat{
 		vectorStore:  vectorStore,
 		neuro:        neuro,
 		historyStore: historyStore,
 		tracer:       tracer,
+		metrics:      m,
 	}
 }
 
@@ -63,7 +67,7 @@ func New(vectorStore vectorStore, neuro neuroConnector, historyStore chatHistory
 //
 // Returns:
 //   - error: non-nil if embedding generation or vector retrieval fails.
-func (c *Chat) ProcessInput(ctx context.Context, input, userID, sessionID string, fn func(response domain.ChatResponse) error) error {
+func (c *Chat) ProcessInput(ctx context.Context, input, userID, sessionID string, fn func(response domain.ChatResponse) error) (err error) {
 	ctx, span := c.tracer.Start(ctx, "chat.service.process_input",
 		trace.WithAttributes(
 			attribute.String("chat.user_id", userID),
@@ -72,19 +76,32 @@ func (c *Chat) ProcessInput(ctx context.Context, input, userID, sessionID string
 	)
 	defer span.End()
 
+	defer func() {
+		status := "success"
+		if err != nil {
+			status = "failure"
+		}
+		c.metrics.MessagesTotal.WithLabelValues(status).Inc()
+	}()
+
+	embeddingStart := time.Now()
 	embedding, err := c.neuro.GenerateEmbeddings(ctx, input)
+	c.metrics.EmbeddingDuration.Observe(time.Since(embeddingStart).Seconds())
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "embedding generation failed")
 		return fmt.Errorf("could not generate embeddings: %w", err)
 	}
 
+	vectorSearchStart := time.Now()
 	docs, err := c.vectorStore.RetrieveVectors(ctx, embedding)
+	c.metrics.VectorSearchDuration.Observe(time.Since(vectorSearchStart).Seconds())
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "vector retrieval failed")
 		return fmt.Errorf("could not retrieve vectors: %w", err)
 	}
+	c.metrics.RetrievedDocuments.Observe(float64(len(docs)))
 	span.SetAttributes(attribute.Int("chat.docs_count", len(docs)))
 	slog.DebugContext(ctx, "retrieved documents", "count", len(docs), "docs", docs)
 
@@ -117,6 +134,7 @@ func (c *Chat) ProcessInput(ctx context.Context, input, userID, sessionID string
 	}
 
 	// Process response with message chunking and saving
+	llmStart := time.Now()
 	assistantContent := strings.Builder{}
 	err = c.neuro.Chat(ctx, workingContext, input, func(response domain.ChatResponse) error {
 		// Accumulate message chunks
@@ -144,6 +162,7 @@ func (c *Chat) ProcessInput(ctx context.Context, input, userID, sessionID string
 		// Pass response to handler (streaming)
 		return fn(response)
 	})
+	c.metrics.LLMGenerationDuration.Observe(time.Since(llmStart).Seconds())
 
 	return err
 }

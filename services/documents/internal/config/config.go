@@ -11,6 +11,7 @@ type Config struct {
 	Database  DatabaseConfig  `yaml:"database" env-prefix:"DB_"`
 	NATS      NATSConfig      `yaml:"nats" env-prefix:"NATS_"`
 	MinIO     MinIOConfig     `yaml:"minio" env-prefix:"MINIO_"`
+	Metrics   MetricsConfig   `yaml:"metrics" env-prefix:"METRICS_"`
 	Telemetry TelemetryConfig `yaml:"telemetry" env-prefix:"TELEMETRY_"`
 }
 
@@ -42,11 +43,17 @@ type NATSConfig struct {
 
 // MinIOConfig holds MinIO configuration
 type MinIOConfig struct {
-	Endpoint  string `env:"ENDPOINT" env-default:"localhost:9000"`
-	AccessKey string `env:"ACCESS_KEY" env-default:"raibecas"`
-	SecretKey string `env:"SECRET_KEY" env-required:"true"`
-	Bucket    string `env:"BUCKET" env-default:"raibecas-documents"`
-	UseSSL    bool   `env:"USE_SSL" env-default:"false"`
+	Endpoint       string `env:"ENDPOINT" env-default:"localhost:9000"`
+	PublicEndpoint string `env:"PUBLIC_ENDPOINT" env-default:""`
+	AccessKey      string `env:"ACCESS_KEY" env-default:"raibecas"`
+	SecretKey      string `env:"SECRET_KEY" env-required:"true"`
+	Bucket         string `env:"BUCKET" env-default:"raibecas-documents"`
+	UseSSL         bool   `env:"USE_SSL" env-default:"false"`
+}
+
+// MetricsConfig holds Prometheus metrics server configuration
+type MetricsConfig struct {
+	Port int `env:"PORT" env-default:"9093"`
 }
 
 // TelemetryConfig holds telemetry configuration

@@ -2,8 +2,10 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,12 +14,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
 
 	"github.com/artmexbet/raibecas/libs/natsw"
 	"github.com/artmexbet/raibecas/libs/telemetry"
 
 	"github.com/artmexbet/raibecas/services/documents/internal/config"
+	"github.com/artmexbet/raibecas/services/documents/internal/domain"
+	"github.com/artmexbet/raibecas/services/documents/internal/metrics"
 	natsPublisher "github.com/artmexbet/raibecas/services/documents/internal/nats"
 	"github.com/artmexbet/raibecas/services/documents/internal/postgres"
 	"github.com/artmexbet/raibecas/services/documents/internal/postgres/queries"
@@ -34,16 +40,19 @@ const (
 
 // App represents the application
 type App struct {
-	cfg        *config.Config
-	logger     *slog.Logger
-	queries    *queries.Queries
-	dbPool     *pgxpool.Pool
-	storage    *storage.MinIOStorage
-	natsConn   *nats.Conn
-	natsClient *natsw.Client
-	jsCtx      *natsw.JetStreamContext
-	server     *server.Server
-	shutdown   func(context.Context) error
+	cfg             *config.Config
+	logger          *slog.Logger
+	queries         *queries.Queries
+	dbPool          *pgxpool.Pool
+	storage         *storage.MinIOStorage
+	natsConn        *nats.Conn
+	natsClient      *natsw.Client
+	jsCtx           *natsw.JetStreamContext
+	server          *server.Server
+	metricsServer   *http.Server
+	shutdown        func(context.Context) error
+	docRepo         *postgres.DocumentRepository
+	businessMetrics *metrics.Metrics
 }
 
 // New creates a new application instance
@@ -106,7 +115,8 @@ func New(ctx context.Context) (*App, error) {
 	)
 
 	// Initialize MinIO storage
-	minioStorage, err := storage.NewMinIOStorage(cfg.MinIO, logger)
+	storageTracer := otel.GetTracerProvider().Tracer("minio-storage")
+	minioStorage, err := storage.NewMinIOStorage(cfg.MinIO, logger, storageTracer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize minio storage: %w", err)
 	}
@@ -130,11 +140,17 @@ func New(ctx context.Context) (*App, error) {
 	app.natsConn = natsConn
 	logger.Info("connected to nats", "url", cfg.NATS.URL)
 
+	// Initialize Prometheus metrics
+	natsMetrics := natsw.NewMetrics(prometheus.DefaultRegisterer)
+	businessMetrics := metrics.New(prometheus.DefaultRegisterer)
+	app.businessMetrics = businessMetrics
+
 	// Create NATS client with middleware and tracing
 	natsTracer := otel.GetTracerProvider().Tracer("nats-client")
 	natsClient := natsw.NewClient(natsConn,
 		natsw.WithLogger(logger),
 		natsw.WithRecover(),
+		natsw.WithMiddleware(natsMetrics.Middleware),
 		natsw.WithTracer(natsTracer),
 		natsw.WithMiddleware(natsw.TraceHandlerMiddleware(natsTracer)),
 	)
@@ -168,6 +184,7 @@ func New(ctx context.Context) (*App, error) {
 	versionRepo := postgres.NewVersionRepository(q)
 	tagRepo := postgres.NewTagRepository(q)
 	metadataRepo := postgres.NewMetadataRepository(q)
+	app.docRepo = docRepo
 
 	// Create service tracer
 	serviceTracer := otel.GetTracerProvider().Tracer("documents-service")
@@ -184,6 +201,7 @@ func New(ctx context.Context) (*App, error) {
 		publisher,
 		logger,
 		serviceTracer,
+		businessMetrics,
 	)
 
 	// Initialize handlers
@@ -194,7 +212,30 @@ func New(ctx context.Context) (*App, error) {
 	srv := server.New(natsClient, jsCtx, docHandler, metadataHandler)
 	app.server = srv
 
+	// Start metrics server
+	app.metricsServer = startMetricsServer(cfg.Metrics.Port, logger)
+
 	return app, nil
+}
+
+// startMetricsServer starts an HTTP server exposing Prometheus metrics on /metrics
+func startMetricsServer(port int, logger *slog.Logger) *http.Server {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: mux,
+	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("metrics server error", "error", err)
+		}
+	}()
+
+	logger.Info("metrics server started", "port", port)
+	return srv
 }
 
 // Run starts the application and blocks until shutdown signal
@@ -209,16 +250,28 @@ func (a *App) Run() error {
 		"nats_url", a.cfg.NATS.URL,
 	)
 
+	metricsCtx, cancelMetrics := context.WithCancel(context.Background())
+	go a.runMetricCollectors(metricsCtx)
+
 	// Wait for shutdown signal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	<-sigChan
 	a.logger.Info("shutting down gracefully...")
+	cancelMetrics()
 
 	// Create shutdown context with timeout
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	if a.metricsServer != nil {
+		if err := a.metricsServer.Shutdown(shutdownCtx); err != nil {
+			a.logger.Error("failed to shutdown metrics server", "error", err)
+		} else {
+			a.logger.Info("metrics server shutdown complete")
+		}
+	}
 
 	// Cleanup with timeout
 	if a.shutdown != nil {
@@ -241,4 +294,30 @@ func (a *App) Run() error {
 
 	a.logger.Info("shutdown complete")
 	return nil
+}
+
+// runMetricCollectors periodically refreshes gauge-based business metrics.
+func (a *App) runMetricCollectors(ctx context.Context) {
+	a.updateDocumentCountMetrics(ctx)
+
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			a.updateDocumentCountMetrics(ctx)
+		}
+	}
+}
+
+func (a *App) updateDocumentCountMetrics(ctx context.Context) {
+	count, err := a.docRepo.Count(ctx, domain.ListDocumentsParams{})
+	if err != nil {
+		a.logger.Error("failed to update document count metrics", "error", err)
+		return
+	}
+	a.businessMetrics.DocumentsTotal.Set(float64(count))
 }

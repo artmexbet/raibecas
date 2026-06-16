@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,6 +13,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	natsgo "github.com/nats-io/nats.go"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -21,6 +25,7 @@ import (
 	"github.com/artmexbet/raibecas/services/auth/internal/config"
 	"github.com/artmexbet/raibecas/services/auth/internal/consumer"
 	"github.com/artmexbet/raibecas/services/auth/internal/handler"
+	"github.com/artmexbet/raibecas/services/auth/internal/metrics"
 	natspkg "github.com/artmexbet/raibecas/services/auth/internal/nats"
 	"github.com/artmexbet/raibecas/services/auth/internal/postgres"
 	"github.com/artmexbet/raibecas/services/auth/internal/service"
@@ -38,6 +43,7 @@ type App struct {
 	userConsumer   *consumer.UserConsumer
 	subscriptions  []*natsgo.Subscription
 	tracerProvider *sdktrace.TracerProvider
+	metricsServer  *http.Server
 }
 
 // New creates a new App-based server instance
@@ -120,10 +126,15 @@ func New(cfg *config.Config) (*App, error) {
 	serviceTracer := tracerProvider.Tracer("auth-service")
 	logger := slog.Default()
 
+	// Initialize Prometheus metrics
+	natsMetrics := natsw.NewMetrics(prometheus.DefaultRegisterer)
+	businessMetrics := metrics.New(prometheus.DefaultRegisterer)
+
 	// Create nats wrapper client with middleware
 	natsClient := natsw.NewClient(natsConn,
 		natsw.WithLogger(logger),
 		natsw.WithRecover(),
+		natsw.WithMiddleware(natsMetrics.Middleware),
 		natsw.WithTracer(natsTracer),
 		natsw.WithMiddleware(natsw.TraceHandlerMiddleware(natsTracer)),
 	)
@@ -155,8 +166,11 @@ func New(cfg *config.Config) (*App, error) {
 	userConsumer := consumer.NewUserConsumer(pgs, logger)
 
 	// Initialize App handlers
-	authHandler := handler.NewAuthHandler(authService, publisher, serviceTracer)
-	regHandler := handler.NewRegistrationHandler(regService, publisher, serviceTracer)
+	authHandler := handler.NewAuthHandler(authService, publisher, serviceTracer, businessMetrics)
+	regHandler := handler.NewRegistrationHandler(regService, publisher, serviceTracer, businessMetrics)
+
+	// Start metrics server
+	metricsServer := startMetricsServer(cfg.Metrics.Port)
 
 	// Setup App subscriptions
 	server := &App{
@@ -168,6 +182,7 @@ func New(cfg *config.Config) (*App, error) {
 		userConsumer:   userConsumer,
 		subscriptions:  make([]*natsgo.Subscription, 0),
 		tracerProvider: tracerProvider,
+		metricsServer:  metricsServer,
 	}
 
 	// Subscribe to request/reply topics
@@ -186,6 +201,26 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	return server, nil
+}
+
+// startMetricsServer starts an HTTP server exposing Prometheus metrics on /metrics
+func startMetricsServer(port int) *http.Server {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: mux,
+	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("Metrics server error", "error", err)
+		}
+	}()
+
+	slog.Info("Metrics server started", "port", port)
+	return srv
 }
 
 // setupSubscriptions sets up App request/reply subscriptions
@@ -265,6 +300,11 @@ func (s *App) Shutdown() error {
 	// Создаем контекст с таймаутом для shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
+	// Shutdown metrics server
+	if err := s.metricsServer.Shutdown(ctx); err != nil {
+		slog.Error("Error shutting down metrics server", "error", err)
+	}
 
 	// Unsubscribe from all topics
 	for _, sub := range s.subscriptions {

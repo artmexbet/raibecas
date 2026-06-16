@@ -1,38 +1,19 @@
 import asyncio
 import logging
-from typing import Awaitable, Callable, Optional, Sequence, Union
+from typing import Awaitable, Callable, Optional, Union
 
 import nats
 from nats.aio.client import Client as NATSClient, Msg
 from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .errors import NATSConnectionNotEstablished
+from pipeline.config import NATSConfig
 
 logger = logging.getLogger(__name__)
 
 Payload = Union[str, bytes]
 MessageHandler = Callable[[Msg], Awaitable[None]]
-
-
-class NATSConfig(BaseSettings):
-    """Configuration for NATS connection"""
-    model_config = SettingsConfigDict(env_prefix='NATS_')
-
-    servers: Sequence[str] = Field(
-        default=("nats://127.0.0.1:4222",),
-        description="NATS server URLs"
-    )
-    name: Optional[str] = Field(default=None, description="Client name")
-    allow_reconnect: bool = Field(default=True, description="Allow reconnection")
-    reconnect_time_wait: float = Field(default=2.0, description="Reconnect wait time in seconds")
-    max_reconnect_attempts: int = Field(default=-1, description="Max reconnect attempts (-1 = unlimited)")
-    connect_timeout: float = Field(default=5.0, description="Connection timeout in seconds")
-    request_timeout: float = Field(default=5.0, description="Request timeout in seconds")
-    ping_interval: float = Field(default=10.0, description="Ping interval in seconds")
-    drain_timeout: float = Field(default=5.0, description="Drain timeout in seconds")
 
 
 class NATSConnector:

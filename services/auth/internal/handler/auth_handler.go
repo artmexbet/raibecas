@@ -16,6 +16,7 @@ import (
 	"github.com/artmexbet/raibecas/libs/natsw"
 
 	"github.com/artmexbet/raibecas/services/auth/internal/domain"
+	"github.com/artmexbet/raibecas/services/auth/internal/metrics"
 	"github.com/artmexbet/raibecas/services/auth/pkg/jwt"
 )
 
@@ -41,14 +42,16 @@ type AuthHandler struct {
 	authService AuthService
 	publisher   EventPublisher
 	tracer      trace.Tracer
+	metrics     *metrics.Metrics
 }
 
 // NewAuthHandler creates a new NATS auth handler
-func NewAuthHandler(authService AuthService, publisher EventPublisher, tracer trace.Tracer) *AuthHandler {
+func NewAuthHandler(authService AuthService, publisher EventPublisher, tracer trace.Tracer, m *metrics.Metrics) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
 		publisher:   publisher,
 		tracer:      tracer,
+		metrics:     m,
 	}
 }
 
@@ -72,8 +75,10 @@ func (h *AuthHandler) HandleLogin(msg *natsw.Message) error {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "login failed")
 		slog.ErrorContext(ctx, "login failed", "email", req.Email, "error", err)
+		h.metrics.LoginAttempts.WithLabelValues("failure").Inc()
 		return h.respondError(msg, mapDomainErrorToCode(err))
 	}
+	h.metrics.LoginAttempts.WithLabelValues("success").Inc()
 
 	span.SetAttributes(attribute.String("auth.user_id", result.User.ID.String()))
 
@@ -167,8 +172,10 @@ func (h *AuthHandler) HandleRefresh(msg *natsw.Message) error {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "refresh failed")
 		slog.WarnContext(ctx, "token refresh failed", "error", err)
+		h.metrics.TokenRefreshes.WithLabelValues("failure").Inc()
 		return h.respondError(msg, mapDomainErrorToCode(err))
 	}
+	h.metrics.TokenRefreshes.WithLabelValues("success").Inc()
 
 	response := LoginResponse{
 		AccessToken:  result.AccessToken,
@@ -203,6 +210,7 @@ func (h *AuthHandler) HandleLogout(msg *natsw.Message) error {
 		slog.ErrorContext(ctx, "logout failed", "user_id", req.UserID, "error", err)
 		return h.respondError(msg, mapDomainErrorToCode(err))
 	}
+	h.metrics.Logouts.Inc()
 
 	// Publish logout event asynchronously
 	go func() {
@@ -239,6 +247,7 @@ func (h *AuthHandler) HandleLogoutAll(msg *natsw.Message) error {
 		slog.ErrorContext(ctx, "logout_all failed", "user_id", req.UserID, "error", err)
 		return h.respondError(msg, mapDomainErrorToCode(err))
 	}
+	h.metrics.Logouts.Inc()
 
 	// Publish logout event asynchronously
 	go func() {
@@ -275,6 +284,7 @@ func (h *AuthHandler) HandleChangePassword(msg *natsw.Message) error {
 		slog.ErrorContext(ctx, "change password failed", "user_id", req.UserID, "error", err)
 		return h.respondError(msg, mapDomainErrorToCode(err))
 	}
+	h.metrics.PasswordChanges.Inc()
 
 	// Publish password reset event asynchronously
 	go func() {
